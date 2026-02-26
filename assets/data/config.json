@@ -1,10 +1,10 @@
 {
 	"analytics": {
-		"name": "::simple_game_name::",
+		"name": "frands",
 		"influx": {
 			"api": "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/write",
 			"org": "7ad01ecb544b8723",
-			"bucket": "::influx_bucket_id::",
+			"bucket": "account-deleted",
 			"token": "token loaded from the '-D API_KEY=<key>' compile flag so it is not committed to source control"
 		}
 	},
