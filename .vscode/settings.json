@@ -1,0 +1,27 @@
+{
+	"search.exclude": {
+		"export/**/*.hx": true
+	},
+	"lime.targetConfigurations": [
+        {
+            "target": "html5",
+            "args": [
+                "-debug",
+            ],
+            "label": "HTML5 Debug Dev Analytics"
+		},
+		{
+            "target": "windows",
+            "args": [
+                "-debug",
+            ],
+            "label": "Windows Debug Dev Analytics"
+        }
+    ],
+    "cSpell.words": [
+        "Aseprite",
+        "FMOD",
+        "haxe",
+        "haxelib"
+    ]
+}

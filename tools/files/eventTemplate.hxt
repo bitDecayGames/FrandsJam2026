@@ -1,0 +1,11 @@
+class ::className:: implements events.IEvent {
+	public final type:String = "::name::";
+	public final reducers:Array<EventReducer> = ::if (meta.reducers != null)::::meta.reducers::::else::[]::end::;
+	public var id:Int;
+::foreach fields::
+	public var ::name:::::type::;::end::
+
+	public function new(::ctorArgs::) {::foreach fields::
+		this.::name:: = ::name::;::end::
+	}
+}

@@ -1,0 +1,27 @@
+# Build files
+/export
+
+# local copy of dependencies
+/.haxelib
+
+# local grafana dashboard files
+metrics/data/
+
+# potential sensitive datasource information
+metrics/.env
+
+# potential ldtk backups we don't want in the repo
+/backups
+
+# FMOD
+fmod/.cache/
+fmod/.unsaved/
+# haxefmod integration
+fmod/Cached*
+
+# error files
+dump/
+
+# misc
+.VSCodeCounter/
+.DS_Store

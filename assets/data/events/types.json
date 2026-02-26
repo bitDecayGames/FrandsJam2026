@@ -1,0 +1,79 @@
+[
+	{
+		"name": "victory",
+		"fields": [
+			{
+				"name": "time",
+				"type": "Float"
+			}
+		]
+	},{
+		"name": "player_died",
+		"fields": [
+			{
+				"name": "cause",
+				"type": "String"
+			}
+		]
+	},{
+		"name": "player_spawn",
+		"fields": [
+			{
+				"name": "posX",
+				"type": "Float"
+			},
+			{
+				"name": "posY",
+				"type": "Float"
+			}
+		]
+	},{
+		"name": "click",
+		"meta": {
+			"reducers": ["COUNT"]
+		},
+		"fields": [
+			{
+				"name": "posX",
+				"type": "Float"
+			},
+			{
+				"name": "posY",
+				"type": "Float"
+			}
+		]
+	},{
+		"name": "speed_click",
+		"meta": {
+			"reducers": ["MIN('time')"]
+		},
+		"fields": [
+			{
+				"name": "time",
+				"type": "Int"
+			}
+		]
+	},{
+		"name": "distance_click",
+		"meta": {
+			"reducers": [
+				"MAX('distance')",
+				"SUM('distance')"
+			]
+		},
+		"fields": [
+			{
+				"name": "distance",
+				"type": "Float"
+			}
+		]
+	},{
+		"name": "achieve",
+		"fields": [
+			{
+				"name": "name",
+				"type": "String"
+			}
+		]
+	}
+]

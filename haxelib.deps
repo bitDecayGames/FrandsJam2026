@@ -1,0 +1,34 @@
+# Main build deps
+flixel 6.0.0
+flixel-addons 3.3.2
+openfl 9.3.3
+lime 8.2.2
+
+# needed to run flixel debug commands
+hscript 2.6.0
+
+# newgrounds integration
+newgrounds 2.0.0
+
+# arcade physics
+# echo git https://github.com/MondayHopscotch/echo.git
+
+# full physics
+# nape-haxe4 2.0.22
+
+# ldtk level editor
+ldtk-haxe-api 1.5.3-rc.1
+
+# bitDecayGames deps
+bitdecaybtree git https://github.com/bitDecayGames/BehaviorTree.git
+bitlytics git https://github.com/bitDecayGames/Bitlytics.git
+flixelutils git https://github.com/bitDecayGames/flixel-utils.git
+
+# for our generation scripting
+json2object 3.11.0
+
+# audio deps
+flixel-fmod git https://github.com/MondayHopscotch/flixel-fmod.git
+# intentionally get haxefmod second so that flixel-fmod doesn't override it
+haxefmod git https://github.com/Tanz0rz/haxe-fmod.git 1.1.0-beta
+
