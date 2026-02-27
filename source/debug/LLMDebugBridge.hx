@@ -16,10 +16,10 @@ import haxe.Json;
 class LLMDebugBridge {
 	static var _eventLog:Array<Dynamic> = [];
 	static var _remainingSteps:Int = 0;
+	static var _frameCount:Int = 0;
 	static inline var MAX_EVENT_LOG:Int = 200;
 
 	public static function init() {
-		FlxG.signals.postUpdate.add(onUpdate);
 		EventBus.subscribeAll(onEvent);
 
 		untyped js.Browser.window.__debug = {
@@ -59,6 +59,7 @@ class LLMDebugBridge {
 	}
 
 	public static function onUpdate() {
+		_frameCount++;
 		if (_remainingSteps > 0) {
 			FlxG.vcr.stepRequested = true;
 			_remainingSteps--;
@@ -105,7 +106,8 @@ class LLMDebugBridge {
 			gameHeight: FlxG.height,
 			elapsed: roundFloat(FlxG.elapsed),
 			paused: FlxG.vcr.paused,
-			timeScale: roundFloat(FlxG.timeScale)
+			timeScale: roundFloat(FlxG.timeScale),
+			frameCount: _frameCount
 		});
 	}
 
@@ -233,7 +235,8 @@ class LLMDebugBridge {
 
 	static function _stepFrames(n:Int):String {
 		FlxG.vcr.pause();
-		_remainingSteps = n;
+		_remainingSteps = n - 1;
+		FlxG.vcr.stepRequested = true;
 		return Json.stringify({stepping: n, paused: true});
 	}
 

@@ -27,7 +27,7 @@ The bridge is gated behind the `llm_bridge` compiler flag. It is not included in
 
 To build manually without serving:
 ```bash
-lime build html5 -Dplay -Dllm_bridge
+lime build html5 -debug -Dplay -Dllm_bridge
 ```
 
 ## API Reference

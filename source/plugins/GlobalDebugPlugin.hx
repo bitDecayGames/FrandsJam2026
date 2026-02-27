@@ -16,6 +16,10 @@ class GlobalDebugPlugin extends FlxBasic {
 		if (FlxG.keys.justPressed.P) {
 			FlxG.state.openSubState(new DemoSelectorState());
 		}
+
+		#if llm_bridge
+		debug.LLMDebugBridge.onUpdate();
+		#end
 	}
 }
 #end
