@@ -19,6 +19,11 @@ class LLMDebugBridge {
 	static var _frameCount:Int = 0;
 	static inline var MAX_EVENT_LOG:Int = 200;
 
+	static var _heldButtons:Map<String, Bool> = new Map();
+	static var _prevHeldButtons:Map<String, Bool> = new Map();
+
+	static var VALID_BUTTONS:Array<String> = ["UP", "DOWN", "LEFT", "RIGHT", "A", "B", "START", "BACK"];
+
 	public static function init() {
 		EventBus.subscribeAll(onEvent);
 
@@ -52,6 +57,15 @@ class LLMDebugBridge {
 			},
 			setTimeScale: function(f:Float) {
 				return _setTimeScale(f);
+			},
+			pressButton: function(name:String) {
+				return _pressButton(name);
+			},
+			releaseButton: function(name:String) {
+				return _releaseButton(name);
+			},
+			releaseAll: function() {
+				return _releaseAll();
 			}
 		};
 
@@ -60,6 +74,8 @@ class LLMDebugBridge {
 
 	public static function onUpdate() {
 		_frameCount++;
+		// Rotate input state so just_pressed/just_released work
+		_prevHeldButtons = _heldButtons.copy();
 		if (_remainingSteps > 0) {
 			FlxG.vcr.stepRequested = true;
 			_remainingSteps--;
@@ -90,6 +106,58 @@ class LLMDebugBridge {
 		if (_eventLog.length > MAX_EVENT_LOG) {
 			_eventLog.shift();
 		}
+	}
+
+	// Public query methods for SimpleController integration
+	public static function isPressed(button:String):Bool {
+		return _heldButtons.exists(button) && _heldButtons.get(button);
+	}
+
+	public static function isJustPressed(button:String):Bool {
+		var curr = _heldButtons.exists(button) && _heldButtons.get(button);
+		var prev = _prevHeldButtons.exists(button) && _prevHeldButtons.get(button);
+		return curr && !prev;
+	}
+
+	public static function isJustReleased(button:String):Bool {
+		var curr = _heldButtons.exists(button) && _heldButtons.get(button);
+		var prev = _prevHeldButtons.exists(button) && _prevHeldButtons.get(button);
+		return !curr && prev;
+	}
+
+	static function _pressButton(name:String):String {
+		var upper = name.toUpperCase();
+		if (VALID_BUTTONS.indexOf(upper) == -1) {
+			return Json.stringify({error: "Invalid button: " + name + ". Valid: " + VALID_BUTTONS.join(", ")});
+		}
+		_heldButtons.set(upper, true);
+		return Json.stringify({held: getHeldList()});
+	}
+
+	static function _releaseButton(name:String):String {
+		var upper = name.toUpperCase();
+		if (VALID_BUTTONS.indexOf(upper) == -1) {
+			return Json.stringify({error: "Invalid button: " + name + ". Valid: " + VALID_BUTTONS.join(", ")});
+		}
+		_heldButtons.set(upper, false);
+		return Json.stringify({held: getHeldList()});
+	}
+
+	static function _releaseAll():String {
+		for (btn in VALID_BUTTONS) {
+			_heldButtons.set(btn, false);
+		}
+		return Json.stringify({held: getHeldList()});
+	}
+
+	static function getHeldList():Array<String> {
+		var list:Array<String> = [];
+		for (btn in VALID_BUTTONS) {
+			if (_heldButtons.exists(btn) && _heldButtons.get(btn)) {
+				list.push(btn);
+			}
+		}
+		return list;
 	}
 
 	static function _getState():String {

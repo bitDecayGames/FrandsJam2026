@@ -90,6 +90,28 @@ Pauses the game and advances exactly N frames, then stays paused. Returns `{"ste
 #### `setTimeScale(f)`
 Sets the game time scale (1.0 = normal, 2.0 = double speed, 0.5 = half). Returns `{"timeScale": 2}`.
 
+### Input Simulation
+
+Playwright keyboard events don't reach HaxeFlixel's input system. Use these functions to inject input directly.
+
+#### `pressButton(name)`
+Hold a button down. Valid names: `"UP"`, `"DOWN"`, `"LEFT"`, `"RIGHT"`, `"A"`, `"B"`, `"START"`, `"BACK"` (case-insensitive). Returns `{"held": ["RIGHT"]}`.
+
+#### `releaseButton(name)`
+Release a held button. Returns `{"held": []}`.
+
+#### `releaseAll()`
+Release all held buttons. Returns `{"held": []}`.
+
+**Example — move player right for 10 frames:**
+```js
+window.__debug.pressButton("RIGHT")
+window.__debug.stepFrames(10)
+// Player has moved right
+window.__debug.releaseAll()
+window.__debug.stepFrames(1)  // Process the release
+```
+
 ## Source
 
 - Bridge implementation: `source/debug/LLMDebugBridge.hx`

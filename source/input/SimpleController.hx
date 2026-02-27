@@ -46,6 +46,10 @@ class SimpleController {
 	];
 
 	public static function pressed(button:Button, player:Int = 0):Bool {
+		#if llm_bridge
+		if (debug.LLMDebugBridge.isPressed(buttonName(button)))
+			return true;
+		#end
 		return pressed_key(button, player) || pressed_pad(button, player);
 	}
 
@@ -61,6 +65,10 @@ class SimpleController {
 	}
 
 	public static function just_pressed(button:Button, player:Int = 0):Bool {
+		#if llm_bridge
+		if (debug.LLMDebugBridge.isJustPressed(buttonName(button)))
+			return true;
+		#end
 		return just_pressed_key(button, player) || just_pressed_pad(button, player);
 	}
 
@@ -76,6 +84,10 @@ class SimpleController {
 	}
 
 	public static function just_released(button:Button, player:Int = 0):Bool {
+		#if llm_bridge
+		if (debug.LLMDebugBridge.isJustReleased(buttonName(button)))
+			return true;
+		#end
 		return just_released_key(button, player) || just_released_pad(button, player);
 	}
 
@@ -89,6 +101,21 @@ class SimpleController {
 			return false;
 		return gamepads[player].anyJustReleased(pad_bindings[button]);
 	}
+
+	#if llm_bridge
+	static function buttonName(button:Button):String {
+		return switch (button) {
+			case UP: "UP";
+			case DOWN: "DOWN";
+			case LEFT: "LEFT";
+			case RIGHT: "RIGHT";
+			case A: "A";
+			case B: "B";
+			case START: "START";
+			case BACK: "BACK";
+		};
+	}
+	#end
 }
 
 enum Button {
