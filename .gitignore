@@ -25,3 +25,4 @@ dump/
 # misc
 .VSCodeCounter/
 .DS_Store
+/scratch/

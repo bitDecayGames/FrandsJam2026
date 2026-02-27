@@ -113,7 +113,7 @@ while read -r line; do
   if [[ ${libName} == "lime" ]] && [[ -z "$INSTALL_GLOBAL" ]]; then
     # this is a one-off just to make sure that lime is configured properly in our local repo
     echo "Running lime setup"
-    haxelib --always run lime setup
+    haxelib --always run lime setup < /dev/null
   fi
 done <haxelib.deps
 
