@@ -1,0 +1,330 @@
+package debug;
+
+#if llm_bridge
+import flixel.FlxG;
+import flixel.FlxBasic;
+import flixel.FlxObject;
+import flixel.FlxSprite;
+import flixel.group.FlxGroup;
+import flixel.tile.FlxBaseTilemap;
+import flixel.tile.FlxTilemap;
+import flixel.util.FlxDirectionFlags;
+import events.EventBus;
+import events.IEvent;
+import haxe.Json;
+
+class LLMDebugBridge {
+	static var _eventLog:Array<Dynamic> = [];
+	static var _remainingSteps:Int = 0;
+	static inline var MAX_EVENT_LOG:Int = 200;
+
+	public static function init() {
+		FlxG.signals.postUpdate.add(onUpdate);
+		EventBus.subscribeAll(onEvent);
+
+		untyped js.Browser.window.__debug = {
+			getState: function() {
+				return _getState();
+			},
+			getSprites: function() {
+				return _getSprites();
+			},
+			getPlayer: function() {
+				return _getPlayer();
+			},
+			getTilemap: function() {
+				return _getTilemap();
+			},
+			getCamera: function() {
+				return _getCamera();
+			},
+			getEventLog: function(?count:Int) {
+				return _getEventLog(count);
+			},
+			pause: function() {
+				return _pause();
+			},
+			resume: function() {
+				return _resume();
+			},
+			stepFrames: function(n:Int) {
+				return _stepFrames(n);
+			},
+			setTimeScale: function(f:Float) {
+				return _setTimeScale(f);
+			}
+		};
+
+		trace("LLMDebugBridge initialized");
+	}
+
+	public static function onUpdate() {
+		if (_remainingSteps > 0) {
+			FlxG.vcr.stepRequested = true;
+			_remainingSteps--;
+			if (_remainingSteps <= 0) {
+				// Stay paused when done stepping
+			}
+		}
+	}
+
+	static function onEvent(e:IEvent) {
+		var obj:Dynamic = {};
+		obj.id = e.id;
+		obj.type = e.type;
+
+		var fields = Reflect.fields(e);
+		for (field in fields) {
+			if (field == "id" || field == "type" || field == "reducers")
+				continue;
+			var value:Dynamic = Reflect.field(e, field);
+			if (Std.isOfType(value, Float)) {
+				Reflect.setField(obj, field, roundFloat(value));
+			} else {
+				Reflect.setField(obj, field, value);
+			}
+		}
+
+		_eventLog.push(obj);
+		if (_eventLog.length > MAX_EVENT_LOG) {
+			_eventLog.shift();
+		}
+	}
+
+	static function _getState():String {
+		var state = FlxG.state;
+		var stateName = Type.getClassName(Type.getClass(state));
+		var subStateName:String = null;
+		if (state.subState != null) {
+			subStateName = Type.getClassName(Type.getClass(state.subState));
+		}
+		return Json.stringify({
+			stateName: stateName,
+			subState: subStateName,
+			gameWidth: FlxG.width,
+			gameHeight: FlxG.height,
+			elapsed: roundFloat(FlxG.elapsed),
+			paused: FlxG.vcr.paused,
+			timeScale: roundFloat(FlxG.timeScale)
+		});
+	}
+
+	static function _getSprites():String {
+		var result:Array<Dynamic> = [];
+		if (FlxG.state != null) {
+			walkGroup(FlxG.state, result, 0);
+		}
+		return Json.stringify(result);
+	}
+
+	static function _getPlayer():String {
+		var player = findPlayer(FlxG.state, 0);
+		if (player == null) {
+			return Json.stringify({error: "Player not found"});
+		}
+		var p:entities.Player = cast player;
+		return Json.stringify({
+			x: roundFloat(p.x),
+			y: roundFloat(p.y),
+			width: roundFloat(p.width),
+			height: roundFloat(p.height),
+			velocityX: roundFloat(p.velocity.x),
+			velocityY: roundFloat(p.velocity.y),
+			animName: p.animation.curAnim != null ? p.animation.curAnim.name : null,
+			animFrame: p.animation.curAnim != null ? p.animation.curAnim.curFrame : 0,
+			facing: Std.string(p.facing),
+			alive: p.alive,
+			speed: roundFloat(@:privateAccess p.speed)
+		});
+	}
+
+	static function _getTilemap():String {
+		var tilemap = findTilemap(FlxG.state, 0);
+		if (tilemap == null) {
+			return Json.stringify({error: "Tilemap not found"});
+		}
+
+		// FlxBaseTilemap inherits from FlxTilemap in practice (via LdtkTilemap),
+		// so cast directly to access tileWidth/tileHeight
+		var tm:FlxTilemap = cast tilemap;
+		var tw = tm.tileWidth;
+		var th = tm.tileHeight;
+
+		@:privateAccess var data = tilemap._data;
+		@:privateAccess var tileObjects = tilemap._tileObjects;
+
+		var grid = new StringBuf();
+		for (row in 0...tilemap.heightInTiles) {
+			if (row > 0)
+				grid.add("\n");
+			for (col in 0...tilemap.widthInTiles) {
+				var idx = row * tilemap.widthInTiles + col;
+				if (idx >= data.length) {
+					grid.add(".");
+					continue;
+				}
+				var tileIdx = data[idx];
+				if (tileIdx < 0 || tileIdx >= tileObjects.length) {
+					grid.add(".");
+					continue;
+				}
+				var tile = tileObjects[tileIdx];
+				if (tile == null) {
+					grid.add(".");
+					continue;
+				}
+				var col2 = tile.allowCollisions;
+				if (col2 == FlxDirectionFlags.NONE) {
+					grid.add(".");
+				} else if (col2 == FlxDirectionFlags.ANY) {
+					grid.add("#");
+				} else if (col2 == FlxDirectionFlags.UP || col2 == FlxDirectionFlags.CEILING) {
+					grid.add("^");
+				} else {
+					grid.add("?");
+				}
+			}
+		}
+
+		return Json.stringify({
+			widthInTiles: tilemap.widthInTiles,
+			heightInTiles: tilemap.heightInTiles,
+			tileWidth: tw,
+			tileHeight: th,
+			x: roundFloat(tilemap.x),
+			y: roundFloat(tilemap.y),
+			collisionGrid: grid.toString()
+		});
+	}
+
+	static function _getCamera():String {
+		var cam = FlxG.camera;
+		return Json.stringify({
+			scrollX: roundFloat(cam.scroll.x),
+			scrollY: roundFloat(cam.scroll.y),
+			zoom: roundFloat(cam.zoom),
+			width: cam.width,
+			height: cam.height,
+			minScrollX: cam.minScrollX,
+			maxScrollX: cam.maxScrollX,
+			minScrollY: cam.minScrollY,
+			maxScrollY: cam.maxScrollY
+		});
+	}
+
+	static function _getEventLog(?count:Int):String {
+		var n = count != null ? count : 50;
+		if (n > MAX_EVENT_LOG)
+			n = MAX_EVENT_LOG;
+		var start = _eventLog.length > n ? _eventLog.length - n : 0;
+		return Json.stringify(_eventLog.slice(start));
+	}
+
+	static function _pause():String {
+		FlxG.vcr.pause();
+		return Json.stringify({paused: true});
+	}
+
+	static function _resume():String {
+		FlxG.vcr.resume();
+		_remainingSteps = 0;
+		return Json.stringify({paused: false});
+	}
+
+	static function _stepFrames(n:Int):String {
+		FlxG.vcr.pause();
+		_remainingSteps = n;
+		return Json.stringify({stepping: n, paused: true});
+	}
+
+	static function _setTimeScale(f:Float):String {
+		FlxG.timeScale = f;
+		return Json.stringify({timeScale: f});
+	}
+
+	static function walkGroup(group:FlxTypedGroup<FlxBasic>, result:Array<Dynamic>, depth:Int) {
+		if (depth > 10 || group == null)
+			return;
+		for (member in group.members) {
+			if (member == null)
+				continue;
+			var info:Dynamic = {};
+			info.type = Type.getClassName(Type.getClass(member));
+			@:privateAccess info.flixelType = Std.string(member.flixelType);
+
+			if (Std.isOfType(member, FlxObject)) {
+				var obj:FlxObject = cast member;
+				info.x = roundFloat(obj.x);
+				info.y = roundFloat(obj.y);
+				info.width = roundFloat(obj.width);
+				info.height = roundFloat(obj.height);
+				info.velocityX = roundFloat(obj.velocity.x);
+				info.velocityY = roundFloat(obj.velocity.y);
+				info.visible = obj.visible;
+				info.alive = obj.alive;
+			}
+
+			if (Std.isOfType(member, FlxSprite)) {
+				var spr:FlxSprite = cast member;
+				info.animName = spr.animation.curAnim != null ? spr.animation.curAnim.name : null;
+				info.animFrame = spr.animation.curAnim != null ? spr.animation.curAnim.curFrame : 0;
+			}
+
+			if (Std.isOfType(member, FlxGroup)) {
+				var sub:FlxGroup = cast member;
+				var children:Array<Dynamic> = [];
+				walkGroup(sub, children, depth + 1);
+				info.children = children;
+			}
+
+			result.push(info);
+		}
+	}
+
+	static function findPlayer(group:FlxTypedGroup<FlxBasic>, depth:Int):FlxBasic {
+		if (depth > 10 || group == null)
+			return null;
+		for (member in group.members) {
+			if (member == null)
+				continue;
+			if (Std.isOfType(member, entities.Player)) {
+				return member;
+			}
+			if (Std.isOfType(member, FlxGroup)) {
+				var found = findPlayer(cast member, depth + 1);
+				if (found != null)
+					return found;
+			}
+		}
+		return null;
+	}
+
+	static function findTilemap(group:FlxTypedGroup<FlxBasic>, depth:Int):FlxBaseTilemap<FlxObject> {
+		if (depth > 10 || group == null)
+			return null;
+		for (member in group.members) {
+			if (member == null)
+				continue;
+			if (Std.isOfType(member, FlxBaseTilemap)) {
+				return cast member;
+			}
+			if (Std.isOfType(member, FlxGroup)) {
+				var found = findTilemap(cast member, depth + 1);
+				if (found != null)
+					return found;
+			}
+		}
+		return null;
+	}
+
+	static inline function roundFloat(v:Float):Float {
+		return Math.round(v * 100) / 100;
+	}
+}
+#else
+class LLMDebugBridge {
+	public static function init() {}
+
+	public static function onUpdate() {}
+}
+#end

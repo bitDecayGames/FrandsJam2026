@@ -119,6 +119,9 @@ class Main extends Sprite {
 
 		FlxG.plugins.addPlugin(new GlobalDebugPlugin());
 		#end
+		#if llm_bridge
+		debug.LLMDebugBridge.init();
+		#end
 	}
 
 	private function configureLogging() {

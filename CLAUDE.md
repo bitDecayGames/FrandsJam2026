@@ -20,6 +20,8 @@ lime build html5 -debug      # Debug build
 
 **Do not run `./bin/run_debug.sh`** — it starts a long-running HTTP server. The user will run this themselves. Use `lime build html5 -debug` to compile only.
 
+`./bin/run_llm_debug.sh` builds with the LLM debug bridge and serves on port 8080. Use this to test the game via Playwright. See [LLM Debug Bridge docs](docs/llm-debug-bridge.md) for the full `window.__debug` API.
+
 ## Architecture
 
 ### Game States (source/states/)
@@ -61,6 +63,7 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 - `SKIP_SPLASH` — skip splash screen
 - `API_KEY` — analytics token for production
 - `dev_analytics` — dev mode analytics
+- `llm_bridge` — enable LLM debug bridge (`window.__debug` API for Playwright introspection)
 
 ## Conventions
 
