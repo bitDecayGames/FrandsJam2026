@@ -62,9 +62,6 @@ class Player extends FlxSprite {
 			}
 		}
 
-		if (SimpleController.just_pressed(Button.A, playerNum)) {
-			color = color ^ 0xFFFFFF;
-		}
 	}
 
 	function updateFrame(dir:Cardinal) {

@@ -7,6 +7,7 @@ import flixel.group.FlxGroup;
 import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
+import entities.FishGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
@@ -23,6 +24,7 @@ using states.FlxStateExt;
 class PlayState extends FlxTransitionableState {
 	var player:Player;
 	var midGroundGroup = new FlxGroup();
+	var fishGroup = new FishGroup();
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
 
@@ -48,6 +50,7 @@ class PlayState extends FlxTransitionableState {
 
 		// Build out our render order
 		add(midGroundGroup);
+		add(fishGroup);
 		add(transitions);
 
 		loadLevel("Level_0");
@@ -70,6 +73,8 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		fishGroup.spawn(FlxG.worldBounds);
+
 		for (t in level.camTransitions) {
 			transitions.add(t);
 		}
@@ -88,6 +93,8 @@ class PlayState extends FlxTransitionableState {
 			t.destroy();
 		}
 		transitions.clear();
+
+		fishGroup.clearAll();
 
 		for (o in midGroundGroup) {
 			o.destroy();
@@ -118,6 +125,8 @@ class PlayState extends FlxTransitionableState {
 
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
+
+		fishGroup.handleOverlap(player);
 	}
 
 	function handleCameraBounds() {
