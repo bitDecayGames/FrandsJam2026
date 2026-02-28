@@ -46,13 +46,17 @@ import plugins.GlobalDebugPlugin;
 #end
 
 class Main extends Sprite {
+	public static function reset() {
+		new GameManager([new Round([new TimedGoal()])]);
+	}
+
 	public function new() {
 		super();
 		Configure.initAnalytics(false);
 		Storage.load();
 
 		// must be here so it exists before any possible starting state
-		new GameManager([new Round([new TimedGoal()])]);
+		Main.reset();
 
 		var startingState:Class<FlxState> = SplashScreenState;
 		#if play

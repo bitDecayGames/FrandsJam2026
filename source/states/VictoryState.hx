@@ -39,6 +39,7 @@ class VictoryState extends FlxTransitionableState {
 	}
 
 	function clickMainMenu():Void {
+		Main.reset();
 		FlxFmod.switchState(MainMenuState.new);
 	}
 
