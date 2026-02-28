@@ -23,6 +23,26 @@ class FishState extends Schema {
 	}
 }
 
+class RoundState extends Schema {
+	public static final STATUS_INACTIVE = "inactive";
+	public static final STATUS_LOBBY = "lobby";
+	public static final STATUS_PRE_ROUND = "pre_round";
+	public static final STATUS_ACTIVE = "active";
+	public static final STATUS_POST_ROUND = "post_round";
+	public static final STATUS_END_GAME = "end_game";
+
+	@:type("string") public var status:String;
+	@:type("uint8") public var currentRound:Int;
+	@:type("uint8") public var totalRounds:Int;
+
+	public function new() {
+		super();
+		status = STATUS_INACTIVE;
+		currentRound = -1;
+		totalRounds = -1;
+	}
+}
+
 class GameState extends Schema {
 	@:type("string")
 	public var hostSessionId:String;
@@ -33,9 +53,13 @@ class GameState extends Schema {
 	@:type({map: FishState})
 	public var fish:MapSchema<FishState>;
 
+	@:type(RoundState)
+	public var round:RoundState;
+
 	public function new() {
 		super();
 		players = new MapSchema<PlayerState>();
 		fish = new MapSchema<FishState>();
+		round = new RoundState();
 	}
 }

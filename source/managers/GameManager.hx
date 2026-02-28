@@ -1,5 +1,6 @@
 package managers;
 
+import schema.RoundState;
 import net.NetworkManager;
 import managers.FishManager.FishDb;
 import rounds.Round;
@@ -14,8 +15,8 @@ class GameManager {
 	public var net:NetworkManager;
 
 	private var round:RoundManager;
-	private var totalRounds:Int = 1;
-	private var currentRoundNumber:Int = 1;
+	private var totalRounds:Int = -1;
+	private var currentRoundNumber:Int = -1;
 
 	private var rounds:Array<Round>;
 
@@ -43,6 +44,13 @@ class GameManager {
 	}
 
 	public function start() {
+		if (currentRoundNumber == 1) {
+			net.sendMessage("round_update", {
+				status: RoundState.STATUS_LOBBY,
+				currentRound: currentRoundNumber,
+				totalRounds: totalRounds,
+			});
+		}
 		setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
 	}
 
@@ -53,14 +61,25 @@ class GameManager {
 		this.round = round;
 		this.round.completed.add(this.checkRound);
 
+		net.sendMessage("round_update", {
+			status: RoundState.STATUS_PRE_ROUND,
+			currentRound: currentRoundNumber,
+		});
+
 		FlxG.switchState(() -> new PlayState(round));
 	}
 
 	private function checkRound() {
 		if (round.isComplete()) {
+			net.sendMessage("round_update", {
+				status: RoundState.STATUS_POST_ROUND,
+			});
 			round.completed.remove(this.checkRound);
 			currentRoundNumber += 1;
 			if (currentRoundNumber >= totalRounds) {
+				net.sendMessage("round_update", {
+					status: RoundState.STATUS_END_GAME,
+				});
 				FlxG.switchState(() -> new VictoryState());
 				currentRoundNumber = 0;
 			} else {

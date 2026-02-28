@@ -48,7 +48,11 @@ import plugins.GlobalDebugPlugin;
 
 class Main extends Sprite {
 	public static function reset() {
-		new GameManager([new Round([new TimedGoal(), new PersonalFishCountGoal()])]);
+		new GameManager([
+			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
+			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
+			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
+		]);
 	}
 
 	public function new() {
@@ -77,6 +81,9 @@ class Main extends Sprite {
 			Achievements.initAchievements();
 		});
 		addChild(new FlxGame(0, 0, startingState, 60, 60, true, false));
+		#if fullscreen
+		lime.app.Application.current.window.maximized = true;
+		#end
 
 		trace('Build Hash: ${Macros.getGitCommitShortHash()}');
 	}

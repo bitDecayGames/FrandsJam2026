@@ -8,6 +8,7 @@ import io.colyseus.serializer.schema.Callbacks;
 import schema.GameState;
 import schema.PlayerState;
 import schema.FishState;
+import schema.RoundState;
 
 typedef SessionIdSignal = FlxTypedSignal<String->Void>;
 typedef PlayerStateSignal = FlxTypedSignal<String->PlayerState->Void>;
@@ -56,6 +57,10 @@ class NetworkManager {
 				trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
 			});
 
+			cb.listen("round", (round:RoundState) -> {
+				trace('RoundState: ${round}');
+			});
+
 			cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
 				trace('NetworkManager: fish added ${id}');
 				onFishAdded.dispatch(id, fish);
@@ -102,21 +107,10 @@ class NetworkManager {
 	}
 
 	public function sendMove(x:Float, y:Float) {
-		if (room == null) {
-			return;
-		}
-		room.send("move", {x: x, y: y});
+		sendMessage("move", {x: x, y: y});
 	}
 
-	public function sendFishMove(id:String, x:Float, y:Float) {
-		if (room == null) {
-			return;
-		}
-
-		room.send("fish_move", {id: id, x: x, y: y});
-	}
-
-	public function setMessage(topic:String, msg:Dynamic) {
+	public function sendMessage(topic:String, msg:Dynamic) {
 		if (room == null) {
 			QLog.notice('[NetMan]: !!Skipping message on topic "$topic"');
 			return;
