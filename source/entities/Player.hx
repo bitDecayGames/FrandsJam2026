@@ -293,7 +293,15 @@ class Player extends FlxSprite {
 		updateFishingLine();
 		updateRock(delta);
 
+		clampToWorldBounds();
+
 		GameManager.ME.net.sendMove(x, y);
+	}
+
+	function clampToWorldBounds() {
+		var bounds = FlxG.worldBounds;
+		x = Math.max(bounds.left, Math.min(bounds.right - width, x));
+		y = Math.max(bounds.top, Math.min(bounds.bottom - height, y));
 	}
 
 	function updateReticle() {
@@ -301,8 +309,8 @@ class Player extends FlxSprite {
 			return;
 		var reticleOffset = lastInputDir.asVector();
 		var bounds = FlxG.worldBounds;
-		reticle.setPosition(Math.max(bounds.left, Math.min(bounds.right, last.x + reticleOffset.x * 96 + 4)),
-			Math.max(bounds.top, Math.min(bounds.bottom, last.y + reticleOffset.y * 96 + 4)));
+		reticle.setPosition(Math.max(bounds.left, Math.min(bounds.right - reticle.width, last.x + reticleOffset.x * 96 + 4)),
+			Math.max(bounds.top, Math.min(bounds.bottom - reticle.height, last.y + reticleOffset.y * 96 + 4)));
 		reticleOffset.put();
 	}
 
