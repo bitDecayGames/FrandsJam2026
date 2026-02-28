@@ -39,7 +39,7 @@ class WaterFish extends FlxSprite {
 			this.waterTiles = waterTiles;
 		}
 		this.isRemote = isRemote;
-		makeGraphic(4, 2, FlxColor.BLACK);
+		loadGraphic("assets/aseprite/characters/fishShadow.png");
 		alpha = 0;
 		fadeInTimer = 1.0;
 		pickTarget();

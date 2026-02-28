@@ -68,7 +68,7 @@ class PlayState extends FlxTransitionableState {
 
 		// QLog.error('Example error');
 
-		fishSpawner = new FishSpawner(() -> player.catchFish());
+		fishSpawner = new FishSpawner(() -> player.catchFish(true));
 		rockGroup = new RockGroup();
 
 		// Build out our render order
@@ -82,7 +82,9 @@ class PlayState extends FlxTransitionableState {
 		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
 		#end
 
+		#if !local
 		fishSpawner.setNet(GameManager.ME.net);
+		#end
 
 		loadLevel("Level_0");
 
@@ -154,6 +156,10 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		#if local
+		rockGroup.spawn(level);
+		fishSpawner.spawn(level);
+		#else
 		FlxTimer.wait(10, () -> {
 			if (NetworkManager.IS_HOST) {
 				rockGroup.spawn(level);
@@ -162,6 +168,7 @@ class PlayState extends FlxTransitionableState {
 				QLog.notice('skipping fish spawn');
 			}
 		});
+		#end
 
 		var spawnerLayer = level.fishSpawnerLayer;
 		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);

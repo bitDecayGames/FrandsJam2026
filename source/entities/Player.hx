@@ -620,7 +620,7 @@ class Player extends FlxSprite {
 		return castState == LANDED && castBobber != null;
 	}
 
-	public function catchFish() {
+	public function catchFish(hasFish:Bool = false) {
 		if (castState == LANDED || castState == CASTING) {
 			castState = CATCH_ANIM;
 			frozen = true;
@@ -634,6 +634,12 @@ class Player extends FlxSprite {
 			}
 			if (castBobber != null) {
 				castBobber.velocity.set(0, 0);
+				if (hasFish) {
+					var fishFrame = FlxG.random.int(0, 4);
+					castBobber.loadGraphic("assets/aseprite/fish.png", true, 32, 32);
+					castBobber.animation.add("fish", [fishFrame]);
+					castBobber.animation.play("fish");
+				}
 			}
 			sendAnimUpdate("catch_" + castDirSuffix, true);
 		}
