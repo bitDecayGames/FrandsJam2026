@@ -1,5 +1,8 @@
 package states;
 
+import debug.DebugLayers;
+import bitdecay.flixel.debug.tools.draw.DebugDraw;
+import todo.TODO;
 import flixel.group.FlxGroup;
 import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
@@ -42,6 +45,11 @@ class PlayState extends FlxTransitionableState {
 		FlxG.camera.pixelPerfectRender = true;
 
 		Achievements.onAchieve.add(handleAchieve);
+		EventBus.subscribe(ClickCount, (c) -> {
+			QLog.notice('I got me an event about ${c.count} clicks having happened.');
+		});
+
+		// QLog.error('Example error');
 
 		// Build out our render order
 		add(midGroundGroup);
@@ -61,8 +69,8 @@ class PlayState extends FlxTransitionableState {
 		if (level.songEvent != "") {
 			FmodManager.PlaySong(level.songEvent);
 		}
-		// Skip loading tilemap — open playfield for now
-		FlxG.worldBounds.set(0, 0, 640, 480);
+		midGroundGroup.add(level.terrainLayer);
+		FlxG.worldBounds.copyFrom(level.terrainLayer.getBounds());
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y);
 		camera.follow(player);
@@ -111,11 +119,22 @@ class PlayState extends FlxTransitionableState {
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
+		if (FlxG.mouse.justPressed) {
+			EventBus.fire(new Click(FlxG.mouse.x, FlxG.mouse.y));
+		}
+
+		FlxG.collide(midGroundGroup, player);
 		handleCameraBounds();
 
 		if (player.hotModeActive && !hotText.isFlashing()) {
 			hotText.start();
 		}
+
+		// TODO helps devs call audio correctly, and helps audio folks find where sounds are needed
+		TODO.sfx('scarySound');
+
+		// DS "Debug Suite" is how we get to all of our debugging tools
+		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
 		FlxG.overlap(player, fishGroup, (p:FlxSprite, f:FlxSprite) -> {
 			var fish:Fish = cast f;

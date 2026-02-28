@@ -1,6 +1,8 @@
 package achievements;
 
 import events.gen.Event.Achieve;
+import events.gen.Event.ClickCount;
+import events.gen.Event.SpeedClickMin;
 import events.EventBus;
 import events.IEvent;
 import flixel.util.FlxSignal.FlxTypedSignal;
@@ -16,7 +18,21 @@ class Achievements {
 	public static var onAchieve = new FlxTypedSignal<(AchievementDef) -> Void>();
 
 	public static function initAchievements() {
-		// TODO: Add fishing achievements here
+		var icons = AchievementToast.icons;
+		// @formatter:off
+		add(new AchievementDef(1, "quick_clicker", "Quick Clicker", "Click twice in less than .2 seconds", icons.speedClick_0)
+			.withEventCondition(SpeedClickMin, (e) -> {
+				return e.min < 200;
+			}));
+		add(new AchievementDef(2, "mad_clicker", "Mad Clicker", "Click a total of 10 times", icons.click10_0)
+			.withEventCondition(ClickCount, (e) -> {
+				return e.count >= 10;
+			}));
+		add(new AchievementDef(3, "ultra_clicker", "Ultra Clicker", "Click a total of 100 times", icons.click100_0)
+			.withEventCondition(ClickCount, (e) -> {
+				return e.count >= 100;
+			}));
+		// @formatter:on
 	}
 
 	static function add(def:AchievementDef) {
