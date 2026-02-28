@@ -9,7 +9,7 @@ import js.lib.Promise;
 
 class GameRoom extends RoomOf<GameState, Dynamic> {
 	override public function onCreate(options:Dynamic):Void {
-		maxClients = 4;
+		maxClients = 6;
 		setState(new GameState());
 
 		// sent when a player moves
