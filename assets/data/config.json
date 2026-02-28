@@ -1,4 +1,8 @@
 {
+	"server": {
+		"host": "Mercury.local",
+		"port": 2567
+	},
 	"analytics": {
 		"name": "frands",
 		"influx": {
