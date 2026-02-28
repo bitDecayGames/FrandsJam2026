@@ -24,6 +24,7 @@ import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
 import entities.Player;
+import entities.Shop;
 import events.gen.Event;
 import events.EventBus;
 import flixel.FlxG;
@@ -44,6 +45,7 @@ class PlayState extends FlxTransitionableState {
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
+	var shop:Shop;
 	var inventoryHUD:InventoryHUD;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
@@ -175,6 +177,10 @@ class PlayState extends FlxTransitionableState {
 		var spawnerLayer = level.fishSpawnerLayer;
 		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
 
+		shop = new Shop();
+		shop.spawnRandom(level);
+		add(shop);
+
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
 
@@ -245,6 +251,7 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
+		shop.checkInteraction(player);
 	}
 
 	function handleCameraBounds() {

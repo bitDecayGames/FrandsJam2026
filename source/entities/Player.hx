@@ -44,6 +44,7 @@ class Player extends FlxSprite {
 	var hotModeTimer:Float = 0;
 
 	public var inventory = new Inventory();
+	public var score:Int = 0;
 
 	public var lastInputDir:Cardinal = E;
 
