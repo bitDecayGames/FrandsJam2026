@@ -130,6 +130,9 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		player.rockWaterLayer = level.fishSpawnerLayer;
+		player.onRockAdded = rockGroup.addRock;
+
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
 

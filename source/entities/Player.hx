@@ -59,9 +59,13 @@ class Player extends FlxSprite {
 	var powerBarBg:FlxSprite;
 	var powerBarFill:FlxSprite;
 
+	// Dependencies for thrown rocks — set by PlayState
+	public var rockWaterLayer:ldtk.Layer_IntGrid;
+	public var onRockAdded:(Float, Float) -> Void;
+
 	// Throw state
 	var throwing:Bool = false;
-	var rockSprite:FlxSprite;
+	var rockSprite:Rock;
 	var rockTarget:FlxPoint;
 	var rockStartPos:FlxPoint;
 	var rockFlightTime:Float = 0;
@@ -252,8 +256,9 @@ class Player extends FlxSprite {
 			playMovementAnim();
 		}
 
-		// Throw rock with B button
-		if (!throwing && castState == IDLE && SimpleController.just_pressed(B)) {
+		// Throw rock with B button (requires a rock in inventory)
+		if (!throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(Rock)) {
+			inventory.remove(Rock);
 			throwing = true;
 			frozen = true;
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
@@ -408,9 +413,7 @@ class Player extends FlxSprite {
 	}
 
 	function launchRock() {
-		rockSprite = new FlxSprite();
-		rockSprite.makeGraphic(6, 6, FlxColor.fromRGB(50, 45, 40));
-		rockSprite.setPosition(x + 4, y + 4);
+		rockSprite = new Rock(x + 4, y + 4, rockWaterLayer, onRockAdded);
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;
@@ -438,13 +441,17 @@ class Player extends FlxSprite {
 		rockSprite.setPosition(groundX, groundY - arcOffset);
 
 		if (t >= 1.0) {
+			var landX = rockTarget.x;
+			var landY = rockTarget.y;
+			var landed = rockSprite;
 			state.remove(rockSprite);
-			rockSprite.destroy();
 			rockSprite = null;
 			rockTarget.put();
 			rockTarget = null;
 			rockStartPos.put();
 			rockStartPos = null;
+			landed.handleLanded(landX, landY);
+			landed.destroy();
 		}
 	}
 

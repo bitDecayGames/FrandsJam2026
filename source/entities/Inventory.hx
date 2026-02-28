@@ -22,6 +22,19 @@ class Inventory {
 		return items.length >= MAX_SLOTS;
 	}
 
+	public function has(item:InventoryItem):Bool {
+		return items.indexOf(item) != -1;
+	}
+
+	public function remove(item:InventoryItem):Bool {
+		var idx = items.indexOf(item);
+		if (idx == -1)
+			return false;
+		items.splice(idx, 1);
+		onChange.dispatch();
+		return true;
+	}
+
 	public function count():Int {
 		return items.length;
 	}

@@ -43,6 +43,10 @@ class RockGroup extends FlxTypedGroup<Rock> {
 		}
 	}
 
+	public function addRock(x:Float, y:Float) {
+		add(new Rock(x, y));
+	}
+
 	public function clearAll() {
 		for (r in this) {
 			r.destroy();
