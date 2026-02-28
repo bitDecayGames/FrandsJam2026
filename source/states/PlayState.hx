@@ -1,5 +1,7 @@
 package states;
 
+import schema.FishState;
+import flixel.util.FlxTimer;
 import managers.GameManager;
 import schema.PlayerState;
 import config.Configure;
@@ -13,6 +15,7 @@ import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
 import entities.FishSpawner;
+import entities.WaterFish;
 import entities.Rock;
 import entities.RockGroup;
 import levels.ldtk.Level;
@@ -33,6 +36,7 @@ class PlayState extends FlxTransitionableState {
 
 	// Network things
 	var remotePlayers:Map<String, Player> = new Map();
+	var remoteFish:Map<String, WaterFish> = new Map();
 
 	var midGroundGroup = new FlxGroup();
 	var fishSpawner:FishSpawner;
@@ -73,10 +77,14 @@ class PlayState extends FlxTransitionableState {
 		add(fishSpawner);
 		add(transitions);
 
-		loadLevel("Level_0");
 		#if !local
 		setupNetwork();
+		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
 		#end
+
+		fishSpawner.setNet(GameManager.ME.net);
+
+		loadLevel("Level_0");
 
 		hotText = new FlashingText("HOT", 0.15, 3.0);
 		add(hotText);
@@ -87,6 +95,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onJoined.add(onPlayerJoined);
 		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
+		GameManager.ME.net.onFishAdded.add(onFishAdded);
 	}
 
 	function onPlayerJoined(sessionId:String) {
@@ -117,6 +126,20 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	function onFishAdded(fishId:String, fishState:FishState) {
+		if (fishSpawner.fishMap.exists(fishId)) {
+			QLog.notice('skipping fish $fishId, it already exists');
+			return;
+		}
+
+		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y}');
+
+		var newFish = new WaterFish(fishState.x, fishState.y, null, true);
+		newFish.setNetwork(GameManager.ME.net, fishId);
+		remoteFish.set(fishId, newFish);
+		midGroundGroup.add(newFish);
+	}
+
 	function loadLevel(level:String) {
 		unload();
 
@@ -131,14 +154,20 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		FlxTimer.wait(10, () -> {
+			if (NetworkManager.IS_HOST) {
+				rockGroup.spawn(level);
+				fishSpawner.spawn(level);
+			} else {
+				QLog.notice('skipping fish spawn');
+			}
+		});
+
 		var spawnerLayer = level.fishSpawnerLayer;
 		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
-
-		rockGroup.spawn(level);
-		fishSpawner.spawn(level);
 
 		for (t in level.camTransitions) {
 			transitions.add(t);
@@ -166,10 +195,6 @@ class PlayState extends FlxTransitionableState {
 			o.destroy();
 		}
 		midGroundGroup.clear();
-	}
-
-	override function destroy() {
-		super.destroy();
 	}
 
 	function handleAchieve(def:AchievementDef) {

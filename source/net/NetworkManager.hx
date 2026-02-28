@@ -27,6 +27,7 @@ class NetworkManager {
 	public var onPlayerChanged:PlayerStateSignal = new PlayerStateSignal();
 	public var onPlayerRemoved:SessionIdSignal = new SessionIdSignal();
 	public var onFishMove:FishStateSignal = new FishStateSignal();
+	public var onFishAdded = new FishStateSignal();
 
 	public static inline var roomName:String = "game_room";
 
@@ -43,6 +44,7 @@ class NetworkManager {
 			}
 
 			room = joinedRoom;
+
 			mySessionId = room.sessionId;
 			trace('NetworkManager: joined room ${roomName} (id: ${room.roomId}) as $mySessionId');
 
@@ -61,6 +63,7 @@ class NetworkManager {
 
 			cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
 				trace('NetworkManager: fish added ${id}');
+				onFishAdded.dispatch(id, fish);
 
 				cb.listen(fish, "x", (_, _) -> {
 					trace('NetMan: (fish: ${id} x update');
@@ -78,6 +81,7 @@ class NetworkManager {
 					return;
 				}
 				onPlayerAdded.dispatch(sessionId, player);
+
 				cb.listen(player, "x", (_, _) -> {
 					trace('NetMan: (sesh: ${sessionId} x update');
 					onPlayerChanged.dispatch(sessionId, player);
@@ -108,9 +112,10 @@ class NetworkManager {
 
 	public function sendMessage(topic:String, msg:Dynamic) {
 		if (room == null) {
-			trace('failed to send message: room is null (${topic} -> ${msg})');
+			QLog.notice('[NetMan]: !!Skipping message on topic "$topic"');
 			return;
 		}
+		QLog.notice('[NetMan]: Sending message on topic "$topic"');
 		room.send(topic, msg);
 	}
 

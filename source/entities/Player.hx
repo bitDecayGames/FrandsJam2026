@@ -136,8 +136,10 @@ class Player extends FlxSprite {
 			launchRock();
 		}
 		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
-			var px = x + 4;
-			var py = y + 4;
+			var retract = getRetractTarget();
+			var px = retract.x;
+			var py = retract.y;
+			retract.put();
 			var dx = px - castBobber.x;
 			var dy = py - castBobber.y;
 			var dist = Math.sqrt(dx * dx + dy * dy);
@@ -283,15 +285,25 @@ class Player extends FlxSprite {
 		if (reticle == null)
 			return;
 		var reticleOffset = lastInputDir.asVector();
-		reticle.setPosition(last.x + reticleOffset.x * 96 + 4, last.y + reticleOffset.y * 96 + 4);
+		var bounds = FlxG.worldBounds;
+		reticle.setPosition(
+			Math.max(bounds.left, Math.min(bounds.right, last.x + reticleOffset.x * 96 + 4)),
+			Math.max(bounds.top, Math.min(bounds.bottom, last.y + reticleOffset.y * 96 + 4))
+		);
 		reticleOffset.put();
 	}
 
 	function getRodTipPos():FlxPoint {
 		if (castState == CAST_ANIM || castState == CASTING) {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
-			if (castState == CAST_ANIM && frame == 3 && (castDirSuffix == "right" || castDirSuffix == "left")) {
-				return if (castDirSuffix == "right") FlxPoint.get(x + 12, y) else FlxPoint.get(x + 4, y);
+			if (castState == CAST_ANIM && frame == CAST_LAUNCH_FRAME) {
+				return switch (castDirSuffix) {
+					case "right": FlxPoint.get(x + 12, y);
+					case "left": FlxPoint.get(x + 4, y);
+					case "down": FlxPoint.get(x, y + 4);
+					case "up": FlxPoint.get(x + 12, y + 4);
+					default: null;
+				};
 			}
 			return switch (castDirSuffix) {
 				case "down": FlxPoint.get(x + 10, y + 24);
@@ -304,21 +316,13 @@ class Player extends FlxSprite {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			return switch (castDirSuffix) {
 				case "down":
-					if (frame == 0) FlxPoint.get(x + 10, y + 24)
-					else if (frame == 1) FlxPoint.get(x + 1, y + 3)
-					else FlxPoint.get(x + 1, y + 6);
+					if (frame == 0) FlxPoint.get(x + 10, y + 24) else if (frame == 1) FlxPoint.get(x + 1, y + 3) else FlxPoint.get(x + 1, y + 6);
 				case "right":
-					if (frame == 0) FlxPoint.get(x + 30, y + 2)
-					else if (frame == 1) FlxPoint.get(x + 14, y - 4)
-					else FlxPoint.get(x + 5, y + 7);
+					if (frame == 0) FlxPoint.get(x + 30, y + 2) else if (frame == 1) FlxPoint.get(x + 14, y - 4) else FlxPoint.get(x + 5, y + 7);
 				case "up":
-					if (frame == 0) FlxPoint.get(x + 3, y - 6)
-					else if (frame == 1) FlxPoint.get(x + 13, y - 8)
-					else FlxPoint.get(x + 19, y - 8);
+					if (frame == 0) FlxPoint.get(x + 3, y - 6) else if (frame == 1) FlxPoint.get(x + 13, y - 8) else FlxPoint.get(x + 19, y - 8);
 				case "left":
-					if (frame == 0) FlxPoint.get(x - 15, y + 2)
-					else if (frame == 1) FlxPoint.get(x + 1, y - 4)
-					else FlxPoint.get(x + 12, y + 5);
+					if (frame == 0) FlxPoint.get(x - 15, y + 2) else if (frame == 1) FlxPoint.get(x + 1, y - 4) else FlxPoint.get(x + 12, y + 5);
 				default: FlxPoint.get(x + 8, y + 8);
 			};
 		} else {
@@ -559,8 +563,10 @@ class Player extends FlxSprite {
 			case CATCH_ANIM:
 				// Bobber retract started by frame event, check for arrival
 				if (castBobber != null) {
-					var px = x + 4;
-					var py = y + 4;
+					var retract = getRetractTarget();
+					var px = retract.x;
+					var py = retract.y;
+					retract.put();
 					var dx = px - castBobber.x;
 					var dy = py - castBobber.y;
 					var dist = Math.sqrt(dx * dx + dy * dy);
@@ -589,8 +595,10 @@ class Player extends FlxSprite {
 				}
 			case RETURNING:
 				if (castBobber != null) {
-					var px = x + 4;
-					var py = y + 4;
+					var retract = getRetractTarget();
+					var px = retract.x;
+					var py = retract.y;
+					retract.put();
 					var dx = px - castBobber.x;
 					var dy = py - castBobber.y;
 					var dist = Math.sqrt(dx * dx + dy * dy);
@@ -688,6 +696,16 @@ class Player extends FlxSprite {
 			case W: "left";
 			case E: "right";
 			default: "down";
+		};
+	}
+
+	function getRetractTarget():FlxPoint {
+		return switch (castDirSuffix) {
+			case "right": FlxPoint.get(x + 8, y-2);
+			case "left": FlxPoint.get(x + 8, y-2);
+			case "down": FlxPoint.get(x, y + 4);
+			case "up": FlxPoint.get(x + 12, y + 4);
+			default: FlxPoint.get(x + 4, y + 4);
 		};
 	}
 
