@@ -36,7 +36,7 @@ class Player extends FlxSprite {
 	];
 
 	var skinIndex:Int = 0;
-	var speed:Float = 150;
+	var speed:Float = 100;
 	var playerNum = 0;
 
 	public var hotModeActive:Bool = false;
@@ -67,6 +67,9 @@ class Player extends FlxSprite {
 	var castPower:Float = 0;
 	var castPowerDir:Float = 1;
 	var castDirSuffix:String = "down";
+	var retractHasFish:Bool = false;
+	public var caughtFishFrame:Int = 0;
+	public var onFishDelivered:Null<() -> Void> = null;
 
 	// Cast sprites
 	var reticle:FlxSprite;
@@ -138,16 +141,30 @@ class Player extends FlxSprite {
 			launchRock();
 		}
 		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
-			var retract = getRetractTarget();
-			var px = retract.x;
-			var py = retract.y;
-			retract.put();
-			var dx = px - castBobber.x;
-			var dy = py - castBobber.y;
-			var dist = Math.sqrt(dx * dx + dy * dy);
-			if (dist > 0) {
-				castBobber.velocity.x = (dx / dist) * 500;
-				castBobber.velocity.y = (dy / dist) * 500;
+			if (retractHasFish) {
+				// Set up arc retract
+				castStartPos = FlxPoint.get(castBobber.x, castBobber.y);
+				var retract = getRetractTarget();
+				castTarget = FlxPoint.get(retract.x, retract.y);
+				retract.put();
+				var dx = castTarget.x - castStartPos.x;
+				var dy = castTarget.y - castStartPos.y;
+				var dist = Math.sqrt(dx * dx + dy * dy);
+				castFlightTime = if (dist > 0) dist / 188 else 0.01;
+				castElapsed = 0;
+				castBobber.velocity.set(0, 0);
+			} else {
+				var retract = getRetractTarget();
+				var px = retract.x;
+				var py = retract.y;
+				retract.put();
+				var dx = px - castBobber.x;
+				var dy = py - castBobber.y;
+				var dist = Math.sqrt(dx * dx + dy * dy);
+				if (dist > 0) {
+					castBobber.velocity.x = (dx / dist) * 188;
+					castBobber.velocity.y = (dy / dist) * 188;
+				}
 			}
 		}
 	}
@@ -160,9 +177,9 @@ class Player extends FlxSprite {
 				castState = RETURNING;
 			} else {
 				castState = IDLE;
+				frozen = false;
+				playMovementAnim(true);
 			}
-			frozen = false;
-			playMovementAnim(true);
 		} else if (throwing) {
 			throwing = false;
 			frozen = false;
@@ -253,7 +270,7 @@ class Player extends FlxSprite {
 		}
 
 		// Only update movement animations when not in a scripted animation
-		if (castState != CAST_ANIM && castState != CATCH_ANIM && !throwing) {
+		if (castState != CAST_ANIM && castState != CATCH_ANIM && castState != RETURNING && !throwing) {
 			playMovementAnim();
 		}
 
@@ -317,17 +334,17 @@ class Player extends FlxSprite {
 				case "left": FlxPoint.get(x - 15, y + 2);
 				default: FlxPoint.get(x + 8, y + 8);
 			};
-		} else if (castState == CATCH_ANIM) {
+		} else if (castState == CATCH_ANIM || castState == RETURNING) {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			return switch (castDirSuffix) {
 				case "down":
-					if (frame == 0) FlxPoint.get(x + 10, y + 24) else if (frame == 1) FlxPoint.get(x + 1, y + 3) else FlxPoint.get(x + 1, y + 6);
+					if (frame == 0) FlxPoint.get(x + 10, y + 24) else if (frame == 1) FlxPoint.get(x + 1, y + 3) else FlxPoint.get(x + 0, y - 5);
 				case "right":
-					if (frame == 0) FlxPoint.get(x + 30, y + 2) else if (frame == 1) FlxPoint.get(x + 14, y - 4) else FlxPoint.get(x + 5, y + 7);
+					if (frame == 0) FlxPoint.get(x + 30, y + 2) else if (frame == 1) FlxPoint.get(x + 14, y - 4) else FlxPoint.get(x - 6, y - 6);
 				case "up":
 					if (frame == 0) FlxPoint.get(x + 3, y - 6) else if (frame == 1) FlxPoint.get(x + 13, y - 8) else FlxPoint.get(x + 19, y - 8);
 				case "left":
-					if (frame == 0) FlxPoint.get(x - 15, y + 2) else if (frame == 1) FlxPoint.get(x + 1, y - 4) else FlxPoint.get(x + 12, y + 5);
+					if (frame == 0) FlxPoint.get(x - 15, y + 2) else if (frame == 1) FlxPoint.get(x + 1, y - 4) else FlxPoint.get(x + 21, y - 6);
 				default: FlxPoint.get(x + 8, y + 8);
 			};
 		} else {
@@ -483,7 +500,7 @@ class Player extends FlxSprite {
 		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y});
 
 		castBobber = new FlxSprite();
-		castBobber.makeGraphic(8, 8, FlxColor.RED);
+		castBobber.loadGraphic(AssetPaths.bobber__png);
 		var tip = getRodTipPos();
 		castBobber.setPosition(tip.x, tip.y);
 		tip.put();
@@ -492,7 +509,7 @@ class Player extends FlxSprite {
 		var dx = castTarget.x - castStartPos.x;
 		var dy = castTarget.y - castStartPos.y;
 		var dist = Math.sqrt(dx * dx + dy * dy);
-		castFlightTime = if (dist > 0) dist / 300 else 0.01;
+		castFlightTime = if (dist > 0) dist / 150 else 0.01;
 		castElapsed = 0;
 
 		state.add(castBobber);
@@ -568,17 +585,27 @@ class Player extends FlxSprite {
 			case CATCH_ANIM:
 				// Bobber retract started by frame event, check for arrival
 				if (castBobber != null) {
-					var retract = getRetractTarget();
-					var px = retract.x;
-					var py = retract.y;
-					retract.put();
-					var dx = px - castBobber.x;
-					var dy = py - castBobber.y;
-					var dist = Math.sqrt(dx * dx + dy * dy);
-					if (dist < 4) {
-						state.remove(castBobber);
-						castBobber.destroy();
-						castBobber = null;
+					if (retractHasFish && castTarget != null) {
+						if (updateCastArc(elapsed)) {
+							state.remove(castBobber);
+							castBobber.destroy();
+							castBobber = null;
+							if (onFishDelivered != null)
+								onFishDelivered();
+						}
+					} else {
+						var retract = getRetractTarget();
+						var px = retract.x;
+						var py = retract.y;
+						retract.put();
+						var dx = px - castBobber.x;
+						var dy = py - castBobber.y;
+						var dist = Math.sqrt(dx * dx + dy * dy);
+						if (dist < 4) {
+							state.remove(castBobber);
+							castBobber.destroy();
+							castBobber = null;
+						}
 					}
 				}
 			case CASTING:
@@ -600,21 +627,36 @@ class Player extends FlxSprite {
 				}
 			case RETURNING:
 				if (castBobber != null) {
-					var retract = getRetractTarget();
-					var px = retract.x;
-					var py = retract.y;
-					retract.put();
-					var dx = px - castBobber.x;
-					var dy = py - castBobber.y;
-					var dist = Math.sqrt(dx * dx + dy * dy);
-					if (dist < 4) {
-						state.remove(castBobber);
-						castBobber.destroy();
-						castBobber = null;
-						castState = IDLE;
+					if (retractHasFish && castTarget != null) {
+						if (updateCastArc(elapsed)) {
+							state.remove(castBobber);
+							castBobber.destroy();
+							castBobber = null;
+							castState = IDLE;
+							frozen = false;
+							playMovementAnim(true);
+							if (onFishDelivered != null)
+								onFishDelivered();
+						}
 					} else {
-						castBobber.velocity.x = (dx / dist) * 500;
-						castBobber.velocity.y = (dy / dist) * 500;
+						var retract = getRetractTarget();
+						var px = retract.x;
+						var py = retract.y;
+						retract.put();
+						var dx = px - castBobber.x;
+						var dy = py - castBobber.y;
+						var dist = Math.sqrt(dx * dx + dy * dy);
+						if (dist < 4) {
+							state.remove(castBobber);
+							castBobber.destroy();
+							castBobber = null;
+							castState = IDLE;
+							frozen = false;
+							playMovementAnim(true);
+						} else {
+							castBobber.velocity.x = (dx / dist) * 188;
+							castBobber.velocity.y = (dy / dist) * 188;
+						}
 					}
 				}
 		}
@@ -624,10 +666,11 @@ class Player extends FlxSprite {
 		return castState == LANDED && castBobber != null;
 	}
 
-	public function catchFish() {
+	public function catchFish(hasFish:Bool = false) {
 		if (castState == LANDED || castState == CASTING) {
 			castState = CATCH_ANIM;
 			frozen = true;
+			retractHasFish = hasFish;
 			if (castTarget != null) {
 				castTarget.put();
 				castTarget = null;
@@ -638,6 +681,12 @@ class Player extends FlxSprite {
 			}
 			if (castBobber != null) {
 				castBobber.velocity.set(0, 0);
+				if (hasFish) {
+					caughtFishFrame = FlxG.random.int(0, 4);
+					castBobber.loadGraphic("assets/aseprite/fish.png", true, 32, 32);
+					castBobber.animation.add("fish", [caughtFishFrame]);
+					castBobber.animation.play("fish");
+				}
 			}
 			sendAnimUpdate("catch_" + castDirSuffix, true);
 		}

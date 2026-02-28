@@ -39,7 +39,8 @@ class WaterFish extends FlxSprite {
 			this.waterTiles = waterTiles;
 		}
 		this.isRemote = isRemote;
-		makeGraphic(4, 2, FlxColor.BLACK);
+		loadGraphic("assets/aseprite/characters/fishShadow.png");
+		centerOffsets();
 		alpha = 0;
 		fadeInTimer = 1.0;
 		pickTarget();
@@ -70,6 +71,8 @@ class WaterFish extends FlxSprite {
 	}
 
 	public function fleeFrom(otherX:Float, otherY:Float) {
+		if (attracted)
+			return;
 		var awayX = x - otherX;
 		var awayY = y - otherY;
 		var len = Math.sqrt(awayX * awayX + awayY * awayY);
@@ -99,10 +102,16 @@ class WaterFish extends FlxSprite {
 				target.put();
 			target = FlxPoint.get(bestTile.x + FlxG.random.float(0, 12), bestTile.y + FlxG.random.float(0, 12));
 			retargetTimer = FlxG.random.float(2, 3);
+
+			var fdx = target.x - x;
+			var fdy = target.y - y;
+			var fdist = Math.sqrt(fdx * fdx + fdy * fdy);
+			if (fdist > 0.1) {
+				velocity.set((fdx / fdist) * SPEED, (fdy / fdist) * SPEED);
+			}
 		}
 
-		velocity.set(0, 0);
-		pauseTimer = FlxG.random.float(0.5, 1.0);
+		pauseTimer = 0;
 	}
 
 	override public function update(elapsed:Float) {
@@ -127,9 +136,13 @@ class WaterFish extends FlxSprite {
 
 		super.update(elapsed);
 
-		checkBobber();
-		if (attracted)
+		if (bobber != null || attracted) {
+			checkBobber();
+		}
+
+		if (attracted) {
 			return;
+		}
 
 		if (pauseTimer > 0) {
 			pauseTimer -= elapsed;
@@ -162,15 +175,18 @@ class WaterFish extends FlxSprite {
 	function checkBobber() {
 		if (bobber == null) {
 			if (attracted) {
-				stopAttract();
+				attracted = false;
+				fleeFrom(x + velocity.x, y + velocity.y);
 			}
 			return;
 		}
 
 		var bx = bobber.x + bobber.width / 2;
 		var by = bobber.y + bobber.height / 2;
-		var dx = bx - x;
-		var dy = by - y;
+		var fx = x + width / 2;
+		var fy = y + height / 2;
+		var dx = bx - fx;
+		var dy = by - fy;
 		var dist = Math.sqrt(dx * dx + dy * dy);
 
 		if (dist < CATCH_DIST) {

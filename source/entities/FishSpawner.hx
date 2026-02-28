@@ -43,6 +43,7 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 				var dx = a.x - b.x;
 				var dy = a.y - b.y;
 				if (dx * dx + dy * dy < SEPARATION_DIST * SEPARATION_DIST) {
+					a.fleeFrom(b.x, b.y);
 					b.fleeFrom(a.x, a.y);
 				}
 			}
