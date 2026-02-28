@@ -1,5 +1,6 @@
 package managers;
 
+import managers.FishManager.FishDb;
 import rounds.Round;
 import states.VictoryState;
 import states.PlayState;
@@ -7,6 +8,8 @@ import flixel.FlxG;
 
 class GameManager {
 	public static var ME:GameManager;
+
+	public var fish:FishManager;
 
 	private var round:RoundManager;
 	private var totalRounds:Int = 1;
@@ -31,6 +34,8 @@ class GameManager {
 		this.rounds = rounds;
 		this.totalRounds = rounds.length;
 		currentRoundNumber = 0;
+
+		fish = new FishManager(new FishDb());
 	}
 
 	public function start() {

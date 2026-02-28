@@ -7,7 +7,8 @@
 				"type": "Float"
 			}
 		]
-	},{
+	},
+	{
 		"name": "player_died",
 		"fields": [
 			{
@@ -15,7 +16,8 @@
 				"type": "String"
 			}
 		]
-	},{
+	},
+	{
 		"name": "player_spawn",
 		"fields": [
 			{
@@ -27,10 +29,13 @@
 				"type": "Float"
 			}
 		]
-	},{
+	},
+	{
 		"name": "click",
 		"meta": {
-			"reducers": ["COUNT"]
+			"reducers": [
+				"COUNT"
+			]
 		},
 		"fields": [
 			{
@@ -42,10 +47,13 @@
 				"type": "Float"
 			}
 		]
-	},{
+	},
+	{
 		"name": "speed_click",
 		"meta": {
-			"reducers": ["MIN('time')"]
+			"reducers": [
+				"MIN('time')"
+			]
 		},
 		"fields": [
 			{
@@ -53,7 +61,8 @@
 				"type": "Int"
 			}
 		]
-	},{
+	},
+	{
 		"name": "distance_click",
 		"meta": {
 			"reducers": [
@@ -67,9 +76,27 @@
 				"type": "Float"
 			}
 		]
-	},{
+	},
+	{
+		"name": "achieve",
+		"fields": [
+			{
+				"name": "name",
+				"type": "String"
+			}
+		]
+	},
+	{
 		"name": "fish_caught",
 		"fields": [
+			{
+				"name": "fishId",
+				"type": "String"
+			},
+			{
+				"name": "ownerId",
+				"type": "String"
+			},
 			{
 				"name": "posX",
 				"type": "Float"
@@ -79,11 +106,16 @@
 				"type": "Float"
 			}
 		]
-	},{
-		"name": "achieve",
+	},
+	{
+		"name": "fish_collected",
 		"fields": [
 			{
-				"name": "name",
+				"name": "fishId",
+				"type": "String"
+			},
+			{
+				"name": "ownerId",
 				"type": "String"
 			}
 		]

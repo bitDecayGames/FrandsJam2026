@@ -32,7 +32,7 @@ class FishGroup extends FlxTypedGroup<Fish> {
 		FlxG.overlap(player, this, (p:FlxSprite, f:FlxSprite) -> {
 			var fish:Fish = cast f;
 			if (SimpleController.just_pressed(Button.A)) {
-				fish.hit();
+				fish.hit(cast(player, Player).sessionId);
 			}
 		});
 	}
