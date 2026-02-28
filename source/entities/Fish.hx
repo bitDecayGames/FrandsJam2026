@@ -6,6 +6,7 @@ import events.EventBus;
 import events.gen.Event;
 
 class Fish extends FlxSprite {
+	public var id:String;
 	public var hp:Int = 10;
 	public var isLiving:Bool = true;
 
@@ -14,11 +15,11 @@ class Fish extends FlxSprite {
 		makeGraphic(16, 16, FlxColor.GREEN);
 	}
 
-	public function hit() {
+	public function hit(playerId:String) {
 		hp -= 1;
 		if (hp <= 0) {
 			isLiving = false;
-			EventBus.fire(new FishCaught(x, y));
+			EventBus.fire(new FishCaught(id, playerId, x, y));
 			QLog.notice('Fish caught at ($x, $y)');
 			kill();
 		}

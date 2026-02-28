@@ -11,6 +11,7 @@ import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
 import entities.FishGroup;
+import entities.FishSpawner;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
@@ -31,6 +32,7 @@ class PlayState extends FlxTransitionableState {
 	var net:NetworkManager;
 
 	var midGroundGroup = new FlxGroup();
+	var fishSpawner = new FishSpawner();
 	var fishGroup = new FishGroup();
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
@@ -60,11 +62,14 @@ class PlayState extends FlxTransitionableState {
 
 		// Build out our render order
 		add(midGroundGroup);
+		add(fishSpawner);
 		add(fishGroup);
 		add(transitions);
 
 		loadLevel("Level_0");
+		#if !local
 		setupNetwork();
+		#end
 
 		hotText = new FlashingText("HOT", 0.15, 3.0);
 		add(hotText);
@@ -115,6 +120,8 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		fishSpawner.spawn(level);
+
 		fishGroup.spawn(FlxG.worldBounds);
 
 		for (t in level.camTransitions) {
@@ -137,6 +144,8 @@ class PlayState extends FlxTransitionableState {
 		transitions.clear();
 
 		fishGroup.clearAll();
+
+		fishSpawner.clearAll();
 
 		for (o in midGroundGroup) {
 			o.destroy();

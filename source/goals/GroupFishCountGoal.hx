@@ -7,11 +7,12 @@ import ui.font.BitmapText.PressStart;
 import flixel.util.FlxColor;
 import states.PlayState;
 
-class PersonalFishCountGoal extends Goal {
+class GroupFishCountGoal extends Goal {
 	private var text:PressStart;
 	private var targetCount:Int;
+	private var sum:Int = 0;
 
-	override public function new(targetCount:Int = 3) {
+	override public function new(targetCount:Int = 10) {
 		super();
 		this.targetCount = targetCount;
 	}
@@ -32,7 +33,9 @@ class PersonalFishCountGoal extends Goal {
 			}
 			count++;
 			scores.set(event.ownerId, count);
-			if (count >= targetCount) {
+
+			sum++;
+			if (sum >= targetCount) {
 				onComplete();
 			}
 		});
@@ -42,6 +45,10 @@ class PersonalFishCountGoal extends Goal {
 		scores.set(playerId, count);
 		if (count >= targetCount) {
 			onComplete();
+		}
+		sum = 0;
+		for (k => v in scores) {
+			sum += v;
 		}
 	}
 
@@ -53,10 +60,6 @@ class PersonalFishCountGoal extends Goal {
 	}
 
 	public function countRemaining() {
-		var s = "";
-		for (k => value in scores) {
-			s += '${k}:${value}\n';
-		}
-		text.text = s;
+		text.text = '${targetCount - sum}';
 	}
 }

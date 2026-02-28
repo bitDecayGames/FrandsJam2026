@@ -62,11 +62,11 @@ class Configure {
 			var url = define.substr(0, Std.int(define.length / 2));
 			if (url.length <= 0) {
 				trace("no valid analytics token found in API_KEY define, setting dev mode to true");
-				return "localhost";
+				return config.server.host;
 			}
 			return url;
 		} else {
-			return "Mercury.local";
+			return config.server.host;
 		}
 	}
 
@@ -83,11 +83,11 @@ class Configure {
 			var port = define.substr(0, Std.int(define.length / 2));
 			if (port.length <= 0) {
 				trace("no valid analytics token found in API_KEY define, setting dev mode to true");
-				return 80;
+				return config.server.port;
 			}
 			return Std.parseInt(port);
 		} else {
-			return 2567;
+			return config.server.port;
 		}
 	}
 
