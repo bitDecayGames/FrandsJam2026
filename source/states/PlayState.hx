@@ -18,7 +18,6 @@ import entities.Player;
 import events.gen.Event;
 import events.EventBus;
 import flixel.FlxG;
-import flixel.FlxSprite;
 import flixel.addons.transition.FlxTransitionableState;
 import ui.FlashingText;
 
@@ -84,7 +83,7 @@ class PlayState extends FlxTransitionableState {
 			}
 			// TODO: Have server give us the player color, too
 			trace('PlayState: remote player $sessionId appeared');
-			var remote = new Player(playerState.x, playerState.y);
+			var remote = new Player(playerState.x, playerState.y, this);
 			remote.isRemote = true;
 			remote.setNetwork(net, sessionId);
 			remotePlayers.set(sessionId, remote);
@@ -112,7 +111,7 @@ class PlayState extends FlxTransitionableState {
 		midGroundGroup.add(level.terrainLayer);
 		FlxG.worldBounds.copyFrom(level.terrainLayer.getBounds());
 
-		player = new Player(level.spawnPoint.x, level.spawnPoint.y);
+		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 		camera.follow(player);
 		add(player);
 
