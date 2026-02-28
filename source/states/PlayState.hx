@@ -32,7 +32,7 @@ class PlayState extends FlxTransitionableState {
 	var net:NetworkManager;
 
 	var midGroundGroup = new FlxGroup();
-	var fishSpawner = new FishSpawner();
+	var fishSpawner:FishSpawner;
 	var fishGroup = new FishGroup();
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
@@ -59,6 +59,8 @@ class PlayState extends FlxTransitionableState {
 		});
 
 		// QLog.error('Example error');
+
+		fishSpawner = new FishSpawner(() -> player.catchFish());
 
 		// Build out our render order
 		add(midGroundGroup);
@@ -178,6 +180,7 @@ class PlayState extends FlxTransitionableState {
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
 		fishGroup.handleOverlap(player);
+		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
 	}
 
 	function handleCameraBounds() {

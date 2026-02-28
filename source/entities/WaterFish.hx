@@ -12,7 +12,15 @@ class WaterFish extends FlxSprite {
 	var pauseTimer:Float = 0;
 
 	static inline var SPEED:Float = 20;
+	static inline var ATTRACT_SPEED:Float = 40;
 	static inline var ARRIVE_DIST:Float = 2;
+	static inline var ATTRACT_DIST:Float = 32; // 2 tiles
+	static inline var CATCH_DIST:Float = 4;
+
+	var attracted:Bool = false;
+
+	public var bobber:FlxSprite;
+	public var onCatch:() -> Void;
 
 	public function new(x:Float, y:Float, waterTiles:Array<FlxPoint>) {
 		super(x, y);
@@ -68,6 +76,12 @@ class WaterFish extends FlxSprite {
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
+		checkBobber();
+
+		if (attracted) {
+			return;
+		}
+
 		if (pauseTimer > 0) {
 			pauseTimer -= elapsed;
 			return;
@@ -91,6 +105,40 @@ class WaterFish extends FlxSprite {
 		}
 	}
 
+	function checkBobber() {
+		if (bobber == null) {
+			if (attracted)
+				stopAttract();
+			return;
+		}
+
+		var bx = bobber.x + bobber.width / 2;
+		var by = bobber.y + bobber.height / 2;
+		var dx = bx - x;
+		var dy = by - y;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+
+		if (dist < CATCH_DIST) {
+			kill();
+			if (onCatch != null)
+				onCatch();
+			return;
+		} else if (dist < ATTRACT_DIST) {
+			attracted = true;
+			pauseTimer = 0;
+			if (dist > 0.1) {
+				velocity.set((dx / dist) * ATTRACT_SPEED, (dy / dist) * ATTRACT_SPEED);
+			}
+		} else if (attracted) {
+			stopAttract();
+		}
+	}
+
+	function stopAttract() {
+		attracted = false;
+		pickTarget();
+	}
+
 	override function destroy() {
 		if (target != null) {
 			target.put();
@@ -98,6 +146,8 @@ class WaterFish extends FlxSprite {
 		}
 		// Don't put waterTiles points — they're shared across fish in the same body
 		waterTiles = null;
+		bobber = null;
+		onCatch = null;
 		super.destroy();
 	}
 }

@@ -14,6 +14,8 @@ import flixel.FlxG;
 class Player extends FlxSprite {
 	// 0-indexed frame within the cast animation when the bobber launches
 	static inline var CAST_LAUNCH_FRAME:Int = 3;
+	// 0-indexed frame within the catch animation when the bobber retracts (1 before final)
+	static inline var CATCH_RETRACT_FRAME:Int = 1;
 
 	var speed:Float = 150;
 	var playerNum = 0;
@@ -36,7 +38,7 @@ class Player extends FlxSprite {
 
 	// Cast state
 	var castState:CastState = IDLE;
-	var castBobber:FlxSprite;
+	public var castBobber(default, null):FlxSprite;
 	var castTarget:FlxPoint;
 	var castPower:Float = 0;
 	var castPowerDir:Float = 1;
@@ -45,6 +47,10 @@ class Player extends FlxSprite {
 	var reticle:FlxSprite;
 	var powerBarBg:FlxSprite;
 	var powerBarFill:FlxSprite;
+
+	// Animation state tracking
+	var lastMoving:Bool = false;
+	var lastAnimDir:Cardinal = E;
 
 	var state:FlxState;
 
@@ -67,10 +73,15 @@ class Player extends FlxSprite {
 		animation.add("cast_right", [43, 44, 45, 46, 47], 12, false);
 		animation.add("cast_up", [49, 50, 51, 52, 53], 12, false);
 		animation.add("cast_left", [55, 56, 57, 58, 59], 12, false);
-		animation.play("stand_down");
+		animation.add("catch_down", [88, 89, 90], 12, false);
+		animation.add("catch_right", [91, 92, 93], 12, false);
+		animation.add("catch_up", [94, 95, 96], 12, false);
+		animation.add("catch_left", [97, 98, 99], 12, false);
 
 		animation.onFrameChange.add(onAnimFrameChange);
 		animation.onFinish.add(onAnimFinish);
+
+		animation.play("stand_down");
 
 		reticle = new FlxSprite();
 		reticle.loadGraphic(AssetPaths.aimingTarget__png, true, 8, 8);
@@ -94,13 +105,45 @@ class Player extends FlxSprite {
 		if (castState == CAST_ANIM && castBobber == null && frameNumber == CAST_LAUNCH_FRAME) {
 			launchBobber();
 		}
+		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
+			var px = x + 4;
+			var py = y + 4;
+			var dx = px - castBobber.x;
+			var dy = py - castBobber.y;
+			var dist = Math.sqrt(dx * dx + dy * dy);
+			if (dist > 0) {
+				castBobber.velocity.x = (dx / dist) * 500;
+				castBobber.velocity.y = (dy / dist) * 500;
+			}
+		}
 	}
 
 	function onAnimFinish(animName:String) {
 		if (castState == CAST_ANIM) {
 			castState = CASTING;
 			frozen = false;
+			playMovementAnim(true);
+		} else if (castState == CATCH_ANIM) {
+			if (castBobber != null) {
+				castState = RETURNING;
+			} else {
+				castState = IDLE;
+			}
+			frozen = false;
+			playMovementAnim(true);
 		}
+	}
+
+	function playMovementAnim(force:Bool = false) {
+		var moving = velocity.x != 0 || velocity.y != 0;
+		if (!force && moving == lastMoving && lastInputDir == lastAnimDir)
+			return;
+
+		lastMoving = moving;
+		lastAnimDir = lastInputDir;
+
+		var dirSuffix = getDirSuffix();
+		animation.play((moving ? "run_" : "stand_") + dirSuffix);
 	}
 
 	public function setNetwork(net:NetworkManager, session:String) {
@@ -150,19 +193,23 @@ class Player extends FlxSprite {
 				} else {
 					var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
 					if (moveDir != NONE) {
-						moveDir.asVector(velocity).scale(speed * 1.5);
+						moveDir.asVector(velocity).normalize().scale(speed * 1.5);
 					}
 				}
 			} else {
 				if (inputDir != NONE) {
-					inputDir.asVector(velocity).scale(speed);
+					inputDir.asVector(velocity).normalize().scale(speed);
 				} else {
 					velocity.set();
 				}
 			}
 		}
 
-		updateAnim();
+		// Only update movement animations when not in a scripted animation
+		if (castState != CAST_ANIM && castState != CATCH_ANIM) {
+			playMovementAnim();
+		}
+
 		updateReticle();
 		updateCast(delta);
 
@@ -241,18 +288,39 @@ class Player extends FlxSprite {
 						frozen = false;
 					} else {
 						castState = CAST_ANIM;
-						var dirSuffix = getDirSuffix();
-						animation.play("cast_" + dirSuffix, true);
+						animation.play("cast_" + getDirSuffix(), true);
 					}
 				}
 			case CAST_ANIM:
-				// Handled by onAnimFrameChange and onAnimFinish signals
+				// Animation signals handle state transitions.
+				// Clamp bobber at target if it arrives during the animation.
+				if (castBobber != null && castTarget != null) {
+					var dx = castTarget.x - castBobber.x;
+					var dy = castTarget.y - castBobber.y;
+					var dot = dx * castBobber.velocity.x + dy * castBobber.velocity.y;
+					if (dot <= 0) {
+						castBobber.setPosition(castTarget.x, castTarget.y);
+						castBobber.velocity.set(0, 0);
+					}
+				}
+			case CATCH_ANIM:
+				// Bobber retract started by frame event, check for arrival
+				if (castBobber != null) {
+					var px = x + 4;
+					var py = y + 4;
+					var dx = px - castBobber.x;
+					var dy = py - castBobber.y;
+					var dist = Math.sqrt(dx * dx + dy * dy);
+					if (dist < 4) {
+						state.remove(castBobber);
+						castBobber.destroy();
+						castBobber = null;
+					}
+				}
 			case CASTING:
 				if (castBobber != null && castTarget != null) {
-					if (FlxG.keys.justPressed.Z || velocity.x != 0 || velocity.y != 0) {
-						castState = RETURNING;
-						castTarget.put();
-						castTarget = null;
+					if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
+						catchFish();
 					} else {
 						var dx = castTarget.x - castBobber.x;
 						var dy = castTarget.y - castBobber.y;
@@ -266,9 +334,7 @@ class Player extends FlxSprite {
 				}
 			case LANDED:
 				if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
-					castState = RETURNING;
-					castTarget.put();
-					castTarget = null;
+					catchFish();
 				}
 			case RETURNING:
 				if (castBobber != null) {
@@ -290,6 +356,25 @@ class Player extends FlxSprite {
 		}
 	}
 
+	public function isBobberLanded():Bool {
+		return castState == LANDED && castBobber != null;
+	}
+
+	public function catchFish() {
+		if (castState == LANDED || castState == CASTING) {
+			castState = CATCH_ANIM;
+			frozen = true;
+			if (castTarget != null) {
+				castTarget.put();
+				castTarget = null;
+			}
+			if (castBobber != null) {
+				castBobber.velocity.set(0, 0);
+			}
+			animation.play("catch_" + getDirSuffix(), true);
+		}
+	}
+
 	function getDirSuffix():String {
 		return switch (lastInputDir) {
 			case N: "up";
@@ -298,19 +383,6 @@ class Player extends FlxSprite {
 			case E: "right";
 			default: "down";
 		};
-	}
-
-	function updateAnim() {
-		// Don't override cast animations
-		if (castState == CAST_ANIM)
-			return;
-
-		var dirSuffix = getDirSuffix();
-		var moving = velocity.x != 0 || velocity.y != 0;
-		var animName = (moving ? "run_" : "stand_") + dirSuffix;
-
-		if (animation.name != animName)
-			animation.play(animName);
 	}
 
 	override function destroy() {
@@ -333,5 +405,6 @@ enum CastState {
 	CAST_ANIM;
 	CASTING;
 	LANDED;
+	CATCH_ANIM;
 	RETURNING;
 }
