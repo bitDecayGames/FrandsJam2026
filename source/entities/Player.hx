@@ -1,5 +1,6 @@
 package entities;
 
+import managers.GameManager;
 import schema.PlayerState;
 import net.NetworkManager;
 import flixel.FlxSprite;
@@ -29,9 +30,6 @@ class Player extends FlxSprite {
 
 	var frozen:Bool = false;
 
-	// Network stuff
-	var net:NetworkManager = null;
-
 	public var sessionId:String = "";
 
 	// tracks if this player is controled by the remote client
@@ -39,7 +37,9 @@ class Player extends FlxSprite {
 
 	// Cast state
 	var castState:CastState = IDLE;
+
 	public var castBobber(default, null):FlxSprite;
+
 	var castTarget:FlxPoint;
 	var castPower:Float = 0;
 	var castPowerDir:Float = 1;
@@ -158,12 +158,11 @@ class Player extends FlxSprite {
 		onAnimUpdate.dispatch(animName, forceRestart);
 	}
 
-	public function setNetwork(net:NetworkManager, session:String) {
+	public function setNetwork(session:String) {
 		cleanupNetwork();
 
-		this.net = net;
-		net.onPCh.add(handleChange);
 		sessionId = session;
+		GameManager.ME.net.onPlayerChanged.add(handleChange);
 	}
 
 	private function handleChange(sesId:String, state:PlayerState):Void {
@@ -225,10 +224,7 @@ class Player extends FlxSprite {
 		updateReticle();
 		updateCast(delta);
 
-		if (net != null) {
-			net.update();
-			net.sendMove(x, y);
-		}
+		GameManager.ME.net.sendMove(x, y);
 	}
 
 	function updateReticle() {
@@ -248,8 +244,7 @@ class Player extends FlxSprite {
 
 		castTarget = FlxPoint.get(targetX, targetY);
 
-		if (net != null)
-			net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
+		GameManager.ME.net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
 
 		castBobber = new FlxSprite();
 		castBobber.makeGraphic(8, 8, FlxColor.RED);
@@ -405,11 +400,7 @@ class Player extends FlxSprite {
 	}
 
 	private function cleanupNetwork() {
-		if (net == null) {
-			return;
-		}
-
-		this.net.onPCh.remove(handleChange);
+		GameManager.ME.net.onPlayerChanged.remove(handleChange);
 	}
 }
 

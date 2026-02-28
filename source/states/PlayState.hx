@@ -1,5 +1,7 @@
 package states;
 
+import managers.GameManager;
+import schema.PlayerState;
 import config.Configure;
 import net.NetworkManager;
 import managers.RoundManager;
@@ -28,7 +30,6 @@ class PlayState extends FlxTransitionableState {
 
 	// Network things
 	var remotePlayers:Map<String, Player> = new Map();
-	var net:NetworkManager;
 
 	var midGroundGroup = new FlxGroup();
 	var fishSpawner:FishSpawner;
@@ -76,33 +77,37 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function setupNetwork() {
-		net = new NetworkManager();
-		net.onJoined = (sessionId) -> {
-			trace('PlayState: joined as $sessionId');
-			player.setNetwork(net, sessionId);
-		};
-		net.onPlayerAdded = (sessionId, playerState) -> {
-			if (sessionId == player.sessionId) {
-				return;
-			}
-			// TODO: Have server give us the player color, too
-			trace('PlayState: remote player $sessionId appeared');
-			var remote = new Player(playerState.x, playerState.y, this);
-			remote.isRemote = true;
-			remote.setNetwork(net, sessionId);
-			remotePlayers.set(sessionId, remote);
-			add(remote);
-		};
-		net.onPlayerRemoved = (sessionId) -> {
-			trace('PlayState: remote player $sessionId left');
-			var remote = remotePlayers.get(sessionId);
-			if (remote != null) {
-				remove(remote);
-				remote.destroy();
-				remotePlayers.remove(sessionId);
-			}
-		};
-		net.connect(Configure.getServerURL(), Configure.getServerPort());
+		GameManager.ME.net.onJoined.add(onPlayerJoined);
+		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
+		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
+	}
+
+	function onPlayerJoined(sessionId:String) {
+		trace('PlayState: joined as $sessionId');
+		player.setNetwork(sessionId);
+	}
+
+	function onPlayerAdded(sessionId:String, playerState:PlayerState) {
+		if (sessionId == player.sessionId) {
+			return;
+		}
+		// TODO: Have server give us the player color, too
+		trace('PlayState: remote player $sessionId appeared');
+		var remote = new Player(playerState.x, playerState.y, this);
+		remote.isRemote = true;
+		remote.setNetwork(sessionId);
+		remotePlayers.set(sessionId, remote);
+		add(remote);
+	}
+
+	function onPlayerRemoved(sessionId:String) {
+		trace('PlayState: remote player $sessionId left');
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remove(remote);
+			remote.destroy();
+			remotePlayers.remove(sessionId);
+		}
 	}
 
 	function loadLevel(level:String) {
@@ -146,6 +151,10 @@ class PlayState extends FlxTransitionableState {
 			o.destroy();
 		}
 		midGroundGroup.clear();
+	}
+
+	override function destroy() {
+		super.destroy();
 	}
 
 	function handleAchieve(def:AchievementDef) {
