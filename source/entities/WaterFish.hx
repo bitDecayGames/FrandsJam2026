@@ -127,10 +127,9 @@ class WaterFish extends FlxSprite {
 
 		super.update(elapsed);
 
-		if (attracted) {
-			checkBobber();
+		checkBobber();
+		if (attracted)
 			return;
-		}
 
 		if (pauseTimer > 0) {
 			pauseTimer -= elapsed;

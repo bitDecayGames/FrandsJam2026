@@ -267,10 +267,7 @@ class Player extends FlxSprite {
 			var rawX = x + dir.x * 96 + 4;
 			var rawY = y + dir.y * 96 + 4;
 			var bounds = FlxG.worldBounds;
-			rockTarget = FlxPoint.get(
-				Math.max(bounds.left, Math.min(bounds.right, rawX)),
-				Math.max(bounds.top, Math.min(bounds.bottom, rawY))
-			);
+			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
 			dir.put();
 		}
 
@@ -287,10 +284,8 @@ class Player extends FlxSprite {
 			return;
 		var reticleOffset = lastInputDir.asVector();
 		var bounds = FlxG.worldBounds;
-		reticle.setPosition(
-			Math.max(bounds.left, Math.min(bounds.right, last.x + reticleOffset.x * 96 + 4)),
-			Math.max(bounds.top, Math.min(bounds.bottom, last.y + reticleOffset.y * 96 + 4))
-		);
+		reticle.setPosition(Math.max(bounds.left, Math.min(bounds.right, last.x + reticleOffset.x * 96 + 4)),
+			Math.max(bounds.top, Math.min(bounds.bottom, last.y + reticleOffset.y * 96 + 4)));
 		reticleOffset.put();
 	}
 
@@ -685,7 +680,7 @@ class Player extends FlxSprite {
 			animation.play(animName, false, false, animFrame);
 		}
 	}
-	
+
 	public function pickupItem(item:InventoryItem):Bool {
 		return inventory.add(item);
 	}
@@ -702,8 +697,8 @@ class Player extends FlxSprite {
 
 	function getRetractTarget():FlxPoint {
 		return switch (castDirSuffix) {
-			case "right": FlxPoint.get(x + 8, y-2);
-			case "left": FlxPoint.get(x + 8, y-2);
+			case "right": FlxPoint.get(x + 8, y - 2);
+			case "left": FlxPoint.get(x + 8, y - 2);
 			case "down": FlxPoint.get(x, y + 4);
 			case "up": FlxPoint.get(x + 12, y + 4);
 			default: FlxPoint.get(x + 4, y + 4);

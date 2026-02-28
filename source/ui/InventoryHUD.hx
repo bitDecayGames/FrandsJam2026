@@ -37,6 +37,7 @@ class InventoryHUD extends FlxSpriteGroup {
 			if (i < inventory.items.length) {
 				var color = switch (inventory.items[i]) {
 					case Rock: FlxColor.GRAY;
+					case Fish: FlxColor.GREEN;
 				};
 				slots[i].makeGraphic(SLOT_SIZE, SLOT_SIZE, color);
 			} else {

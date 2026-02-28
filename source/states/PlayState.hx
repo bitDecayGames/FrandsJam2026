@@ -17,6 +17,8 @@ import entities.CameraTransition;
 import entities.FishSpawner;
 import entities.WaterFish;
 import entities.Rock;
+import entities.GroundFishGroup;
+import entities.Inventory.InventoryItem;
 import entities.RockGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
@@ -41,6 +43,7 @@ class PlayState extends FlxTransitionableState {
 	var midGroundGroup = new FlxGroup();
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
+	var groundFishGroup:GroundFishGroup;
 	var inventoryHUD:InventoryHUD;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
@@ -68,12 +71,14 @@ class PlayState extends FlxTransitionableState {
 
 		// QLog.error('Example error');
 
-		fishSpawner = new FishSpawner(() -> player.catchFish());
+		fishSpawner = new FishSpawner(onFishCaught);
 		rockGroup = new RockGroup();
+		groundFishGroup = new GroundFishGroup();
 
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
+		add(groundFishGroup);
 		add(fishSpawner);
 		add(transitions);
 
@@ -189,12 +194,24 @@ class PlayState extends FlxTransitionableState {
 		transitions.clear();
 
 		rockGroup.clearAll();
+		groundFishGroup.clearAll();
 		fishSpawner.clearAll();
 
 		for (o in midGroundGroup) {
 			o.destroy();
 		}
 		midGroundGroup.clear();
+	}
+
+	function onFishCaught() {
+		if (!player.inventory.add(Fish)) {
+			var dir = player.lastInputDir.asVector();
+			var dropX = player.x - dir.x * 16;
+			var dropY = player.y - dir.y * 16;
+			dir.put();
+			groundFishGroup.addFish(dropX, dropY);
+		}
+		player.catchFish();
 	}
 
 	function handleAchieve(def:AchievementDef) {
@@ -223,6 +240,7 @@ class PlayState extends FlxTransitionableState {
 
 		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
 		rockGroup.checkPickup(player);
+		groundFishGroup.checkPickup(player);
 	}
 
 	function handleCameraBounds() {
