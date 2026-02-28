@@ -85,9 +85,6 @@ class PlayState extends FlxTransitionableState {
 		#if !local
 		setupNetwork();
 		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		#end
-
-		#if !local
 		fishSpawner.setNet(GameManager.ME.net);
 		#end
 
