@@ -66,7 +66,7 @@ class Configure {
 			}
 			return url;
 		} else {
-			return "localhost";
+			return "Mercury.local";
 		}
 	}
 

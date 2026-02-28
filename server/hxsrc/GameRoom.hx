@@ -1,3 +1,4 @@
+import GameState.FishState;
 import haxe.Json;
 import colyseus.server.Client;
 import colyseus.server.Room.RoomOf;
@@ -10,6 +11,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	override public function onCreate(options:Dynamic):Void {
 		maxClients = 4;
 		setState(new GameState());
+
+		// sent when a player moves
 		onMessage("move", (client:Client, data:Dynamic) -> {
 			var player:PlayerState = state.players.get(client.sessionId);
 			if (player != null) {
@@ -17,6 +20,23 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				player.y = data.y;
 			}
 		});
+
+		// sent when a client spawns a fish
+		onMessage("fish_spawn", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "fish_spawn" message: ${Json.stringify(data)}');
+			state.fish.set(data.id, new FishState());
+		});
+
+		// sent when a fish moves
+		onMessage("fish_move", (client:Client, data:Dynamic) -> {
+			var fish:FishState = state.fish.get(data.id);
+			if (fish != null) {
+				fish.x = data.x;
+				fish.y = data.y;
+			}
+		});
+
+		// sent when a player casts their line
 		onMessage("cast_line", (client, data) -> {
 			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');
 			broadcast("cast_line", data, {except: client});
