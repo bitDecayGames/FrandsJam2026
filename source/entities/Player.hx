@@ -312,21 +312,13 @@ class Player extends FlxSprite {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			return switch (castDirSuffix) {
 				case "down":
-					if (frame == 0) FlxPoint.get(x + 10, y + 24)
-					else if (frame == 1) FlxPoint.get(x + 1, y + 3)
-					else FlxPoint.get(x + 1, y + 6);
+					if (frame == 0) FlxPoint.get(x + 10, y + 24) else if (frame == 1) FlxPoint.get(x + 1, y + 3) else FlxPoint.get(x + 1, y + 6);
 				case "right":
-					if (frame == 0) FlxPoint.get(x + 30, y + 2)
-					else if (frame == 1) FlxPoint.get(x + 14, y - 4)
-					else FlxPoint.get(x + 5, y + 7);
+					if (frame == 0) FlxPoint.get(x + 30, y + 2) else if (frame == 1) FlxPoint.get(x + 14, y - 4) else FlxPoint.get(x + 5, y + 7);
 				case "up":
-					if (frame == 0) FlxPoint.get(x + 3, y - 6)
-					else if (frame == 1) FlxPoint.get(x + 13, y - 8)
-					else FlxPoint.get(x + 19, y - 8);
+					if (frame == 0) FlxPoint.get(x + 3, y - 6) else if (frame == 1) FlxPoint.get(x + 13, y - 8) else FlxPoint.get(x + 19, y - 8);
 				case "left":
-					if (frame == 0) FlxPoint.get(x - 15, y + 2)
-					else if (frame == 1) FlxPoint.get(x + 1, y - 4)
-					else FlxPoint.get(x + 12, y + 5);
+					if (frame == 0) FlxPoint.get(x - 15, y + 2) else if (frame == 1) FlxPoint.get(x + 1, y - 4) else FlxPoint.get(x + 12, y + 5);
 				default: FlxPoint.get(x + 8, y + 8);
 			};
 		} else {

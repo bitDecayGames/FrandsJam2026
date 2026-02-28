@@ -1,5 +1,6 @@
 package entities;
 
+import net.NetworkManager;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.math.FlxPoint;
@@ -9,11 +10,21 @@ import levels.ldtk.Level;
 class FishSpawner extends FlxTypedGroup<WaterFish> {
 	static inline var SEPARATION_DIST:Float = 20;
 
+	var nextFishID:Int = 1;
+
+	public var fishMap = new Map<String, WaterFish>();
+
+	var net:NetworkManager;
+
 	var catchCallback:() -> Void;
 
 	public function new(onCatch:() -> Void) {
 		super();
 		catchCallback = onCatch;
+	}
+
+	public function setNet(net:NetworkManager) {
+		this.net = net;
 	}
 
 	override public function update(elapsed:Float) {
@@ -106,8 +117,15 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 				}
 
 				for (_ in 0...numFish) {
+					var fid = nextFishID++;
 					var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
+					if (net != null) {
+						var data:Dynamic = {id: '${fid}', x: tile.x, y: tile.y};
+						QLog.notice('sending fish_spawn message: $data');
+						net.sendMessage("fish_spawn", data);
+					}
 					var fish = new WaterFish(tile.x, tile.y, waterTiles);
+					fishMap.set('${fid}', fish);
 					fish.onCatch = catchCallback;
 					add(fish);
 				}
