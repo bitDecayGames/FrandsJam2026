@@ -10,6 +10,8 @@ import schema.PlayerState;
 import schema.FishState;
 
 class NetworkManager {
+	public static var IS_HOST:Bool = false;
+
 	var client:Client;
 	var room:Room<GameState>;
 
