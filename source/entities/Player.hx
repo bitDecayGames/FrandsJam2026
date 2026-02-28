@@ -6,6 +6,7 @@ import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
+import flixel.util.FlxSignal;
 import input.InputCalculator;
 import input.SimpleController;
 import bitdecay.flixel.spacial.Cardinal;
@@ -52,6 +53,8 @@ class Player extends FlxSprite {
 	var lastMoving:Bool = false;
 	var lastAnimDir:Cardinal = E;
 
+	public var onAnimUpdate = new FlxTypedSignal<(String, Bool) -> Void>();
+
 	var state:FlxState;
 
 	public function new(X:Float, Y:Float, state:FlxState) {
@@ -81,7 +84,11 @@ class Player extends FlxSprite {
 		animation.onFrameChange.add(onAnimFrameChange);
 		animation.onFinish.add(onAnimFinish);
 
-		animation.play("stand_down");
+		onAnimUpdate.add((animName, forceRestart) -> {
+			animation.play(animName, forceRestart);
+		});
+
+		sendAnimUpdate("stand_down");
 
 		reticle = new FlxSprite();
 		reticle.loadGraphic(AssetPaths.aimingTarget__png, true, 8, 8);
@@ -143,7 +150,11 @@ class Player extends FlxSprite {
 		lastAnimDir = lastInputDir;
 
 		var dirSuffix = getDirSuffix();
-		animation.play((moving ? "run_" : "stand_") + dirSuffix);
+		sendAnimUpdate((moving ? "run_" : "stand_") + dirSuffix);
+	}
+
+	function sendAnimUpdate(animName:String, forceRestart:Bool = false) {
+		onAnimUpdate.dispatch(animName, forceRestart);
 	}
 
 	public function setNetwork(net:NetworkManager, session:String) {
@@ -288,7 +299,7 @@ class Player extends FlxSprite {
 						frozen = false;
 					} else {
 						castState = CAST_ANIM;
-						animation.play("cast_" + getDirSuffix(), true);
+						sendAnimUpdate("cast_" + getDirSuffix(), true);
 					}
 				}
 			case CAST_ANIM:
@@ -371,7 +382,7 @@ class Player extends FlxSprite {
 			if (castBobber != null) {
 				castBobber.velocity.set(0, 0);
 			}
-			animation.play("catch_" + getDirSuffix(), true);
+			sendAnimUpdate("catch_" + getDirSuffix(), true);
 		}
 	}
 
@@ -386,6 +397,7 @@ class Player extends FlxSprite {
 	}
 
 	override function destroy() {
+		onAnimUpdate.removeAll();
 		cleanupNetwork();
 		super.destroy();
 	}
