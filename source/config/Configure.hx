@@ -66,6 +66,10 @@ class Configure {
 			}
 			return url;
 		} else {
+			#if forcelocal
+			return "localhost";
+			#end
+
 			return config.server.host;
 		}
 	}

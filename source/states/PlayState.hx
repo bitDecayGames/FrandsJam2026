@@ -1,5 +1,6 @@
 package states;
 
+import flixel.util.FlxTimer;
 import config.Configure;
 import net.NetworkManager;
 import managers.RoundManager;
@@ -12,6 +13,7 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
 import entities.FishGroup;
 import entities.FishSpawner;
+import entities.WaterFish;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
@@ -29,6 +31,7 @@ class PlayState extends FlxTransitionableState {
 
 	// Network things
 	var remotePlayers:Map<String, Player> = new Map();
+	var remoteFish:Map<String, WaterFish> = new Map();
 	var net:NetworkManager;
 
 	var midGroundGroup = new FlxGroup();
@@ -66,10 +69,14 @@ class PlayState extends FlxTransitionableState {
 		add(fishGroup);
 		add(transitions);
 
-		loadLevel("Level_0");
 		#if !local
 		setupNetwork();
+		net.connect(Configure.getServerURL(), Configure.getServerPort());
 		#end
+
+		fishSpawner.setNet(net);
+
+		loadLevel("Level_0");
 
 		hotText = new FlashingText("HOT", 0.15, 3.0);
 		add(hotText);
@@ -82,7 +89,7 @@ class PlayState extends FlxTransitionableState {
 			trace('PlayState: joined as $sessionId');
 			player.setNetwork(net, sessionId);
 		};
-		net.onPlayerAdded = (sessionId, playerState) -> {
+		net.onPlayerAdded.add((sessionId, playerState) -> {
 			if (sessionId == player.sessionId) {
 				return;
 			}
@@ -93,7 +100,7 @@ class PlayState extends FlxTransitionableState {
 			remote.setNetwork(net, sessionId);
 			remotePlayers.set(sessionId, remote);
 			add(remote);
-		};
+		});
 		net.onPlayerRemoved = (sessionId) -> {
 			trace('PlayState: remote player $sessionId left');
 			var remote = remotePlayers.get(sessionId);
@@ -103,7 +110,16 @@ class PlayState extends FlxTransitionableState {
 				remotePlayers.remove(sessionId);
 			}
 		};
-		net.connect(Configure.getServerURL(), Configure.getServerPort());
+		net.onFishAdded.add((fishId, fishState) -> {
+			if (fishSpawner.fishMap.exists(fishId)) {
+				return;
+			}
+
+			var newFish = new WaterFish(fishState.x, fishState.y, null, true);
+			newFish.setNetwork(net, fishId);
+			remoteFish.set(fishId, newFish);
+			midGroundGroup.add(newFish);
+		});
 	}
 
 	function loadLevel(level:String) {
@@ -120,9 +136,10 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
-		fishSpawner.spawn(level);
-
-		fishGroup.spawn(FlxG.worldBounds);
+		FlxTimer.wait(2, () -> {
+			fishSpawner.spawn(level);
+		});
+		// fishGroup.spawn(FlxG.worldBounds);
 
 		for (t in level.camTransitions) {
 			transitions.add(t);

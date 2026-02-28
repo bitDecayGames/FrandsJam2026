@@ -3,7 +3,7 @@
   "hash": {
     "roomcount": {},
     "roomhistory": {
-      "a5UOY0LGf": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"HVev3NwCL\",\"state\":\"{\\\"players\\\":{\\\"1bw5ewUiz\\\":{\\\"x\\\":56,\\\"y\\\":48}}}\",\"clients\":[{\"sessionId\":\"1bw5ewUiz\",\"reconnectionToken\":\"ZRBvQWVET\"}]}"
+      "x5Ek2z-3-": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"E3tPTytuy\",\"state\":\"{\\\"players\\\":{\\\"Msizv84Wp\\\":{\\\"x\\\":56,\\\"y\\\":48},\\\"Kle06hdig\\\":{\\\"x\\\":56,\\\"y\\\":48}},\\\"fish\\\":{\\\"1\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"2\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"3\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"4\\\":{\\\"x\\\":0,\\\"y\\\":0}}}\",\"clients\":[{\"sessionId\":\"Msizv84Wp\",\"reconnectionToken\":\"1UDvpswlF\"},{\"sessionId\":\"Kle06hdig\",\"reconnectionToken\":\"-VpRM6G2_\"}]}"
     }
   },
   "keys": {}

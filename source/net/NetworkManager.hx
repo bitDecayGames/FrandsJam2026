@@ -16,12 +16,13 @@ class NetworkManager {
 	public var mySessionId:String = "";
 
 	public var onJoined:(sessionId:String) -> Void;
-	public var onPlayerAdded:(sessionId:String, player:PlayerState) -> Void;
 	public var onPlayerChanged:(sessionId:String, player:PlayerState) -> Void;
 	public var onPlayerRemoved:(sessionId:String) -> Void;
 
+	public var onPlayerAdded = new FlxTypedSignal<(String, PlayerState) -> Void>();
 	public var onPCh = new FlxTypedSignal<(String, PlayerState) -> Void>();
 
+	public var onFishAdded = new FlxTypedSignal<(String, FishState) -> Void>();
 	public var onFishMove = new FlxTypedSignal<(String, FishState) -> Void>();
 
 	public static inline var roomName:String = "game_room";
@@ -50,6 +51,7 @@ class NetworkManager {
 
 			cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
 				trace('NetworkManager: fish added ${id}');
+				onFishAdded.dispatch(id, fish);
 
 				cb.listen(fish, "x", (_, _) -> {
 					trace('NetMan: (fish: ${id} x update');
@@ -66,9 +68,9 @@ class NetworkManager {
 				if (sessionId == mySessionId) {
 					return;
 				}
-				if (onPlayerAdded != null) {
-					onPlayerAdded(sessionId, player);
-				}
+
+				onPlayerAdded.dispatch(sessionId, player);
+
 				cb.listen(player, "x", (_, _) -> {
 					trace('NetMan: (sesh: ${sessionId} x update');
 					onPCh.dispatch(sessionId, player);
@@ -108,10 +110,20 @@ class NetworkManager {
 		room.send("move", {x: x, y: y});
 	}
 
-	public function setMessage(topic:String, msg:Dynamic) {
+	public function sendFishMove(id:String, x:Float, y:Float) {
 		if (room == null) {
 			return;
 		}
+
+		room.send("fish_move", {id: id, x: x, y: y});
+	}
+
+	public function setMessage(topic:String, msg:Dynamic) {
+		if (room == null) {
+			QLog.notice('[NetMan]: !!Skipping message on topic "$topic"');
+			return;
+		}
+		QLog.notice('[NetMan]: Sending message on topic "$topic"');
 		room.send(topic, msg);
 	}
 

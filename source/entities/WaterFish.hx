@@ -1,29 +1,56 @@
 package entities;
 
+import schema.FishState;
+import net.NetworkManager;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
 
 class WaterFish extends FlxSprite {
-	var waterTiles:Array<FlxPoint>;
+	var waterTiles:Array<FlxPoint> = [];
 	var target:FlxPoint;
 	var retargetTimer:Float;
 	var pauseTimer:Float = 0;
 
+	public var isRemote = false;
+
+	var net:NetworkManager = null;
+
+	public var fishId = "";
+
 	static inline var SPEED:Float = 20;
 	static inline var ARRIVE_DIST:Float = 2;
 
-	public function new(x:Float, y:Float, waterTiles:Array<FlxPoint>) {
+	public function new(x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false) {
 		super(x, y);
-		this.waterTiles = waterTiles;
+		if (waterTiles != null) {
+			this.waterTiles = waterTiles;
+		}
+		this.isRemote = isRemote;
 		makeGraphic(4, 2, FlxColor.BLACK);
 		pickTarget();
 	}
 
+	public function setNetwork(net:NetworkManager, id:String) {
+		this.net = net;
+		net.onFishMove.add(handleChange);
+		fishId = id;
+	}
+
+	private function handleChange(id:String, state:FishState):Void {
+		if (fishId != id) {
+			return;
+		}
+
+		setPosition(state.x, state.y);
+	}
+
 	function pickTarget() {
-		if (target != null)
+		if (target != null) {
 			target.put();
+		}
+
 		var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
 		target = FlxPoint.get(tile.x + FlxG.random.float(0, 12), tile.y + FlxG.random.float(0, 12));
 		retargetTimer = FlxG.random.float(2, 3);
@@ -68,6 +95,11 @@ class WaterFish extends FlxSprite {
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
+		if (isRemote) {
+			// TODO: drive animations but network controls main stuff
+			return;
+		}
+
 		if (pauseTimer > 0) {
 			pauseTimer -= elapsed;
 			return;
@@ -88,6 +120,11 @@ class WaterFish extends FlxSprite {
 			pickTarget();
 		} else {
 			velocity.set((dx / dist) * SPEED, (dy / dist) * SPEED);
+		}
+
+		if (net != null) {
+			net.update();
+			net.sendMove(x, y);
 		}
 	}
 
