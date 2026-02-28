@@ -13,6 +13,7 @@ import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
 import entities.FishSpawner;
+import entities.RockGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
@@ -33,6 +34,7 @@ class PlayState extends FlxTransitionableState {
 
 	var midGroundGroup = new FlxGroup();
 	var fishSpawner:FishSpawner;
+	var rockGroup:RockGroup;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
 
@@ -60,9 +62,11 @@ class PlayState extends FlxTransitionableState {
 		// QLog.error('Example error');
 
 		fishSpawner = new FishSpawner(() -> player.catchFish());
+		rockGroup = new RockGroup();
 
 		// Build out our render order
 		add(midGroundGroup);
+		add(rockGroup);
 		add(fishSpawner);
 		add(transitions);
 
@@ -124,6 +128,7 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		rockGroup.spawn(level);
 		fishSpawner.spawn(level);
 
 		for (t in level.camTransitions) {
@@ -145,6 +150,7 @@ class PlayState extends FlxTransitionableState {
 		}
 		transitions.clear();
 
+		rockGroup.clearAll();
 		fishSpawner.clearAll();
 
 		for (o in midGroundGroup) {
