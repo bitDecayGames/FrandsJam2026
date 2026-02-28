@@ -22,6 +22,7 @@ class GroundFish extends FlxSprite {
 	var arcEnd:FlxPoint;
 	var arcFlightTime:Float = 0;
 	var arcElapsed:Float = 0;
+
 	public var landing:Bool = false;
 
 	public function new(startX:Float, startY:Float, landX:Float, landY:Float, fishFrame:Int = 0) {

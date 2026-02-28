@@ -68,6 +68,7 @@ class Player extends FlxSprite {
 	var castPowerDir:Float = 1;
 	var castDirSuffix:String = "down";
 	var retractHasFish:Bool = false;
+
 	public var caughtFishFrame:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
 

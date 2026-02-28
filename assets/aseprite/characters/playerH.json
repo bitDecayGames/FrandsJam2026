@@ -1,843 +1,6 @@
 { "frames": [
    {
     "filename": "playerH 0.aseprite",
-    "frame": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 1.aseprite",
-    "frame": { "x": 48, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 2.aseprite",
-    "frame": { "x": 96, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 3.aseprite",
-    "frame": { "x": 144, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 4.aseprite",
-    "frame": { "x": 192, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 5.aseprite",
-    "frame": { "x": 240, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 6.aseprite",
-    "frame": { "x": 288, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 7.aseprite",
-    "frame": { "x": 336, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 8.aseprite",
-    "frame": { "x": 384, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 9.aseprite",
-    "frame": { "x": 432, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 10.aseprite",
-    "frame": { "x": 480, "y": 0, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 11.aseprite",
-    "frame": { "x": 0, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 12.aseprite",
-    "frame": { "x": 48, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 13.aseprite",
-    "frame": { "x": 96, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 14.aseprite",
-    "frame": { "x": 144, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 15.aseprite",
-    "frame": { "x": 192, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 16.aseprite",
-    "frame": { "x": 240, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 17.aseprite",
-    "frame": { "x": 288, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 18.aseprite",
-    "frame": { "x": 336, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 19.aseprite",
-    "frame": { "x": 384, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 20.aseprite",
-    "frame": { "x": 432, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 21.aseprite",
-    "frame": { "x": 480, "y": 48, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 22.aseprite",
-    "frame": { "x": 0, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 23.aseprite",
-    "frame": { "x": 48, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 24.aseprite",
-    "frame": { "x": 96, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 25.aseprite",
-    "frame": { "x": 144, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 26.aseprite",
-    "frame": { "x": 192, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 27.aseprite",
-    "frame": { "x": 240, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 28.aseprite",
-    "frame": { "x": 288, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 29.aseprite",
-    "frame": { "x": 336, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 30.aseprite",
-    "frame": { "x": 384, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 31.aseprite",
-    "frame": { "x": 432, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 32.aseprite",
-    "frame": { "x": 480, "y": 96, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 33.aseprite",
-    "frame": { "x": 0, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 34.aseprite",
-    "frame": { "x": 48, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 35.aseprite",
-    "frame": { "x": 96, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 36.aseprite",
-    "frame": { "x": 144, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 37.aseprite",
-    "frame": { "x": 192, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 38.aseprite",
-    "frame": { "x": 240, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 39.aseprite",
-    "frame": { "x": 288, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 40.aseprite",
-    "frame": { "x": 336, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 41.aseprite",
-    "frame": { "x": 384, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 42.aseprite",
-    "frame": { "x": 432, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 43.aseprite",
-    "frame": { "x": 480, "y": 144, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 44.aseprite",
-    "frame": { "x": 0, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 45.aseprite",
-    "frame": { "x": 48, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 46.aseprite",
-    "frame": { "x": 96, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 47.aseprite",
-    "frame": { "x": 144, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 48.aseprite",
-    "frame": { "x": 192, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 49.aseprite",
-    "frame": { "x": 240, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 50.aseprite",
-    "frame": { "x": 288, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 51.aseprite",
-    "frame": { "x": 336, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 52.aseprite",
-    "frame": { "x": 384, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 53.aseprite",
-    "frame": { "x": 432, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 54.aseprite",
-    "frame": { "x": 480, "y": 192, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 55.aseprite",
-    "frame": { "x": 0, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 56.aseprite",
-    "frame": { "x": 48, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 57.aseprite",
-    "frame": { "x": 96, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 58.aseprite",
-    "frame": { "x": 144, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 59.aseprite",
-    "frame": { "x": 192, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 60.aseprite",
-    "frame": { "x": 240, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 61.aseprite",
-    "frame": { "x": 288, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 62.aseprite",
-    "frame": { "x": 336, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 63.aseprite",
-    "frame": { "x": 384, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 64.aseprite",
-    "frame": { "x": 432, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 65.aseprite",
-    "frame": { "x": 480, "y": 240, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 66.aseprite",
-    "frame": { "x": 0, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 67.aseprite",
-    "frame": { "x": 48, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 68.aseprite",
-    "frame": { "x": 96, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 69.aseprite",
-    "frame": { "x": 144, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 70.aseprite",
-    "frame": { "x": 192, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 71.aseprite",
-    "frame": { "x": 144, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 72.aseprite",
-    "frame": { "x": 240, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 73.aseprite",
-    "frame": { "x": 240, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 74.aseprite",
-    "frame": { "x": 288, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 75.aseprite",
-    "frame": { "x": 336, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 76.aseprite",
-    "frame": { "x": 240, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 77.aseprite",
-    "frame": { "x": 384, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 78.aseprite",
-    "frame": { "x": 432, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 79.aseprite",
-    "frame": { "x": 384, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 80.aseprite",
-    "frame": { "x": 480, "y": 288, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 81.aseprite",
-    "frame": { "x": 0, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 82.aseprite",
-    "frame": { "x": 48, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 83.aseprite",
-    "frame": { "x": 96, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 84.aseprite",
-    "frame": { "x": 144, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 85.aseprite",
-    "frame": { "x": 192, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 86.aseprite",
-    "frame": { "x": 240, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 87.aseprite",
-    "frame": { "x": 288, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 88.aseprite",
-    "frame": { "x": 336, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 89.aseprite",
-    "frame": { "x": 384, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 90.aseprite",
-    "frame": { "x": 432, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 91.aseprite",
-    "frame": { "x": 480, "y": 336, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 92.aseprite",
-    "frame": { "x": 0, "y": 384, "w": 48, "h": 48 },
-    "rotated": false,
-    "trimmed": false,
-    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
-    "sourceSize": { "w": 48, "h": 48 },
-    "duration": 100
-   },
-   {
-    "filename": "playerH 93.aseprite",
     "frame": { "x": 48, "y": 384, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
@@ -846,8 +9,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 94.aseprite",
-    "frame": { "x": 96, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 1.aseprite",
+    "frame": { "x": 432, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -855,8 +18,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 95.aseprite",
-    "frame": { "x": 144, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 2.aseprite",
+    "frame": { "x": 384, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -864,8 +27,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 96.aseprite",
-    "frame": { "x": 192, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 3.aseprite",
+    "frame": { "x": 336, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -873,8 +36,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 97.aseprite",
-    "frame": { "x": 240, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 4.aseprite",
+    "frame": { "x": 288, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -882,8 +45,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 98.aseprite",
-    "frame": { "x": 288, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 5.aseprite",
+    "frame": { "x": 240, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -891,8 +54,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 99.aseprite",
-    "frame": { "x": 336, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 6.aseprite",
+    "frame": { "x": 192, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -900,8 +63,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 100.aseprite",
-    "frame": { "x": 384, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 7.aseprite",
+    "frame": { "x": 144, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -909,8 +72,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 101.aseprite",
-    "frame": { "x": 432, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 8.aseprite",
+    "frame": { "x": 96, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -918,8 +81,8 @@
     "duration": 100
    },
    {
-    "filename": "playerH 102.aseprite",
-    "frame": { "x": 480, "y": 384, "w": 48, "h": 48 },
+    "filename": "playerH 9.aseprite",
+    "frame": { "x": 48, "y": 288, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -927,7 +90,160 @@
     "duration": 100
    },
    {
-    "filename": "playerH 103.aseprite",
+    "filename": "playerH 10.aseprite",
+    "frame": { "x": 0, "y": 288, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 11.aseprite",
+    "frame": { "x": 480, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 12.aseprite",
+    "frame": { "x": 336, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 13.aseprite",
+    "frame": { "x": 384, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 14.aseprite",
+    "frame": { "x": 336, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 15.aseprite",
+    "frame": { "x": 288, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 16.aseprite",
+    "frame": { "x": 240, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 17.aseprite",
+    "frame": { "x": 192, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 18.aseprite",
+    "frame": { "x": 144, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 19.aseprite",
+    "frame": { "x": 96, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 20.aseprite",
+    "frame": { "x": 48, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 21.aseprite",
+    "frame": { "x": 0, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 22.aseprite",
+    "frame": { "x": 480, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 23.aseprite",
+    "frame": { "x": 432, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 24.aseprite",
+    "frame": { "x": 384, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 25.aseprite",
+    "frame": { "x": 432, "y": 240, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 26.aseprite",
+    "frame": { "x": 48, "y": 432, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 27.aseprite",
     "frame": { "x": 0, "y": 432, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
@@ -936,8 +252,692 @@
     "duration": 100
    },
    {
+    "filename": "playerH 28.aseprite",
+    "frame": { "x": 480, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 29.aseprite",
+    "frame": { "x": 432, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 30.aseprite",
+    "frame": { "x": 384, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 31.aseprite",
+    "frame": { "x": 336, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 32.aseprite",
+    "frame": { "x": 288, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 33.aseprite",
+    "frame": { "x": 240, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 34.aseprite",
+    "frame": { "x": 192, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 35.aseprite",
+    "frame": { "x": 144, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 36.aseprite",
+    "frame": { "x": 96, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 37.aseprite",
+    "frame": { "x": 480, "y": 288, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 38.aseprite",
+    "frame": { "x": 0, "y": 384, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 39.aseprite",
+    "frame": { "x": 480, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 40.aseprite",
+    "frame": { "x": 432, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 41.aseprite",
+    "frame": { "x": 384, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 42.aseprite",
+    "frame": { "x": 336, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 43.aseprite",
+    "frame": { "x": 288, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 44.aseprite",
+    "frame": { "x": 240, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 45.aseprite",
+    "frame": { "x": 192, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 46.aseprite",
+    "frame": { "x": 144, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 47.aseprite",
+    "frame": { "x": 96, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 48.aseprite",
+    "frame": { "x": 48, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 49.aseprite",
+    "frame": { "x": 0, "y": 336, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 50.aseprite",
+    "frame": { "x": 288, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 51.aseprite",
+    "frame": { "x": 144, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 52.aseprite",
+    "frame": { "x": 96, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 53.aseprite",
+    "frame": { "x": 48, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 54.aseprite",
+    "frame": { "x": 0, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 55.aseprite",
+    "frame": { "x": 480, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 56.aseprite",
+    "frame": { "x": 432, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 57.aseprite",
+    "frame": { "x": 384, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 58.aseprite",
+    "frame": { "x": 336, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 59.aseprite",
+    "frame": { "x": 288, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 60.aseprite",
+    "frame": { "x": 240, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 61.aseprite",
+    "frame": { "x": 192, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 62.aseprite",
+    "frame": { "x": 144, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 63.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 64.aseprite",
+    "frame": { "x": 48, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 65.aseprite",
+    "frame": { "x": 0, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 66.aseprite",
+    "frame": { "x": 480, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 67.aseprite",
+    "frame": { "x": 432, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 68.aseprite",
+    "frame": { "x": 384, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 69.aseprite",
+    "frame": { "x": 336, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 70.aseprite",
+    "frame": { "x": 288, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 71.aseprite",
+    "frame": { "x": 336, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 72.aseprite",
+    "frame": { "x": 240, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 73.aseprite",
+    "frame": { "x": 240, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 74.aseprite",
+    "frame": { "x": 192, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 75.aseprite",
+    "frame": { "x": 144, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 76.aseprite",
+    "frame": { "x": 240, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 77.aseprite",
+    "frame": { "x": 96, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 78.aseprite",
+    "frame": { "x": 48, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 79.aseprite",
+    "frame": { "x": 96, "y": 0, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 80.aseprite",
+    "frame": { "x": 96, "y": 48, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 81.aseprite",
+    "frame": { "x": 288, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 82.aseprite",
+    "frame": { "x": 240, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 83.aseprite",
+    "frame": { "x": 192, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 84.aseprite",
+    "frame": { "x": 144, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 85.aseprite",
+    "frame": { "x": 96, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 86.aseprite",
+    "frame": { "x": 48, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 87.aseprite",
+    "frame": { "x": 0, "y": 192, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 88.aseprite",
+    "frame": { "x": 480, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 89.aseprite",
+    "frame": { "x": 432, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 90.aseprite",
+    "frame": { "x": 384, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 91.aseprite",
+    "frame": { "x": 336, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 92.aseprite",
+    "frame": { "x": 192, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 93.aseprite",
+    "frame": { "x": 240, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 94.aseprite",
+    "frame": { "x": 192, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 95.aseprite",
+    "frame": { "x": 144, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 96.aseprite",
+    "frame": { "x": 96, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 97.aseprite",
+    "frame": { "x": 48, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 98.aseprite",
+    "frame": { "x": 0, "y": 144, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 99.aseprite",
+    "frame": { "x": 480, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 100.aseprite",
+    "frame": { "x": 432, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 101.aseprite",
+    "frame": { "x": 384, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 102.aseprite",
+    "frame": { "x": 336, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
+    "filename": "playerH 103.aseprite",
+    "frame": { "x": 288, "y": 96, "w": 48, "h": 48 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
+    "sourceSize": { "w": 48, "h": 48 },
+    "duration": 100
+   },
+   {
     "filename": "playerH 104.aseprite",
-    "frame": { "x": 48, "y": 432, "w": 48, "h": 48 },
+    "frame": { "x": 240, "y": 96, "w": 48, "h": 48 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 48, "h": 48 },
@@ -946,7 +946,7 @@
    }
  ],
  "meta": {
-  "app": "https://www.aseprite.org/",
+  "app": "http://www.aseprite.org/",
   "version": "1.3.14.4-x64",
   "image": "playerH.png",
   "format": "RGBA8888",

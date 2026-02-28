@@ -1,5 +1,6 @@
 package entities;
 
+import managers.GameManager;
 import schema.FishState;
 import net.NetworkManager;
 import flixel.FlxG;
@@ -33,23 +34,21 @@ class WaterFish extends FlxSprite {
 	var respawnTimer:Float = 0;
 	var fadeInTimer:Float = 0;
 
-	public function new(x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false) {
+	public function new(id:String, x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false) {
 		super(x, y);
+		fishId = id;
 		if (waterTiles != null) {
 			this.waterTiles = waterTiles;
 		}
 		this.isRemote = isRemote;
+		if (isRemote) {
+			GameManager.ME.net.onFishMove.add(handleChange);
+		}
 		loadGraphic("assets/aseprite/characters/fishShadow.png");
 		centerOffsets();
 		alpha = 0;
 		fadeInTimer = 1.0;
 		pickTarget();
-	}
-
-	public function setNetwork(net:NetworkManager, id:String) {
-		this.net = net;
-		net.onFishMove.add(handleChange);
-		fishId = id;
 	}
 
 	private function handleChange(id:String, state:FishState):Void {
@@ -61,6 +60,10 @@ class WaterFish extends FlxSprite {
 	}
 
 	function pickTarget() {
+		if (isRemote) {
+			return;
+		}
+
 		if (target != null) {
 			target.put();
 		}
@@ -115,6 +118,11 @@ class WaterFish extends FlxSprite {
 	}
 
 	override public function update(elapsed:Float) {
+		if (fadeInTimer > 0) {
+			fadeInTimer -= elapsed;
+			alpha = Math.min(1.0, 1.0 - fadeInTimer);
+		}
+
 		if (isRemote) {
 			// TODO: drive animations but network controls main stuff
 			super.update(elapsed);
@@ -127,11 +135,6 @@ class WaterFish extends FlxSprite {
 				respawn();
 			}
 			return;
-		}
-
-		if (fadeInTimer > 0) {
-			fadeInTimer -= elapsed;
-			alpha = Math.min(1.0, 1.0 - fadeInTimer);
 		}
 
 		super.update(elapsed);
@@ -166,10 +169,7 @@ class WaterFish extends FlxSprite {
 			velocity.set((dx / dist) * SPEED, (dy / dist) * SPEED);
 		}
 
-		if (net != null) {
-			net.update();
-			net.sendMove(x, y);
-		}
+		GameManager.ME.net.sendMessage("fish_move", {id: fishId, x: x, y: y}, true);
 	}
 
 	function checkBobber() {

@@ -9,7 +9,7 @@ import js.lib.Promise;
 
 class GameRoom extends RoomOf<GameState, Dynamic> {
 	override public function onCreate(options:Dynamic):Void {
-		maxClients = 4;
+		maxClients = 6;
 		setState(new GameState());
 
 		// sent when a player moves
@@ -24,7 +24,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// sent when a client spawns a fish
 		onMessage("fish_spawn", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_spawn" message: ${Json.stringify(data)}');
-			state.fish.set(data.id, new FishState());
+			state.fish.set(data.id, new FishState(data.x, data.y));
 		});
 
 		// sent when a fish moves
