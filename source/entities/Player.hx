@@ -4,15 +4,10 @@ import flixel.FlxSprite;
 import input.InputCalculator;
 import input.SimpleController;
 import bitdecay.flixel.graphics.Aseprite;
-import bitdecay.flixel.graphics.AsepriteMacros;
 import bitdecay.flixel.spacial.Cardinal;
 import flixel.FlxG;
 
 class Player extends FlxSprite {
-	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/player.json");
-	public static var layers = AsepriteMacros.layerNames("assets/aseprite/characters/player.json");
-	public static var eventData = AsepriteMacros.frameUserData("assets/aseprite/characters/player.json", "Layer 1");
-
 	var speed:Float = 150;
 	var playerNum = 0;
 
@@ -22,15 +17,9 @@ class Player extends FlxSprite {
 
 	public function new(X:Float, Y:Float) {
 		super(X, Y);
-		// This call can be used once https://github.com/HaxeFlixel/flixel/pull/2860 is merged
-		// FlxAsepriteUtil.loadAseAtlasAndTags(this, AssetPaths.player__png, AssetPaths.player__json);
-		Aseprite.loadAllAnimations(this, AssetPaths.player__json);
-		animation.play(anims.right);
-		animation.onFrameChange.add((anim, frame, index) -> {
-			if (eventData.exists(index)) {
-				trace('frame $index has data ${eventData.get(index)}');
-			}
-		});
+		Aseprite.loadAllAnimations(this, AssetPaths.playerA__json);
+		setSize(16, 16);
+		offset.set(16, 16);
 	}
 
 	override public function update(delta:Float) {
