@@ -15,6 +15,7 @@ import events.gen.Event;
 import events.EventBus;
 import flixel.FlxG;
 import flixel.FlxSprite;
+import flixel.util.FlxColor;
 import flixel.addons.transition.FlxTransitionableState;
 import ui.FlashingText;
 
@@ -22,6 +23,7 @@ using states.FlxStateExt;
 
 class PlayState extends FlxTransitionableState {
 	var player:Player;
+	var reticle:FlxSprite;
 	var midGroundGroup = new FlxGroup();
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
@@ -70,6 +72,10 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		reticle = new FlxSprite();
+		reticle.makeGraphic(16, 16, FlxColor.fromRGBFloat(1, 1, 1, 0.5));
+		add(reticle);
+
 		for (t in level.camTransitions) {
 			transitions.add(t);
 		}
@@ -108,6 +114,10 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 		handleCameraBounds();
+
+		var reticleOffset = player.lastInputDir.asVector();
+		reticle.setPosition(player.x + reticleOffset.x * 32, player.y + reticleOffset.y * 32);
+		reticleOffset.put();
 
 		if (player.hotModeActive && !hotText.isFlashing()) {
 			hotText.start();

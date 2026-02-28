@@ -12,7 +12,7 @@ class Player extends FlxSprite {
 
 	public var hotModeActive:Bool = false;
 	var hotModeTimer:Float = 0;
-	var lastInputDir:Cardinal = E;
+	public var lastInputDir:Cardinal = E;
 
 	static inline var FRAME_DOWN = 1;
 	static inline var FRAME_RIGHT = 2;
