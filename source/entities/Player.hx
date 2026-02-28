@@ -12,16 +12,29 @@ import flixel.util.FlxSpriteUtil;
 import input.InputCalculator;
 import input.SimpleController;
 import bitdecay.flixel.spacial.Cardinal;
+import bitdecay.flixel.graphics.AsepriteMacros;
 import flixel.FlxG;
+import haxe.io.Path;
 import entities.Inventory;
 import entities.Inventory.InventoryItem;
 
 class Player extends FlxSprite {
+	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/playerA.json");
+
 	// 0-indexed frame within the cast animation when the bobber launches
 	static inline var CAST_LAUNCH_FRAME:Int = 3;
 	// 0-indexed frame within the catch animation when the bobber retracts (1 before final)
 	static inline var CATCH_RETRACT_FRAME:Int = 1;
 
+	static var SKINS:Array<String> = [
+		"assets/aseprite/characters/playerA.json",
+		"assets/aseprite/characters/playerB.json",
+		"assets/aseprite/characters/playerC.json",
+		"assets/aseprite/characters/playerF.json",
+		"assets/aseprite/characters/playerH.json",
+	];
+
+	var skinIndex:Int = 0;
 	var speed:Float = 150;
 	var playerNum = 0;
 
@@ -81,30 +94,7 @@ class Player extends FlxSprite {
 	public function new(X:Float, Y:Float, state:FlxState) {
 		super(X, Y);
 		this.state = state;
-		loadGraphic(AssetPaths.playerA__png, true, 48, 48);
-		setSize(16, 16);
-		offset.set(16, 16);
-
-		animation.add("stand_down", [1]);
-		animation.add("run_down", [2, 3, 4, 5, 6, 7, 8, 9], 12, true);
-		animation.add("stand_right", [10]);
-		animation.add("run_right", [11, 12, 13, 14, 15, 16, 17, 18], 12, true);
-		animation.add("stand_up", [19]);
-		animation.add("run_up", [20, 21, 22, 23, 24, 25, 26, 23], 12, true);
-		animation.add("stand_left", [28]);
-		animation.add("run_left", [29, 30, 31, 32, 33, 34, 35, 36], 12, true);
-		animation.add("cast_down", [37, 38, 39, 40, 41], 12, false);
-		animation.add("cast_right", [43, 44, 45, 46, 47], 12, false);
-		animation.add("cast_up", [49, 50, 51, 52, 53], 12, false);
-		animation.add("cast_left", [55, 56, 57, 58, 59], 12, false);
-		animation.add("throw_down", [61, 62, 63, 64, 65, 66, 67, 68], 12, false);
-		animation.add("throw_right", [69, 70, 69, 10, 10, 71, 72, 10], 12, false);
-		animation.add("throw_up", [73, 74, 73, 75, 76, 77, 78, 79], 12, false);
-		animation.add("throw_left", [80, 81, 82, 83, 84, 85, 86, 87], 12, false);
-		animation.add("catch_down", [88, 89, 90], 12, false);
-		animation.add("catch_right", [91, 92, 93], 12, false);
-		animation.add("catch_up", [94, 95, 96], 12, false);
-		animation.add("catch_left", [97, 98, 99], 12, false);
+		loadSkin(SKINS[skinIndex]);
 
 		animation.onFrameChange.add(onAnimFrameChange);
 		animation.onFinish.add(onAnimFinish);
@@ -215,6 +205,14 @@ class Player extends FlxSprite {
 			return;
 		}
 
+		if (FlxG.keys.justPressed.Q) {
+			skinIndex = (skinIndex - 1 + SKINS.length) % SKINS.length;
+			swapSkin();
+		} else if (FlxG.keys.justPressed.E) {
+			skinIndex = (skinIndex + 1) % SKINS.length;
+			swapSkin();
+		}
+
 		if (frozen) {
 			velocity.set();
 		} else {
@@ -263,7 +261,13 @@ class Player extends FlxSprite {
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
 			// Capture reticle target for the rock
 			var dir = lastInputDir.asVector();
-			rockTarget = FlxPoint.get(x + dir.x * 96 + 4, y + dir.y * 96 + 4);
+			var rawX = x + dir.x * 96 + 4;
+			var rawY = y + dir.y * 96 + 4;
+			var bounds = FlxG.worldBounds;
+			rockTarget = FlxPoint.get(
+				Math.max(bounds.left, Math.min(bounds.right, rawX)),
+				Math.max(bounds.top, Math.min(bounds.bottom, rawY))
+			);
 			dir.put();
 		}
 
@@ -285,6 +289,10 @@ class Player extends FlxSprite {
 
 	function getRodTipPos():FlxPoint {
 		if (castState == CAST_ANIM || castState == CASTING) {
+			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
+			if (castState == CAST_ANIM && frame == 3 && (castDirSuffix == "right" || castDirSuffix == "left")) {
+				return if (castDirSuffix == "right") FlxPoint.get(x + 12, y) else FlxPoint.get(x + 4, y);
+			}
 			return switch (castDirSuffix) {
 				case "down": FlxPoint.get(x + 10, y + 24);
 				case "right": FlxPoint.get(x + 30, y + 2);
@@ -441,7 +449,7 @@ class Player extends FlxSprite {
 			rockTarget = null;
 			rockStartPos.put();
 			rockStartPos = null;
-			landed.handleLanded(landX, landY);
+			landed.resolveThrow(landX, landY);
 			landed.destroy();
 		}
 	}
@@ -459,7 +467,9 @@ class Player extends FlxSprite {
 
 		castBobber = new FlxSprite();
 		castBobber.makeGraphic(8, 8, FlxColor.RED);
-		castBobber.setPosition(x + 4, y + 4);
+		var tip = getRodTipPos();
+		castBobber.setPosition(tip.x, tip.y);
+		tip.put();
 
 		castStartPos = FlxPoint.get(castBobber.x, castBobber.y);
 		var dx = castTarget.x - castStartPos.x;
@@ -612,6 +622,53 @@ class Player extends FlxSprite {
 		}
 	}
 
+	static var ONE_SHOT_PREFIXES:Array<String> = ["cast_", "throw_", "catch_"];
+
+	function loadSkin(jsonPath:String) {
+		var jsonText:String = openfl.Assets.getText(jsonPath);
+		var json = haxe.Json.parse(jsonText);
+
+		var pngPath = Path.join([Path.directory(jsonPath), json.meta.image]);
+		var sheetW:Int = json.meta.size.w;
+		var cols:Int = Std.int(sheetW / 48);
+
+		loadGraphic(pngPath, true, 48, 48);
+		setSize(16, 16);
+		offset.set(16, 16);
+
+		var frames:Array<Dynamic> = json.frames;
+		var tags:Array<Dynamic> = json.meta.frameTags;
+		for (tag in tags) {
+			var name:String = tag.name;
+			var from:Int = tag.from;
+			var to:Int = tag.to;
+			var indices:Array<Int> = [];
+			for (i in from...to + 1) {
+				var fx:Int = frames[i].frame.x;
+				var fy:Int = frames[i].frame.y;
+				indices.push(Std.int(fy / 48) * cols + Std.int(fx / 48));
+			}
+			var loop = true;
+			for (p in ONE_SHOT_PREFIXES) {
+				if (StringTools.startsWith(name, p)) {
+					loop = false;
+					break;
+				}
+			}
+			animation.add(name, indices, 12, loop);
+		}
+	}
+
+	function swapSkin() {
+		var curAnim = animation.curAnim;
+		var animName = curAnim != null ? curAnim.name : null;
+		var animFrame = curAnim != null ? curAnim.curFrame : 0;
+		loadSkin(SKINS[skinIndex]);
+		if (animName != null) {
+			animation.play(animName, false, false, animFrame);
+		}
+	}
+	
 	public function pickupItem(item:InventoryItem):Bool {
 		return inventory.add(item);
 	}
