@@ -15,8 +15,8 @@ class GameManager {
 	public var net:NetworkManager;
 
 	private var round:RoundManager;
-	private var totalRounds:Int = 1;
-	private var currentRoundNumber:Int = 1;
+	private var totalRounds:Int = -1;
+	private var currentRoundNumber:Int = -1;
 
 	private var rounds:Array<Round>;
 
@@ -44,7 +44,7 @@ class GameManager {
 	}
 
 	public function start() {
-		if (currentRoundNumber == 0) {
+		if (currentRoundNumber == 1) {
 			net.sendMessage("round_update", {
 				status: RoundState.STATUS_LOBBY,
 				currentRound: currentRoundNumber,

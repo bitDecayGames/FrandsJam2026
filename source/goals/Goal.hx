@@ -13,7 +13,6 @@ class Goal extends FlxBasic {
 	private var scores:Map<String, Int> = new Map<String, Int>();
 
 	public function initialize(state:PlayState) {
-		completed.removeAll();
 		scores = new Map<String, Int>();
 		state.add(this);
 	}

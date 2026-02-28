@@ -40,8 +40,9 @@ class RoundManager {
 	}
 
 	private function checkForCompletion() {
-		if (complete)
+		if (complete) {
 			return;
+		}
 		if (round.allGoalsRequired) {
 			for (goal in round.goals) {
 				if (!goal.isComplete()) {

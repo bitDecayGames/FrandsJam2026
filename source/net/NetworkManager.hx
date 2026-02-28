@@ -108,6 +108,7 @@ class NetworkManager {
 
 	public function sendMessage(topic:String, msg:Dynamic) {
 		if (room == null) {
+			trace('failed to send message: room is null (${topic} -> ${msg})');
 			return;
 		}
 		room.send(topic, msg);
