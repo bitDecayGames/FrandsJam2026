@@ -21,11 +21,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
+      - name: Sparse checkout FMOD SDK (html5 only)
+        run: |
+          git clone --no-checkout --filter=blob:none \
+            https://x-access-token:${{ secrets.FMOD_SDK_TOKEN }}@github.com/Tanz0rz/fmod-sdk-cache.git \
+            fmod-sdk-cache
+          cd fmod-sdk-cache
+          git sparse-checkout set sdk/2.03.12/html5
+          git checkout
+
       - name: Make html5 build
         uses: bitDecayGames/lime-build-action@v0.0.39
         with:
           buildArgs: -D API_KEY=${{ secrets.ANALYTICS_TOKEN }} -D dev_analytics
           initScriptFile: ./bin/init_deps.sh
+        env:
+          FMOD_SDK_WEB: ${{ github.workspace }}/fmod-sdk-cache/sdk/2.03.12/html5
 
       - name: Upload html5 zip artifact
         uses: actions/upload-artifact@v4
