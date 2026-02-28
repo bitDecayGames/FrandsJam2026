@@ -12,6 +12,9 @@ import bitdecay.flixel.spacial.Cardinal;
 import flixel.FlxG;
 
 class Player extends FlxSprite {
+	// 0-indexed frame within the cast animation when the bobber launches
+	static inline var CAST_LAUNCH_FRAME:Int = 3;
+
 	var speed:Float = 150;
 	var playerNum = 0;
 
@@ -58,9 +61,16 @@ class Player extends FlxSprite {
 		animation.add("run_right", [11, 12, 13, 14, 15, 16, 17, 18], 12, true);
 		animation.add("stand_up", [19]);
 		animation.add("run_up", [20, 21, 22, 23, 24, 25, 26, 23], 12, true);
-		animation.add("stand_left", [27]);
-		animation.add("run_left", [28, 29, 30, 31, 32, 33, 34, 35], 12, true);
+		animation.add("stand_left", [28]);
+		animation.add("run_left", [29, 30, 31, 32, 33, 34, 35, 36], 12, true);
+		animation.add("cast_down", [37, 38, 39, 40, 41], 12, false);
+		animation.add("cast_right", [43, 44, 45, 46, 47], 12, false);
+		animation.add("cast_up", [49, 50, 51, 52, 53], 12, false);
+		animation.add("cast_left", [55, 56, 57, 58, 59], 12, false);
 		animation.play("stand_down");
+
+		animation.onFrameChange.add(onAnimFrameChange);
+		animation.onFinish.add(onAnimFinish);
 
 		reticle = new FlxSprite();
 		reticle.loadGraphic(AssetPaths.aimingTarget__png, true, 8, 8);
@@ -78,6 +88,19 @@ class Player extends FlxSprite {
 		powerBarFill.visible = false;
 		powerBarFill.origin.set(0, 0);
 		state.add(powerBarFill);
+	}
+
+	function onAnimFrameChange(animName:String, frameNumber:Int, frameIndex:Int) {
+		if (castState == CAST_ANIM && castBobber == null && frameNumber == CAST_LAUNCH_FRAME) {
+			launchBobber();
+		}
+	}
+
+	function onAnimFinish(animName:String) {
+		if (castState == CAST_ANIM) {
+			castState = CASTING;
+			frozen = false;
+		}
 	}
 
 	public function setNetwork(net:NetworkManager, session:String) {
@@ -157,6 +180,31 @@ class Player extends FlxSprite {
 		reticleOffset.put();
 	}
 
+	function launchBobber() {
+		var reticleDir = lastInputDir.asVector();
+		var castDist = castPower * 96;
+		var targetX = x + reticleDir.x * castDist + 4;
+		var targetY = y + reticleDir.y * castDist + 4;
+		reticleDir.put();
+
+		castTarget = FlxPoint.get(targetX, targetY);
+
+		if (net != null)
+			net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
+
+		castBobber = new FlxSprite();
+		castBobber.makeGraphic(8, 8, FlxColor.RED);
+		castBobber.setPosition(x + 4, y + 4);
+		var dx = castTarget.x - castBobber.x;
+		var dy = castTarget.y - castBobber.y;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+		if (dist > 0) {
+			castBobber.velocity.x = (dx / dist) * 300;
+			castBobber.velocity.y = (dy / dist) * 300;
+		}
+		state.add(castBobber);
+	}
+
 	function updateCast(elapsed:Float) {
 		switch (castState) {
 			case IDLE:
@@ -187,36 +235,18 @@ class Player extends FlxSprite {
 				if (SimpleController.just_pressed(A)) {
 					powerBarBg.visible = false;
 					powerBarFill.visible = false;
-					frozen = false;
 
 					if (castPower < 0.05) {
 						castState = IDLE;
+						frozen = false;
 					} else {
-						castState = CASTING;
-						var reticleDir = lastInputDir.asVector();
-						var castDist = castPower * 96;
-						var targetX = x + reticleDir.x * castDist + 4;
-						var targetY = y + reticleDir.y * castDist + 4;
-						reticleDir.put();
-
-						castTarget = FlxPoint.get(targetX, targetY);
-
-						if (net != null)
-							net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
-
-						castBobber = new FlxSprite();
-						castBobber.makeGraphic(8, 8, FlxColor.RED);
-						castBobber.setPosition(x + 4, y + 4);
-						var dx = castTarget.x - castBobber.x;
-						var dy = castTarget.y - castBobber.y;
-						var dist = Math.sqrt(dx * dx + dy * dy);
-						if (dist > 0) {
-							castBobber.velocity.x = (dx / dist) * 300;
-							castBobber.velocity.y = (dy / dist) * 300;
-						}
-						state.add(castBobber);
+						castState = CAST_ANIM;
+						var dirSuffix = getDirSuffix();
+						animation.play("cast_" + dirSuffix, true);
 					}
 				}
+			case CAST_ANIM:
+				// Handled by onAnimFrameChange and onAnimFinish signals
 			case CASTING:
 				if (castBobber != null && castTarget != null) {
 					if (FlxG.keys.justPressed.Z || velocity.x != 0 || velocity.y != 0) {
@@ -260,15 +290,22 @@ class Player extends FlxSprite {
 		}
 	}
 
-	function updateAnim() {
-		var dirSuffix = switch (lastInputDir) {
+	function getDirSuffix():String {
+		return switch (lastInputDir) {
 			case N: "up";
 			case S: "down";
 			case W: "left";
 			case E: "right";
 			default: "down";
 		};
+	}
 
+	function updateAnim() {
+		// Don't override cast animations
+		if (castState == CAST_ANIM)
+			return;
+
+		var dirSuffix = getDirSuffix();
 		var moving = velocity.x != 0 || velocity.y != 0;
 		var animName = (moving ? "run_" : "stand_") + dirSuffix;
 
@@ -293,6 +330,7 @@ class Player extends FlxSprite {
 enum CastState {
 	IDLE;
 	CHARGING;
+	CAST_ANIM;
 	CASTING;
 	LANDED;
 	RETURNING;
