@@ -19,13 +19,11 @@ class TimedGoal extends Goal {
 
 	override function initialize(state:PlayState) {
 		super.initialize(state);
-		// MW: might need to add to a specific UI group here for sprite sorting
 		this.text = new PressStart(FlxG.width * .5, FlxG.height * .5, "Hello World");
 		this.text.color = FlxColor.CYAN;
 		this.text.alignment = FlxTextAlign.CENTER;
+		// TODO: MW need to add to a specific UI group here for sprite sorting
 		state.add(text);
-		var test = new FlxSprite();
-		state.add(test);
 	}
 
 	override public function update(delta:Float) {
