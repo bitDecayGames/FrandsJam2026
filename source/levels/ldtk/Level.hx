@@ -25,6 +25,7 @@ class Level {
 	public var songEvent:String = "";
 
 	public var terrainLayer:BDTilemap;
+	public var fishSpawnerLayer:ldtk.Layer_IntGrid;
 	public var spawnPoint:FlxPoint = FlxPoint.get();
 
 	public var camZones:Map<String, FlxRect>;
@@ -39,6 +40,8 @@ class Level {
 
 		terrainLayer = new BDTilemap();
 		terrainLayer.loadLdtk(raw.l_Terrain);
+
+		fishSpawnerLayer = raw.l_FishSpawner;
 
 		if (raw.l_Objects.all_Spawn.length == 0) {
 			throw('no spawn found in level ${nameOrIID}');
