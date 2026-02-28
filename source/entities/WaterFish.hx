@@ -134,7 +134,6 @@ class WaterFish extends FlxSprite {
 
 		if (attracted) {
 			return;
-		}
 
 		if (pauseTimer > 0) {
 			pauseTimer -= elapsed;

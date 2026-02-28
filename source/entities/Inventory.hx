@@ -42,4 +42,5 @@ class Inventory {
 
 enum InventoryItem {
 	Rock;
+	Fish;
 }
