@@ -12,14 +12,27 @@ import flixel.util.FlxSpriteUtil;
 import input.InputCalculator;
 import input.SimpleController;
 import bitdecay.flixel.spacial.Cardinal;
+import bitdecay.flixel.graphics.Aseprite;
+import bitdecay.flixel.graphics.AsepriteMacros;
 import flixel.FlxG;
 
 class Player extends FlxSprite {
+	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/playerA.json");
+
 	// 0-indexed frame within the cast animation when the bobber launches
 	static inline var CAST_LAUNCH_FRAME:Int = 3;
 	// 0-indexed frame within the catch animation when the bobber retracts (1 before final)
 	static inline var CATCH_RETRACT_FRAME:Int = 1;
 
+	static var SKINS:Array<String> = [
+		"assets/aseprite/characters/playerA.json",
+		"assets/aseprite/characters/playerB.json",
+		"assets/aseprite/characters/playerC.json",
+		"assets/aseprite/characters/playerF.json",
+		"assets/aseprite/characters/playerH.json",
+	];
+
+	var skinIndex:Int = 0;
 	var speed:Float = 150;
 	var playerNum = 0;
 
@@ -74,30 +87,7 @@ class Player extends FlxSprite {
 	public function new(X:Float, Y:Float, state:FlxState) {
 		super(X, Y);
 		this.state = state;
-		loadGraphic(AssetPaths.playerA__png, true, 48, 48);
-		setSize(16, 16);
-		offset.set(16, 16);
-
-		animation.add("stand_down", [1]);
-		animation.add("run_down", [2, 3, 4, 5, 6, 7, 8, 9], 12, true);
-		animation.add("stand_right", [10]);
-		animation.add("run_right", [11, 12, 13, 14, 15, 16, 17, 18], 12, true);
-		animation.add("stand_up", [19]);
-		animation.add("run_up", [20, 21, 22, 23, 24, 25, 26, 23], 12, true);
-		animation.add("stand_left", [28]);
-		animation.add("run_left", [29, 30, 31, 32, 33, 34, 35, 36], 12, true);
-		animation.add("cast_down", [37, 38, 39, 40, 41], 12, false);
-		animation.add("cast_right", [43, 44, 45, 46, 47], 12, false);
-		animation.add("cast_up", [49, 50, 51, 52, 53], 12, false);
-		animation.add("cast_left", [55, 56, 57, 58, 59], 12, false);
-		animation.add("throw_down", [61, 62, 63, 64, 65, 66, 67, 68], 12, false);
-		animation.add("throw_right", [69, 70, 69, 10, 10, 71, 72, 10], 12, false);
-		animation.add("throw_up", [73, 74, 73, 75, 76, 77, 78, 79], 12, false);
-		animation.add("throw_left", [80, 81, 82, 83, 84, 85, 86, 87], 12, false);
-		animation.add("catch_down", [88, 89, 90], 12, false);
-		animation.add("catch_right", [91, 92, 93], 12, false);
-		animation.add("catch_up", [94, 95, 96], 12, false);
-		animation.add("catch_left", [97, 98, 99], 12, false);
+		loadSkin(SKINS[skinIndex]);
 
 		animation.onFrameChange.add(onAnimFrameChange);
 		animation.onFinish.add(onAnimFinish);
@@ -206,6 +196,14 @@ class Player extends FlxSprite {
 		if (isRemote) {
 			// events drive this one
 			return;
+		}
+
+		if (FlxG.keys.justPressed.Q) {
+			skinIndex = (skinIndex - 1 + SKINS.length) % SKINS.length;
+			swapSkin();
+		} else if (FlxG.keys.justPressed.E) {
+			skinIndex = (skinIndex + 1) % SKINS.length;
+			swapSkin();
 		}
 
 		if (frozen) {
@@ -320,6 +318,14 @@ class Player extends FlxSprite {
 		if (castBobber == null) {
 			fishingLine.visible = false;
 			return;
+		}
+
+		if (castState == CAST_ANIM && (castDirSuffix == "right" || castDirSuffix == "left")) {
+			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
+			if (frame < 4) {
+				fishingLine.visible = false;
+				return;
+			}
 		}
 
 		var tip = getRodTipPos();
@@ -607,6 +613,31 @@ class Player extends FlxSprite {
 				castBobber.velocity.set(0, 0);
 			}
 			sendAnimUpdate("catch_" + castDirSuffix, true);
+		}
+	}
+
+	static var ONE_SHOT_PREFIXES:Array<String> = ["cast_", "throw_", "catch_"];
+
+	function loadSkin(jsonPath:String) {
+		Aseprite.loadAllAnimations(this, jsonPath);
+		setSize(16, 16);
+		offset.set(16, 16);
+		for (prefix in ONE_SHOT_PREFIXES) {
+			for (dir in ["down", "right", "up", "left"]) {
+				var anim = animation.getByName(prefix + dir);
+				if (anim != null)
+					anim.looped = false;
+			}
+		}
+	}
+
+	function swapSkin() {
+		var curAnim = animation.curAnim;
+		var animName = curAnim != null ? curAnim.name : null;
+		var animFrame = curAnim != null ? curAnim.curFrame : 0;
+		loadSkin(SKINS[skinIndex]);
+		if (animName != null) {
+			animation.play(animName, false, false, animFrame);
 		}
 	}
 
