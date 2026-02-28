@@ -31,6 +31,7 @@ import flixel.FlxG;
 import flixel.addons.transition.FlxTransitionableState;
 import ui.FlashingText;
 import ui.InventoryHUD;
+import ui.ScoreHUD;
 
 using states.FlxStateExt;
 
@@ -47,6 +48,7 @@ class PlayState extends FlxTransitionableState {
 	var groundFishGroup:GroundFishGroup;
 	var shop:Shop;
 	var inventoryHUD:InventoryHUD;
+	var scoreHUD:ScoreHUD;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
 
@@ -184,6 +186,9 @@ class PlayState extends FlxTransitionableState {
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
+
+		scoreHUD = new ScoreHUD(player);
+		add(scoreHUD);
 
 		for (t in level.camTransitions) {
 			transitions.add(t);
