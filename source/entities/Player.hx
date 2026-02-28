@@ -31,6 +31,7 @@ class Player extends FlxSprite {
 		"assets/aseprite/characters/playerB.json",
 		"assets/aseprite/characters/playerC.json",
 		"assets/aseprite/characters/playerF.json",
+		"assets/aseprite/characters/playerG.json",
 		"assets/aseprite/characters/playerH.json",
 	];
 
@@ -285,7 +286,11 @@ class Player extends FlxSprite {
 		if (reticle == null)
 			return;
 		var reticleOffset = lastInputDir.asVector();
-		reticle.setPosition(last.x + reticleOffset.x * 96 + 4, last.y + reticleOffset.y * 96 + 4);
+		var bounds = FlxG.worldBounds;
+		reticle.setPosition(
+			Math.max(bounds.left, Math.min(bounds.right, last.x + reticleOffset.x * 96 + 4)),
+			Math.max(bounds.top, Math.min(bounds.bottom, last.y + reticleOffset.y * 96 + 4))
+		);
 		reticleOffset.put();
 	}
 
