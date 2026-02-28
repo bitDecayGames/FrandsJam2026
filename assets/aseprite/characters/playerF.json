@@ -46,7 +46,7 @@
    }
  ],
  "meta": {
-  "app": "https://www.aseprite.org/",
+  "app": "http://www.aseprite.org/",
   "version": "1.3.14.4-x64",
   "image": "playerF.png",
   "format": "RGBA8888",

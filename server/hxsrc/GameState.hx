@@ -12,12 +12,27 @@ class PlayerState extends Schema {
 	}
 }
 
+class FishState extends Schema {
+	@:type("float32") public var x:Float;
+	@:type("float32") public var y:Float;
+
+	public function new() {
+		super();
+		x = 0;
+		y = 0;
+	}
+}
+
 class GameState extends Schema {
 	@:type({map: PlayerState})
 	public var players:MapSchema<PlayerState>;
 
+	@:type({map: FishState})
+	public var fish:MapSchema<FishState>;
+
 	public function new() {
 		super();
 		players = new MapSchema<PlayerState>();
+		fish = new MapSchema<FishState>();
 	}
 }

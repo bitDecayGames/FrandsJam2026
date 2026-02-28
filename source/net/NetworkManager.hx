@@ -7,8 +7,11 @@ import io.colyseus.Room;
 import io.colyseus.serializer.schema.Callbacks;
 import schema.GameState;
 import schema.PlayerState;
+import schema.FishState;
 
 class NetworkManager {
+	public static var IS_HOST:Bool = false;
+
 	var client:Client;
 	var room:Room<GameState>;
 
@@ -20,6 +23,8 @@ class NetworkManager {
 	public var onPlayerRemoved:(sessionId:String) -> Void;
 
 	public var onPCh = new FlxTypedSignal<(String, PlayerState) -> Void>();
+
+	public var onFishMove = new FlxTypedSignal<(String, FishState) -> Void>();
 
 	public static inline var roomName:String = "game_room";
 
@@ -44,6 +49,19 @@ class NetworkManager {
 			}
 
 			var cb = Callbacks.get(room);
+
+			cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
+				trace('NetworkManager: fish added ${id}');
+
+				cb.listen(fish, "x", (_, _) -> {
+					trace('NetMan: (fish: ${id} x update');
+					onFishMove.dispatch(id, fish);
+				});
+				cb.listen(fish, "y", (_, _) -> {
+					trace('NetMan: (fish: ${id} y update');
+					onFishMove.dispatch(id, fish);
+				});
+			});
 
 			cb.onAdd(room.state, "players", (player:PlayerState, sessionId:String) -> {
 				trace('NetworkManager: player added $sessionId');
