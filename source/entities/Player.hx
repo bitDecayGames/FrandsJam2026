@@ -13,6 +13,8 @@ import input.InputCalculator;
 import input.SimpleController;
 import bitdecay.flixel.spacial.Cardinal;
 import flixel.FlxG;
+import entities.Inventory;
+import entities.Inventory.InventoryItem;
 
 class Player extends FlxSprite {
 	// 0-indexed frame within the cast animation when the bobber launches
@@ -26,6 +28,8 @@ class Player extends FlxSprite {
 	public var hotModeActive:Bool = false;
 
 	var hotModeTimer:Float = 0;
+
+	public var inventory = new Inventory();
 
 	public var lastInputDir:Cardinal = E;
 
@@ -608,6 +612,10 @@ class Player extends FlxSprite {
 			}
 			sendAnimUpdate("catch_" + castDirSuffix, true);
 		}
+	}
+
+	public function pickupItem(item:InventoryItem):Bool {
+		return inventory.add(item);
 	}
 
 	function getDirSuffix():String {
