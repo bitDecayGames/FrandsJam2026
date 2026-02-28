@@ -12,13 +12,14 @@ FrandsJam is a HaxeFlixel game built with Haxe, OpenFL/Lime, and FMOD audio. It 
 ./bin/init_deps.sh          # Install dependencies from haxelib.deps
 lime build html5             # Production build
 lime build html5 -debug      # Debug build
+lime build hl -debug         # HashLink debug build (preferred for local testing)
 ./bin/format.sh              # Format Haxe code
 ./bin/export_ase.sh          # Export Aseprite files to atlases
 ./bin/generate_events.sh     # Regenerate Event.hx from types.json
 ./bin/setup_hooks.sh         # Install git hooks
 ```
 
-**Do not run `./bin/run_debug.sh`** — it starts a long-running HTTP server. The user will run this themselves. Use `lime build html5 -debug` to compile only.
+**Do not run `./bin/run_debug.sh`** — it starts a long-running HTTP server. The user will run this themselves. Use `lime build hl -debug` to compile only.
 
 `./bin/run_llm_debug.sh` builds with the LLM debug bridge and serves on port 8080. Use this to test the game via Playwright. See [LLM Debug Bridge docs](docs/llm-debug-bridge.md) for the full `window.__debug` API.
 
@@ -41,6 +42,12 @@ Achievements registered in `Achievements.initAchievements()` with event-based co
 
 ### Audio (FMOD)
 FmodConstants.hx is auto-generated from the FMOD Studio project in `fmod/`. Use `FmodManager.PlaySong()` / `PlaySoundOneShot()` / `StopSong()`. Constants are in FmodSongs and FmodSFX.
+
+### Player (source/entities/Player.hx)
+Player extends FlxSprite (48x48 graphic, 16x16 hitbox). Takes an `FlxState` reference in its constructor so it can add/remove its own child sprites (reticle, power bar, cast bobber) from the scene. Movement speed is 150px/s (225 in hot mode). Uses `InputCalculator.getInputCardinal()` for input and tracks `lastInputDir` for facing direction. Has a `frozen` flag that suppresses movement during cast charging.
+
+### Fishing Cast System (source/entities/Player.hx)
+Cast mechanic uses a `CastState` enum (IDLE → CHARGING → CASTING → LANDED → RETURNING). Press Z to start charging — a power bar pulses below the player. Press Z again to launch a bobber toward the reticle at a distance proportional to power (max 96px / 6 tiles). Press Z or move to retract the bobber at any point (mid-flight, landed). The bobber flies back to the player at 500px/s before being destroyed. The `CastState` enum is defined at module level in Player.hx.
 
 ### Analytics & Storage (source/helpers/)
 Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence for achievements and metrics.
@@ -71,6 +78,10 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 - Logging: `QLog.notice()`, `QLog.warning()`, `QLog.error()`
 - Reference assets via the `AssetPaths` auto-generated class
 - Game window: 640x480, 60 FPS
+- Tile size: 16x16 pixels
+- Entity-specific logic (sprites, state machines, input) belongs in the entity class, not PlayState. Entities receive an `FlxState` reference to manage their own child sprites.
+- When making sprites visible, set their position before setting `visible = true` to avoid a one-frame flash at the previous location
+- Use `FlxPoint.get()`/`.put()` for pooled points; call `.put()` when done to return to pool
 
 ## Git Hooks
 
