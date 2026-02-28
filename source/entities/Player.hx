@@ -55,6 +55,14 @@ class Player extends FlxSprite {
 	var powerBarBg:FlxSprite;
 	var powerBarFill:FlxSprite;
 
+	// Throw state
+	var throwing:Bool = false;
+	var rockSprite:FlxSprite;
+	var rockTarget:FlxPoint;
+	var rockStartPos:FlxPoint;
+	var rockFlightTime:Float = 0;
+	var rockElapsed:Float = 0;
+
 	// Animation state tracking
 	var lastMoving:Bool = false;
 	var lastAnimDir:Cardinal = E;
@@ -82,6 +90,10 @@ class Player extends FlxSprite {
 		animation.add("cast_right", [43, 44, 45, 46, 47], 12, false);
 		animation.add("cast_up", [49, 50, 51, 52, 53], 12, false);
 		animation.add("cast_left", [55, 56, 57, 58, 59], 12, false);
+		animation.add("throw_down", [61, 62, 63, 64, 65, 66, 67, 68], 12, false);
+		animation.add("throw_right", [69, 70, 69, 10, 10, 71, 72, 10], 12, false);
+		animation.add("throw_up", [73, 74, 73, 75, 76, 77, 78, 79], 12, false);
+		animation.add("throw_left", [80, 81, 82, 83, 84, 85, 86, 87], 12, false);
 		animation.add("catch_down", [88, 89, 90], 12, false);
 		animation.add("catch_right", [91, 92, 93], 12, false);
 		animation.add("catch_up", [94, 95, 96], 12, false);
@@ -123,6 +135,9 @@ class Player extends FlxSprite {
 		if (castState == CAST_ANIM && castBobber == null && frameNumber == CAST_LAUNCH_FRAME) {
 			launchBobber();
 		}
+		if (throwing && rockSprite == null && frameNumber == 6) {
+			launchRock();
+		}
 		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
 			var px = x + 4;
 			var py = y + 4;
@@ -145,6 +160,10 @@ class Player extends FlxSprite {
 			} else {
 				castState = IDLE;
 			}
+			frozen = false;
+			playMovementAnim(true);
+		} else if (throwing) {
+			throwing = false;
 			frozen = false;
 			playMovementAnim(true);
 		}
@@ -225,13 +244,25 @@ class Player extends FlxSprite {
 		}
 
 		// Only update movement animations when not in a scripted animation
-		if (castState != CAST_ANIM && castState != CATCH_ANIM) {
+		if (castState != CAST_ANIM && castState != CATCH_ANIM && !throwing) {
 			playMovementAnim();
+		}
+
+		// Throw rock with B button
+		if (!throwing && castState == IDLE && SimpleController.just_pressed(B)) {
+			throwing = true;
+			frozen = true;
+			sendAnimUpdate("throw_" + getDirSuffix(), true);
+			// Capture reticle target for the rock
+			var dir = lastInputDir.asVector();
+			rockTarget = FlxPoint.get(x + dir.x * 96 + 4, y + dir.y * 96 + 4);
+			dir.put();
 		}
 
 		updateReticle();
 		updateCast(delta);
 		updateFishingLine();
+		updateRock(delta);
 
 		GameManager.ME.net.sendMove(x, y);
 	}
@@ -370,6 +401,47 @@ class Player extends FlxSprite {
 		fishingLine.dirty = true;
 		fishingLine.visible = true;
 		tip.put();
+	}
+
+	function launchRock() {
+		rockSprite = new FlxSprite();
+		rockSprite.makeGraphic(6, 6, FlxColor.fromRGB(50, 45, 40));
+		rockSprite.setPosition(x + 4, y + 4);
+		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
+		var dx = rockTarget.x - rockStartPos.x;
+		var dy = rockTarget.y - rockStartPos.y;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+		rockFlightTime = if (dist > 0) dist / 200 else 0.01;
+		rockElapsed = 0;
+		state.add(rockSprite);
+	}
+
+	function updateRock(elapsed:Float) {
+		if (rockSprite == null)
+			return;
+
+		rockElapsed += elapsed;
+		var t = Math.min(1.0, rockElapsed / rockFlightTime);
+
+		var groundX = rockStartPos.x + (rockTarget.x - rockStartPos.x) * t;
+		var groundY = rockStartPos.y + (rockTarget.y - rockStartPos.y) * t;
+
+		var totalDist = Math.sqrt((rockTarget.x - rockStartPos.x) * (rockTarget.x - rockStartPos.x)
+			+ (rockTarget.y - rockStartPos.y) * (rockTarget.y - rockStartPos.y));
+		var arcHeight = Math.min(totalDist * 0.5, 64);
+		var arcOffset = arcHeight * 4 * t * (1 - t);
+
+		rockSprite.setPosition(groundX, groundY - arcOffset);
+
+		if (t >= 1.0) {
+			state.remove(rockSprite);
+			rockSprite.destroy();
+			rockSprite = null;
+			rockTarget.put();
+			rockTarget = null;
+			rockStartPos.put();
+			rockStartPos = null;
+		}
 	}
 
 	function launchBobber() {
@@ -550,6 +622,14 @@ class Player extends FlxSprite {
 
 	override function destroy() {
 		onAnimUpdate.removeAll();
+		if (rockTarget != null) {
+			rockTarget.put();
+			rockTarget = null;
+		}
+		if (rockStartPos != null) {
+			rockStartPos.put();
+			rockStartPos = null;
+		}
 		cleanupNetwork();
 		super.destroy();
 	}

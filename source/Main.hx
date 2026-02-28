@@ -77,6 +77,9 @@ class Main extends Sprite {
 			Achievements.initAchievements();
 		});
 		addChild(new FlxGame(0, 0, startingState, 60, 60, true, false));
+		#if fullscreen
+		lime.app.Application.current.window.maximized = true;
+		#end
 
 		trace('Build Hash: ${Macros.getGitCommitShortHash()}');
 	}

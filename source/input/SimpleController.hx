@@ -19,7 +19,7 @@ class SimpleController {
 			LEFT => [FlxKey.LEFT, FlxKey.A],
 			RIGHT => [FlxKey.RIGHT, FlxKey.D],
 			A => [FlxKey.Z],
-			B => [FlxKey.C, FlxKey.B],
+			B => [FlxKey.X, FlxKey.B],
 			START => [FlxKey.ENTER],
 			BACK => [FlxKey.ESCAPE],
 		],
