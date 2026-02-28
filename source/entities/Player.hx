@@ -12,9 +12,9 @@ import flixel.util.FlxSpriteUtil;
 import input.InputCalculator;
 import input.SimpleController;
 import bitdecay.flixel.spacial.Cardinal;
-import bitdecay.flixel.graphics.Aseprite;
 import bitdecay.flixel.graphics.AsepriteMacros;
 import flixel.FlxG;
+import haxe.io.Path;
 import entities.Inventory;
 import entities.Inventory.InventoryItem;
 
@@ -283,6 +283,10 @@ class Player extends FlxSprite {
 
 	function getRodTipPos():FlxPoint {
 		if (castState == CAST_ANIM || castState == CASTING) {
+			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
+			if (castState == CAST_ANIM && frame == 3 && (castDirSuffix == "right" || castDirSuffix == "left")) {
+				return if (castDirSuffix == "right") FlxPoint.get(x + 12, y) else FlxPoint.get(x + 4, y);
+			}
 			return switch (castDirSuffix) {
 				case "down": FlxPoint.get(x + 10, y + 24);
 				case "right": FlxPoint.get(x + 30, y + 2);
@@ -326,14 +330,6 @@ class Player extends FlxSprite {
 		if (castBobber == null) {
 			fishingLine.visible = false;
 			return;
-		}
-
-		if (castState == CAST_ANIM && (castDirSuffix == "right" || castDirSuffix == "left")) {
-			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
-			if (frame < 4) {
-				fishingLine.visible = false;
-				return;
-			}
 		}
 
 		var tip = getRodTipPos();
@@ -473,7 +469,9 @@ class Player extends FlxSprite {
 
 		castBobber = new FlxSprite();
 		castBobber.makeGraphic(8, 8, FlxColor.RED);
-		castBobber.setPosition(x + 4, y + 4);
+		var tip = getRodTipPos();
+		castBobber.setPosition(tip.x, tip.y);
+		tip.put();
 
 		castStartPos = FlxPoint.get(castBobber.x, castBobber.y);
 		var dx = castTarget.x - castStartPos.x;
@@ -629,15 +627,37 @@ class Player extends FlxSprite {
 	static var ONE_SHOT_PREFIXES:Array<String> = ["cast_", "throw_", "catch_"];
 
 	function loadSkin(jsonPath:String) {
-		Aseprite.loadAllAnimations(this, jsonPath);
+		var jsonText:String = openfl.Assets.getText(jsonPath);
+		var json = haxe.Json.parse(jsonText);
+
+		var pngPath = Path.join([Path.directory(jsonPath), json.meta.image]);
+		var sheetW:Int = json.meta.size.w;
+		var cols:Int = Std.int(sheetW / 48);
+
+		loadGraphic(pngPath, true, 48, 48);
 		setSize(16, 16);
 		offset.set(16, 16);
-		for (prefix in ONE_SHOT_PREFIXES) {
-			for (dir in ["down", "right", "up", "left"]) {
-				var anim = animation.getByName(prefix + dir);
-				if (anim != null)
-					anim.looped = false;
+
+		var frames:Array<Dynamic> = json.frames;
+		var tags:Array<Dynamic> = json.meta.frameTags;
+		for (tag in tags) {
+			var name:String = tag.name;
+			var from:Int = tag.from;
+			var to:Int = tag.to;
+			var indices:Array<Int> = [];
+			for (i in from...to + 1) {
+				var fx:Int = frames[i].frame.x;
+				var fy:Int = frames[i].frame.y;
+				indices.push(Std.int(fy / 48) * cols + Std.int(fx / 48));
 			}
+			var loop = true;
+			for (p in ONE_SHOT_PREFIXES) {
+				if (StringTools.startsWith(name, p)) {
+					loop = false;
+					break;
+				}
+			}
+			animation.add(name, indices, 12, loop);
 		}
 	}
 
