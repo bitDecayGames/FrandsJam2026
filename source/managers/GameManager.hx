@@ -53,6 +53,7 @@ class GameManager {
 			currentRoundNumber += 1;
 			if (currentRoundNumber >= totalRounds) {
 				FlxG.switchState(() -> new VictoryState());
+				currentRoundNumber = 0;
 			} else {
 				// gets called multiple times, but the trick is that currentRoundNumber changes between calling this start function
 				start();
