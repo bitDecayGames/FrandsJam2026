@@ -23,11 +23,6 @@ class Player extends FlxSprite {
 
 	var frozen:Bool = false;
 
-	static inline var FRAME_DOWN = 1;
-	static inline var FRAME_RIGHT = 2;
-	static inline var FRAME_UP = 3;
-	static inline var FRAME_LEFT = 4;
-
 	// Network stuff
 	var net:NetworkManager = null;
 
@@ -56,7 +51,16 @@ class Player extends FlxSprite {
 		loadGraphic(AssetPaths.playerA__png, true, 48, 48);
 		setSize(16, 16);
 		offset.set(16, 16);
-		animation.frameIndex = FRAME_DOWN;
+
+		animation.add("stand_down", [1]);
+		animation.add("run_down", [2, 3, 4, 5, 6, 7, 8, 9], 12, true);
+		animation.add("stand_right", [10]);
+		animation.add("run_right", [11, 12, 13, 14, 15, 16, 17, 18], 12, true);
+		animation.add("stand_up", [19]);
+		animation.add("run_up", [20, 21, 22, 23, 24, 25, 26, 23], 12, true);
+		animation.add("stand_left", [27]);
+		animation.add("run_left", [28, 29, 30, 31, 32, 33, 34, 35], 12, true);
+		animation.play("stand_down");
 
 		reticle = new FlxSprite();
 		reticle.loadGraphic(AssetPaths.aimingTarget__png, true, 8, 8);
@@ -106,7 +110,6 @@ class Player extends FlxSprite {
 			var inputDir = InputCalculator.getInputCardinal(playerNum);
 			if (inputDir != NONE) {
 				lastInputDir = inputDir;
-				updateFrame(inputDir);
 			}
 
 			if (FlxG.keys.justPressed.T && !hotModeActive) {
@@ -136,6 +139,7 @@ class Player extends FlxSprite {
 			}
 		}
 
+		updateAnim();
 		updateReticle();
 		updateCast(delta);
 
@@ -197,7 +201,8 @@ class Player extends FlxSprite {
 
 						castTarget = FlxPoint.get(targetX, targetY);
 
-						net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
+						if (net != null)
+							net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
 
 						castBobber = new FlxSprite();
 						castBobber.makeGraphic(8, 8, FlxColor.RED);
@@ -255,18 +260,20 @@ class Player extends FlxSprite {
 		}
 	}
 
-	function updateFrame(dir:Cardinal) {
-		switch (dir) {
-			case N:
-				animation.frameIndex = FRAME_UP;
-			case S:
-				animation.frameIndex = FRAME_DOWN;
-			case W:
-				animation.frameIndex = FRAME_LEFT;
-			case E:
-				animation.frameIndex = FRAME_RIGHT;
-			default:
-		}
+	function updateAnim() {
+		var dirSuffix = switch (lastInputDir) {
+			case N: "up";
+			case S: "down";
+			case W: "left";
+			case E: "right";
+			default: "down";
+		};
+
+		var moving = velocity.x != 0 || velocity.y != 0;
+		var animName = (moving ? "run_" : "stand_") + dirSuffix;
+
+		if (animation.name != animName)
+			animation.play(animName);
 	}
 
 	override function destroy() {
