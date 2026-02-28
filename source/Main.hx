@@ -1,5 +1,6 @@
 package;
 
+import goals.PersonalFishCountGoal;
 import goals.TimedGoal;
 import rounds.Round;
 import managers.RoundManager;
@@ -47,7 +48,7 @@ import plugins.GlobalDebugPlugin;
 
 class Main extends Sprite {
 	public static function reset() {
-		new GameManager([new Round([new TimedGoal()])]);
+		new GameManager([new Round([new TimedGoal(), new PersonalFishCountGoal()])]);
 	}
 
 	public function new() {
