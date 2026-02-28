@@ -261,7 +261,13 @@ class Player extends FlxSprite {
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
 			// Capture reticle target for the rock
 			var dir = lastInputDir.asVector();
-			rockTarget = FlxPoint.get(x + dir.x * 96 + 4, y + dir.y * 96 + 4);
+			var rawX = x + dir.x * 96 + 4;
+			var rawY = y + dir.y * 96 + 4;
+			var bounds = FlxG.worldBounds;
+			rockTarget = FlxPoint.get(
+				Math.max(bounds.left, Math.min(bounds.right, rawX)),
+				Math.max(bounds.top, Math.min(bounds.bottom, rawY))
+			);
 			dir.put();
 		}
 
@@ -451,7 +457,7 @@ class Player extends FlxSprite {
 			rockTarget = null;
 			rockStartPos.put();
 			rockStartPos = null;
-			landed.handleLanded(landX, landY);
+			landed.resolveThrow(landX, landY);
 			landed.destroy();
 		}
 	}
