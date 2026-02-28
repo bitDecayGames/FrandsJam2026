@@ -14,7 +14,7 @@ class Rock extends FlxSprite {
 		makeGraphic(8, 8, FlxColor.GRAY);
 	}
 
-	public function handleLanded(landX:Float, landY:Float) {
+	public function resolveThrow(landX:Float, landY:Float) {
 		if (waterLayer == null || onAddToWorld == null)
 			return;
 		var grid = waterLayer.gridSize;
