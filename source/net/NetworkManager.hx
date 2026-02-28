@@ -9,6 +9,10 @@ import schema.GameState;
 import schema.PlayerState;
 import schema.FishState;
 
+typedef SessionIdSignal = FlxTypedSignal<String->Void>;
+typedef PlayerStateSignal = FlxTypedSignal<String->PlayerState->Void>;
+typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>;
+
 class NetworkManager {
 	public static var IS_HOST:Bool = false;
 
@@ -17,14 +21,11 @@ class NetworkManager {
 
 	public var mySessionId:String = "";
 
-	public var onJoined:(sessionId:String) -> Void;
-	public var onPlayerAdded:(sessionId:String, player:PlayerState) -> Void;
-	public var onPlayerChanged:(sessionId:String, player:PlayerState) -> Void;
-	public var onPlayerRemoved:(sessionId:String) -> Void;
-
-	public var onPCh = new FlxTypedSignal<(String, PlayerState) -> Void>();
-
-	public var onFishMove = new FlxTypedSignal<(String, FishState) -> Void>();
+	public var onJoined:SessionIdSignal = new SessionIdSignal();
+	public var onPlayerAdded:PlayerStateSignal = new PlayerStateSignal();
+	public var onPlayerChanged:PlayerStateSignal = new PlayerStateSignal();
+	public var onPlayerRemoved:SessionIdSignal = new SessionIdSignal();
+	public var onFishMove:FishStateSignal = new FishStateSignal();
 
 	public static inline var roomName:String = "game_room";
 
@@ -44,9 +45,7 @@ class NetworkManager {
 			mySessionId = room.sessionId;
 			trace('NetworkManager: joined room ${roomName} (id: ${room.roomId}) as $mySessionId');
 
-			if (onJoined != null) {
-				onJoined(mySessionId);
-			}
+			onJoined.dispatch(mySessionId);
 
 			var cb = Callbacks.get(room);
 
@@ -73,22 +72,14 @@ class NetworkManager {
 				if (sessionId == mySessionId) {
 					return;
 				}
-				if (onPlayerAdded != null) {
-					onPlayerAdded(sessionId, player);
-				}
+				onPlayerAdded.dispatch(sessionId, player);
 				cb.listen(player, "x", (_, _) -> {
 					trace('NetMan: (sesh: ${sessionId} x update');
-					onPCh.dispatch(sessionId, player);
-					if (onPlayerChanged != null) {
-						onPlayerChanged(sessionId, player);
-					}
+					onPlayerChanged.dispatch(sessionId, player);
 				});
 				cb.listen(player, "y", (_, _) -> {
 					trace('NetMan: (sesh: ${sessionId} y update');
-					onPCh.dispatch(sessionId, player);
-					if (onPlayerChanged != null) {
-						onPlayerChanged(sessionId, player);
-					}
+					onPlayerChanged.dispatch(sessionId, player);
 				});
 			});
 
@@ -97,9 +88,7 @@ class NetworkManager {
 				if (sessionId == mySessionId) {
 					return;
 				}
-				if (onPlayerRemoved != null) {
-					onPlayerRemoved(sessionId);
-				}
+				onPlayerRemoved.dispatch(sessionId);
 			});
 
 			room.onMessage("cast_line", (message) -> {

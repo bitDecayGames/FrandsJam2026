@@ -1,5 +1,7 @@
 package states;
 
+import managers.GameManager;
+import schema.PlayerState;
 import config.Configure;
 import net.NetworkManager;
 import managers.RoundManager;
@@ -10,7 +12,6 @@ import flixel.group.FlxGroup;
 import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
-import entities.FishGroup;
 import entities.FishSpawner;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
@@ -29,11 +30,9 @@ class PlayState extends FlxTransitionableState {
 
 	// Network things
 	var remotePlayers:Map<String, Player> = new Map();
-	var net:NetworkManager;
 
 	var midGroundGroup = new FlxGroup();
-	var fishSpawner = new FishSpawner();
-	var fishGroup = new FishGroup();
+	var fishSpawner:FishSpawner;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
 
@@ -60,10 +59,11 @@ class PlayState extends FlxTransitionableState {
 
 		// QLog.error('Example error');
 
+		fishSpawner = new FishSpawner(() -> player.catchFish());
+
 		// Build out our render order
 		add(midGroundGroup);
 		add(fishSpawner);
-		add(fishGroup);
 		add(transitions);
 
 		loadLevel("Level_0");
@@ -77,33 +77,37 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function setupNetwork() {
-		net = new NetworkManager();
-		net.onJoined = (sessionId) -> {
-			trace('PlayState: joined as $sessionId');
-			player.setNetwork(net, sessionId);
-		};
-		net.onPlayerAdded = (sessionId, playerState) -> {
-			if (sessionId == player.sessionId) {
-				return;
-			}
-			// TODO: Have server give us the player color, too
-			trace('PlayState: remote player $sessionId appeared');
-			var remote = new Player(playerState.x, playerState.y, this);
-			remote.isRemote = true;
-			remote.setNetwork(net, sessionId);
-			remotePlayers.set(sessionId, remote);
-			add(remote);
-		};
-		net.onPlayerRemoved = (sessionId) -> {
-			trace('PlayState: remote player $sessionId left');
-			var remote = remotePlayers.get(sessionId);
-			if (remote != null) {
-				remove(remote);
-				remote.destroy();
-				remotePlayers.remove(sessionId);
-			}
-		};
-		net.connect(Configure.getServerURL(), Configure.getServerPort());
+		GameManager.ME.net.onJoined.add(onPlayerJoined);
+		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
+		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
+	}
+
+	function onPlayerJoined(sessionId:String) {
+		trace('PlayState: joined as $sessionId');
+		player.setNetwork(sessionId);
+	}
+
+	function onPlayerAdded(sessionId:String, playerState:PlayerState) {
+		if (sessionId == player.sessionId) {
+			return;
+		}
+		// TODO: Have server give us the player color, too
+		trace('PlayState: remote player $sessionId appeared');
+		var remote = new Player(playerState.x, playerState.y, this);
+		remote.isRemote = true;
+		remote.setNetwork(sessionId);
+		remotePlayers.set(sessionId, remote);
+		add(remote);
+	}
+
+	function onPlayerRemoved(sessionId:String) {
+		trace('PlayState: remote player $sessionId left');
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remove(remote);
+			remote.destroy();
+			remotePlayers.remove(sessionId);
+		}
 	}
 
 	function loadLevel(level:String) {
@@ -121,8 +125,6 @@ class PlayState extends FlxTransitionableState {
 		add(player);
 
 		fishSpawner.spawn(level);
-
-		fishGroup.spawn(FlxG.worldBounds);
 
 		for (t in level.camTransitions) {
 			transitions.add(t);
@@ -143,14 +145,16 @@ class PlayState extends FlxTransitionableState {
 		}
 		transitions.clear();
 
-		fishGroup.clearAll();
-
 		fishSpawner.clearAll();
 
 		for (o in midGroundGroup) {
 			o.destroy();
 		}
 		midGroundGroup.clear();
+	}
+
+	override function destroy() {
+		super.destroy();
 	}
 
 	function handleAchieve(def:AchievementDef) {
@@ -177,7 +181,7 @@ class PlayState extends FlxTransitionableState {
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
-		fishGroup.handleOverlap(player);
+		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
 	}
 
 	function handleCameraBounds() {
