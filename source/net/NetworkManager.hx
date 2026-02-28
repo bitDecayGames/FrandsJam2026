@@ -50,6 +50,11 @@ class NetworkManager {
 
 			var cb = Callbacks.get(room);
 
+			cb.listen("hostSessionId", (val:String, prev:String) -> {
+				IS_HOST = val == mySessionId;
+				trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
+			});
+
 			cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
 				trace('NetworkManager: fish added ${id}');
 
