@@ -136,8 +136,10 @@ class Player extends FlxSprite {
 			launchRock();
 		}
 		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
-			var px = x + 4;
-			var py = y + 4;
+			var retract = getRetractTarget();
+			var px = retract.x;
+			var py = retract.y;
+			retract.put();
 			var dx = px - castBobber.x;
 			var dy = py - castBobber.y;
 			var dist = Math.sqrt(dx * dx + dy * dy);
@@ -290,8 +292,14 @@ class Player extends FlxSprite {
 	function getRodTipPos():FlxPoint {
 		if (castState == CAST_ANIM || castState == CASTING) {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
-			if (castState == CAST_ANIM && frame == 3 && (castDirSuffix == "right" || castDirSuffix == "left")) {
-				return if (castDirSuffix == "right") FlxPoint.get(x + 12, y) else FlxPoint.get(x + 4, y);
+			if (castState == CAST_ANIM && frame == CAST_LAUNCH_FRAME) {
+				return switch (castDirSuffix) {
+					case "right": FlxPoint.get(x + 12, y);
+					case "left": FlxPoint.get(x + 4, y);
+					case "down": FlxPoint.get(x, y + 4);
+					case "up": FlxPoint.get(x + 12, y + 4);
+					default: null;
+				};
 			}
 			return switch (castDirSuffix) {
 				case "down": FlxPoint.get(x + 10, y + 24);
@@ -559,8 +567,10 @@ class Player extends FlxSprite {
 			case CATCH_ANIM:
 				// Bobber retract started by frame event, check for arrival
 				if (castBobber != null) {
-					var px = x + 4;
-					var py = y + 4;
+					var retract = getRetractTarget();
+					var px = retract.x;
+					var py = retract.y;
+					retract.put();
 					var dx = px - castBobber.x;
 					var dy = py - castBobber.y;
 					var dist = Math.sqrt(dx * dx + dy * dy);
@@ -589,8 +599,10 @@ class Player extends FlxSprite {
 				}
 			case RETURNING:
 				if (castBobber != null) {
-					var px = x + 4;
-					var py = y + 4;
+					var retract = getRetractTarget();
+					var px = retract.x;
+					var py = retract.y;
+					retract.put();
 					var dx = px - castBobber.x;
 					var dy = py - castBobber.y;
 					var dist = Math.sqrt(dx * dx + dy * dy);
@@ -688,6 +700,16 @@ class Player extends FlxSprite {
 			case W: "left";
 			case E: "right";
 			default: "down";
+		};
+	}
+
+	function getRetractTarget():FlxPoint {
+		return switch (castDirSuffix) {
+			case "right": FlxPoint.get(x + 8, y-2);
+			case "left": FlxPoint.get(x + 8, y-2);
+			case "down": FlxPoint.get(x, y + 4);
+			case "up": FlxPoint.get(x + 12, y + 4);
+			default: FlxPoint.get(x + 4, y + 4);
 		};
 	}
 
