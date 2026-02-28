@@ -457,7 +457,7 @@ class Player extends FlxSprite {
 
 		castTarget = FlxPoint.get(targetX, targetY);
 
-		GameManager.ME.net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
+		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y});
 
 		castBobber = new FlxSprite();
 		castBobber.makeGraphic(8, 8, FlxColor.RED);

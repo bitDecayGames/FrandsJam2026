@@ -1,10 +1,10 @@
 package goals;
 
-import flixel.FlxObject;
+import flixel.FlxBasic;
 import states.PlayState;
 import flixel.util.FlxSignal;
 
-class Goal extends FlxObject {
+class Goal extends FlxBasic {
 	public var runTimeSec:Float = 0;
 	public var paused:Bool = false;
 	public var completed:FlxSignal = new FlxSignal();
@@ -13,6 +13,8 @@ class Goal extends FlxObject {
 	private var scores:Map<String, Int> = new Map<String, Int>();
 
 	public function initialize(state:PlayState) {
+		completed.removeAll();
+		scores = new Map<String, Int>();
 		state.add(this);
 	}
 

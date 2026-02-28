@@ -41,6 +41,14 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');
 			broadcast("cast_line", data, {except: client});
 		});
+
+		onMessage("round_update", (client:Client, data:Dynamic) -> {
+			if (data != null) {
+				state.round.status = data.status;
+				state.round.currentRound = data.currentRound;
+				state.round.totalRounds = data.totalRounds;
+			}
+		});
 	}
 
 	override public function onJoin(client:Client, ?options:Dynamic):EitherType<Void, Promise<Dynamic>> {
