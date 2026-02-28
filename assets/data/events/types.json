@@ -68,6 +68,18 @@
 			}
 		]
 	},{
+		"name": "fish_caught",
+		"fields": [
+			{
+				"name": "posX",
+				"type": "Float"
+			},
+			{
+				"name": "posY",
+				"type": "Float"
+			}
+		]
+	},{
 		"name": "achieve",
 		"fields": [
 			{

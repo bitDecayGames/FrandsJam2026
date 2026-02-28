@@ -12,7 +12,7 @@ import events.IEvent.EventReducer;
  * Files used to generate these types:
  * ../assets/data/events/types.json
  *
- * Input Hash: f120b78ca86015591d353c723ba50fee
+ * Input Hash: bab19087d334f613e2981dd0bf7f8913
  */
 
 class MetaRegistry {
@@ -147,6 +147,20 @@ class DistanceClickSum implements events.IEvent {
 
 	public function new(sum:Float) {
 		this.sum = sum;
+	}
+}
+
+class FishCaught implements events.IEvent {
+	public final type:String = "fish_caught";
+	public final reducers:Array<EventReducer> = [];
+	public var id:Int;
+
+	public var posX:Float;
+	public var posY:Float;
+
+	public function new(posX:Float, posY:Float) {
+		this.posX = posX;
+		this.posY = posY;
 	}
 }
 

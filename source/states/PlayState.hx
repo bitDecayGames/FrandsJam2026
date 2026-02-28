@@ -2,6 +2,7 @@ package states;
 
 import config.Configure;
 import net.NetworkManager;
+import managers.RoundManager;
 import debug.DebugLayers;
 import bitdecay.flixel.debug.tools.draw.DebugDraw;
 import todo.TODO;
@@ -9,6 +10,7 @@ import flixel.group.FlxGroup;
 import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
+import entities.FishGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
@@ -18,6 +20,7 @@ import events.EventBus;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.addons.transition.FlxTransitionableState;
+import ui.FlashingText;
 
 using states.FlxStateExt;
 
@@ -29,13 +32,18 @@ class PlayState extends FlxTransitionableState {
 	var net:NetworkManager;
 
 	var midGroundGroup = new FlxGroup();
+	var fishGroup = new FishGroup();
 	var activeCameraTransition:CameraTransition = null;
+	var hotText:FlashingText;
 
 	var transitions = new FlxTypedGroup<CameraTransition>();
 
 	var ldtk = new LdtkProject();
 
-	public function new() {
+	var round:RoundManager;
+
+	public function new(round:RoundManager) {
+		this.round = round;
 		super();
 	}
 
@@ -53,10 +61,15 @@ class PlayState extends FlxTransitionableState {
 
 		// Build out our render order
 		add(midGroundGroup);
+		add(fishGroup);
 		add(transitions);
 
 		loadLevel("Level_0");
 		setupNetwork();
+
+		hotText = new FlashingText("HOT", 0.15, 3.0);
+		add(hotText);
+		round.initialize(this);
 	}
 
 	function setupNetwork() {
@@ -103,6 +116,8 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		fishGroup.spawn(FlxG.worldBounds);
+
 		for (t in level.camTransitions) {
 			transitions.add(t);
 		}
@@ -121,6 +136,8 @@ class PlayState extends FlxTransitionableState {
 			t.destroy();
 		}
 		transitions.clear();
+
+		fishGroup.clearAll();
 
 		for (o in midGroundGroup) {
 			o.destroy();
@@ -142,11 +159,17 @@ class PlayState extends FlxTransitionableState {
 		FlxG.collide(midGroundGroup, player);
 		handleCameraBounds();
 
+		if (player.hotModeActive && !hotText.isFlashing()) {
+			hotText.start();
+		}
+
 		// TODO helps devs call audio correctly, and helps audio folks find where sounds are needed
 		TODO.sfx('scarySound');
 
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
+
+		fishGroup.handleOverlap(player);
 	}
 
 	function handleCameraBounds() {

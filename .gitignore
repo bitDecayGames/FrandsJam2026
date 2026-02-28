@@ -29,3 +29,4 @@ dump/
 .DS_Store
 /scratch/
 .playwright-mcp/
+.Trash

@@ -21,6 +21,22 @@ class LLMDebugBridge {
 
 	static var _heldButtons:Map<String, Bool> = new Map();
 	static var _prevHeldButtons:Map<String, Bool> = new Map();
+	static var _lastStepButtons:Map<String, Bool> = new Map();
+	static var _pendingReleases:Array<String> = [];
+	static var _releaseAfterSteps:Int = 0;
+	static var _walkTarget:{
+		x:Float,
+		y:Float,
+		thresh:Float,
+		active:Bool,
+		framesUsed:Int
+	} = {
+		x: 0,
+		y: 0,
+		thresh: 2,
+		active: false,
+		framesUsed: 0
+	};
 
 	static var VALID_BUTTONS:Array<String> = ["UP", "DOWN", "LEFT", "RIGHT", "A", "B", "START", "BACK"];
 
@@ -66,6 +82,15 @@ class LLMDebugBridge {
 			},
 			releaseAll: function() {
 				return _releaseAll();
+			},
+			teleportPlayer: function(x:Float, y:Float) {
+				return _teleportPlayer(x, y);
+			},
+			tapButton: function(name:String, ?holdFrames:Int) {
+				return _tapButton(name, holdFrames);
+			},
+			walkTo: function(x:Float, y:Float, ?threshold:Float) {
+				return _walkTo(x, y, threshold);
 			}
 		};
 
@@ -74,13 +99,44 @@ class LLMDebugBridge {
 
 	public static function onUpdate() {
 		_frameCount++;
-		// Rotate input state so just_pressed/just_released work
-		_prevHeldButtons = _heldButtons.copy();
 		if (_remainingSteps > 0) {
+			// Rotate input state only on frames where the game actually steps,
+			// so just_pressed/just_released reflect real transitions
+			_prevHeldButtons = _lastStepButtons.copy();
+			_lastStepButtons = _heldButtons.copy();
 			FlxG.vcr.stepRequested = true;
 			_remainingSteps--;
-			if (_remainingSteps <= 0) {
-				// Stay paused when done stepping
+
+			// Handle tapButton: release after hold frames expire
+			if (_releaseAfterSteps > 0) {
+				_releaseAfterSteps--;
+				if (_releaseAfterSteps <= 0) {
+					for (btn in _pendingReleases) {
+						_heldButtons.set(btn, false);
+					}
+					_pendingReleases = [];
+					// Step one more frame to process the release
+					_remainingSteps++;
+				}
+			}
+
+			// Handle walkTo: check if player arrived
+			if (_walkTarget.active) {
+				_walkTarget.framesUsed++;
+				var player = findPlayer(FlxG.state, 0);
+				if (player != null) {
+					var p:FlxObject = cast player;
+					var dx = _walkTarget.x - p.x;
+					var dy = _walkTarget.y - p.y;
+					var dist = Math.sqrt(dx * dx + dy * dy);
+					if (dist <= _walkTarget.thresh) {
+						// Arrived — stop moving
+						_releaseAll();
+						p.velocity.set(0, 0);
+						_walkTarget.active = false;
+						_remainingSteps = 0;
+					}
+				}
 			}
 		}
 	}
@@ -311,6 +367,83 @@ class LLMDebugBridge {
 	static function _setTimeScale(f:Float):String {
 		FlxG.timeScale = f;
 		return Json.stringify({timeScale: f});
+	}
+
+	static function _tapButton(name:String, ?holdFrames:Int):String {
+		var hold = holdFrames != null ? holdFrames : 1;
+		var upper = name.toUpperCase();
+		if (VALID_BUTTONS.indexOf(upper) == -1) {
+			return Json.stringify({error: "Invalid button: " + name + ". Valid: " + VALID_BUTTONS.join(", ")});
+		}
+		// Press, step for hold duration, release, step 1 to process release
+		_heldButtons.set(upper, true);
+		_stepFrames(hold);
+		// Queue the release after the hold frames complete
+		_pendingReleases.push(upper);
+		_releaseAfterSteps = hold;
+		return Json.stringify({tapped: upper, holdFrames: hold});
+	}
+
+	static function _walkTo(x:Float, y:Float, ?threshold:Float):String {
+		var thresh = threshold != null ? threshold : 2.0;
+		var player = findPlayer(FlxG.state, 0);
+		if (player == null) {
+			return Json.stringify({error: "Player not found"});
+		}
+		var p:FlxObject = cast player;
+		var dx = x - p.x;
+		var dy = y - p.y;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+
+		if (dist <= thresh) {
+			return Json.stringify({
+				arrived: true,
+				x: roundFloat(p.x),
+				y: roundFloat(p.y),
+				framesUsed: 0
+			});
+		}
+
+		// Calculate how many frames we need at player speed (~150px/sec, ~2.5px/frame)
+		var maxFrames = Math.ceil(dist / 2.0) + 10; // generous estimate with padding
+
+		// Set direction buttons
+		_releaseAll();
+		if (dx > thresh)
+			_heldButtons.set("RIGHT", true);
+		if (dx < -thresh)
+			_heldButtons.set("LEFT", true);
+		if (dy > thresh)
+			_heldButtons.set("DOWN", true);
+		if (dy < -thresh)
+			_heldButtons.set("UP", true);
+
+		_stepFrames(maxFrames);
+		_walkTarget = {
+			x: x,
+			y: y,
+			thresh: thresh,
+			active: true,
+			framesUsed: 0
+		};
+		return Json.stringify({
+			walking: true,
+			targetX: roundFloat(x),
+			targetY: roundFloat(y),
+			maxFrames: maxFrames
+		});
+	}
+
+	static function _teleportPlayer(x:Float, y:Float):String {
+		var player = findPlayer(FlxG.state, 0);
+		if (player == null) {
+			return Json.stringify({error: "Player not found"});
+		}
+		var p:FlxObject = cast player;
+		p.x = x;
+		p.y = y;
+		p.velocity.set(0, 0);
+		return Json.stringify({x: roundFloat(x), y: roundFloat(y)});
 	}
 
 	static function walkGroup(group:FlxTypedGroup<FlxBasic>, result:Array<Dynamic>, depth:Int) {

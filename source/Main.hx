@@ -1,5 +1,10 @@
 package;
 
+import goals.PersonalFishCountGoal;
+import goals.TimedGoal;
+import rounds.Round;
+import managers.RoundManager;
+import managers.GameManager;
 import macros.EnumAbstract;
 import flixel.graphics.frames.FlxBitmapFont;
 import achievements.Achievements;
@@ -32,7 +37,7 @@ import openfl.utils.Assets;
 import states.MainMenuState;
 import states.SplashScreenState;
 #if play
-import states.PlayState;
+import states.AutoPlayState;
 #end
 #if credits
 import states.CreditsState;
@@ -42,14 +47,21 @@ import plugins.GlobalDebugPlugin;
 #end
 
 class Main extends Sprite {
+	public static function reset() {
+		new GameManager([new Round([new TimedGoal(), new PersonalFishCountGoal()])]);
+	}
+
 	public function new() {
 		super();
 		Configure.initAnalytics(false);
 		Storage.load();
 
+		// must be here so it exists before any possible starting state
+		Main.reset();
+
 		var startingState:Class<FlxState> = SplashScreenState;
 		#if play
-		startingState = PlayState;
+		startingState = AutoPlayState;
 		#elseif credits
 		startingState = CreditsState;
 		#else
