@@ -2,9 +2,7 @@
   "data": {},
   "hash": {
     "roomcount": {},
-    "roomhistory": {
-      "-uINT6Obm": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"IBpKNJeWW\",\"state\":\"{\\\"players\\\":{\\\"OxaQ39pcZ\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"DtPr1eiNL\\\":{\\\"x\\\":56,\\\"y\\\":48}},\\\"fish\\\":{}}\",\"clients\":[{\"sessionId\":\"OxaQ39pcZ\",\"reconnectionToken\":\"lS4UuOLuH\"},{\"sessionId\":\"DtPr1eiNL\",\"reconnectionToken\":\"D1JNj1JLv\"}]}"
-    }
+    "roomhistory": {}
   },
   "keys": {}
 }

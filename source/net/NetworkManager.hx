@@ -107,15 +107,19 @@ class NetworkManager {
 	}
 
 	public function sendMove(x:Float, y:Float) {
-		sendMessage("move", {x: x, y: y});
+		sendMessage("move", {x: x, y: y}, true);
 	}
 
-	public function sendMessage(topic:String, msg:Dynamic) {
+	public function sendMessage(topic:String, msg:Dynamic, mute:Bool = false) {
 		if (room == null) {
-			QLog.notice('[NetMan]: !!Skipping message on topic "$topic"');
+			if (!mute) {
+				QLog.notice('[NetMan]: !!Skipping message on topic "$topic"');
+			}
 			return;
 		}
-		QLog.notice('[NetMan]: Sending message on topic "$topic"');
+		if (!mute) {
+			QLog.notice('[NetMan]: Sending message on topic "$topic"');
+		}
 		room.send(topic, msg);
 	}
 
