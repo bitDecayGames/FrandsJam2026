@@ -16,10 +16,10 @@ class FishState extends Schema {
 	@:type("float32") public var x:Float;
 	@:type("float32") public var y:Float;
 
-	public function new() {
+	public function new(x:Float, y:Float) {
 		super();
-		x = 0;
-		y = 0;
+		this.x = x;
+		this.y = y;
 	}
 }
 

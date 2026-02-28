@@ -1,5 +1,7 @@
 package states;
 
+import flixel.util.FlxColor;
+import flixel.FlxSprite;
 import schema.FishState;
 import flixel.util.FlxTimer;
 import managers.GameManager;
@@ -134,10 +136,10 @@ class PlayState extends FlxTransitionableState {
 
 		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y}');
 
-		var newFish = new WaterFish(fishState.x, fishState.y, null, true);
-		newFish.setNetwork(GameManager.ME.net, fishId);
+		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true);
 		remoteFish.set(fishId, newFish);
-		midGroundGroup.add(newFish);
+		fishSpawner.add(newFish);
+		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
 
 	function loadLevel(level:String) {
