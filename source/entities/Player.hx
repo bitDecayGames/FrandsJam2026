@@ -108,7 +108,7 @@ class Player extends FlxSprite {
 			velocity.set();
 		} else {
 			var inputDir = InputCalculator.getInputCardinal(playerNum);
-			if (inputDir != NONE) {
+			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
 				lastInputDir = inputDir;
 			}
 
