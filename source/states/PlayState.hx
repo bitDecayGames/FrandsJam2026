@@ -19,6 +19,8 @@ import entities.CameraTransition;
 import entities.FishSpawner;
 import entities.WaterFish;
 import entities.Rock;
+import entities.GroundFishGroup;
+import entities.Inventory.InventoryItem;
 import entities.RockGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
@@ -43,6 +45,7 @@ class PlayState extends FlxTransitionableState {
 	var midGroundGroup = new FlxGroup();
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
+	var groundFishGroup:GroundFishGroup;
 	var inventoryHUD:InventoryHUD;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
@@ -70,21 +73,22 @@ class PlayState extends FlxTransitionableState {
 
 		// QLog.error('Example error');
 
-		fishSpawner = new FishSpawner(() -> player.catchFish());
+		fishSpawner = new FishSpawner(onFishCaught);
 		rockGroup = new RockGroup();
+		groundFishGroup = new GroundFishGroup();
 
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
+		add(groundFishGroup);
 		add(fishSpawner);
 		add(transitions);
 
 		#if !local
 		setupNetwork();
 		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		#end
-
 		fishSpawner.setNet(GameManager.ME.net);
+		#end
 
 		loadLevel("Level_0");
 
@@ -156,6 +160,10 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		#if local
+		rockGroup.spawn(level);
+		fishSpawner.spawn(level);
+		#else
 		FlxTimer.wait(10, () -> {
 			if (NetworkManager.IS_HOST) {
 				rockGroup.spawn(level);
@@ -164,9 +172,11 @@ class PlayState extends FlxTransitionableState {
 				QLog.notice('skipping fish spawn');
 			}
 		});
+		#end
 
 		var spawnerLayer = level.fishSpawnerLayer;
 		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
+		groundFishGroup.setWaterLayer(spawnerLayer);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -191,12 +201,23 @@ class PlayState extends FlxTransitionableState {
 		transitions.clear();
 
 		rockGroup.clearAll();
+		groundFishGroup.clearAll();
 		fishSpawner.clearAll();
 
 		for (o in midGroundGroup) {
 			o.destroy();
 		}
 		midGroundGroup.clear();
+	}
+
+	function onFishCaught() {
+		player.onFishDelivered = () -> {
+			if (!player.inventory.add(Fish)) {
+				groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishFrame);
+			}
+			player.onFishDelivered = null;
+		};
+		player.catchFish(true);
 	}
 
 	function handleAchieve(def:AchievementDef) {
@@ -225,6 +246,7 @@ class PlayState extends FlxTransitionableState {
 
 		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
 		rockGroup.checkPickup(player);
+		groundFishGroup.checkPickup(player);
 	}
 
 	function handleCameraBounds() {

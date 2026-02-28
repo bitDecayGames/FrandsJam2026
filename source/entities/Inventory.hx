@@ -8,7 +8,13 @@ class Inventory {
 	public var items:Array<InventoryItem> = [];
 	public var onChange = new FlxSignal();
 
-	public function new() {}
+	public function new() {
+		#if rocks
+		for (_ in 0...MAX_SLOTS) {
+			items.push(Rock);
+		}
+		#end
+	}
 
 	public function add(item:InventoryItem):Bool {
 		if (isFull())
@@ -42,4 +48,5 @@ class Inventory {
 
 enum InventoryItem {
 	Rock;
+	Fish;
 }

@@ -15,7 +15,7 @@ typedef PlayerStateSignal = FlxTypedSignal<String->PlayerState->Void>;
 typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>;
 
 class NetworkManager {
-	public static var IS_HOST:Bool = false;
+	public static var IS_HOST:Bool = #if local true #else false #end;
 
 	var client:Client;
 	var room:Room<GameState>;
@@ -34,6 +34,7 @@ class NetworkManager {
 	public function new() {}
 
 	public function connect(host:String, port:Int) {
+		#if local return; #end
 		var addr = '${Configure.getServerProtocol()}$host:$port';
 		trace('attempting to connect to: ${addr}');
 		client = new Client(addr);
@@ -107,10 +108,12 @@ class NetworkManager {
 	}
 
 	public function sendMove(x:Float, y:Float) {
+		#if local return; #end
 		sendMessage("move", {x: x, y: y}, true);
 	}
 
 	public function sendMessage(topic:String, msg:Dynamic, mute:Bool = false) {
+		#if local return; #end
 		if (room == null) {
 			if (!mute) {
 				QLog.notice('[NetMan]: !!Skipping message on topic "$topic"');
