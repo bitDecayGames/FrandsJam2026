@@ -1,5 +1,6 @@
 package managers;
 
+import net.NetworkManager;
 import managers.FishManager.FishDb;
 import rounds.Round;
 import states.VictoryState;
@@ -10,6 +11,7 @@ class GameManager {
 	public static var ME:GameManager;
 
 	public var fish:FishManager;
+	public var net:NetworkManager;
 
 	private var round:RoundManager;
 	private var totalRounds:Int = 1;
@@ -36,6 +38,8 @@ class GameManager {
 		currentRoundNumber = 0;
 
 		fish = new FishManager(new FishDb());
+
+		net = new NetworkManager();
 	}
 
 	public function start() {
