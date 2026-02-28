@@ -47,7 +47,16 @@ FmodConstants.hx is auto-generated from the FMOD Studio project in `fmod/`. Use 
 Player extends FlxSprite (48x48 graphic, 16x16 hitbox). Takes an `FlxState` reference in its constructor so it can add/remove its own child sprites (reticle, power bar, cast bobber) from the scene. Movement speed is 150px/s (225 in hot mode). Uses `InputCalculator.getInputCardinal()` for input and tracks `lastInputDir` for facing direction. Has a `frozen` flag that suppresses movement during cast charging.
 
 ### Fishing Cast System (source/entities/Player.hx)
-Cast mechanic uses a `CastState` enum (IDLE → CHARGING → CASTING → LANDED → RETURNING). Press Z to start charging — a power bar pulses below the player. Press Z again to launch a bobber toward the reticle at a distance proportional to power (max 96px / 6 tiles). Press Z or move to retract the bobber at any point (mid-flight, landed). The bobber flies back to the player at 500px/s before being destroyed. The `CastState` enum is defined at module level in Player.hx.
+Cast mechanic uses a `CastState` enum (IDLE → CHARGING → CAST_ANIM → CASTING → LANDED → CATCH_ANIM → RETURNING). Press Z to start charging — a power bar pulses below the player. Press Z again to launch a bobber toward the reticle at a distance proportional to power (max 96px / 6 tiles). Press Z or move to retract the bobber at any point (mid-flight, landed). The bobber flies back to the player at 500px/s before being destroyed. The `CastState` enum is defined at module level in Player.hx.
+
+The bobber launches on frame 3 of the 5-frame cast animation (CAST_LAUNCH_FRAME) with velocity 300px/s. A dot-product overshoot check in CAST_ANIM clamps the bobber at the target if it arrives during the animation, preventing visual snap-back on short casts. The same dot-product check in CASTING transitions to LANDED. `Player.catchFish()` transitions to CATCH_ANIM, which plays a retract animation and returns the bobber.
+
+### Fish System (source/entities/)
+**FishSpawner** (`FishSpawner.hx`) is a `FlxTypedGroup<WaterFish>` that flood-fills the FishSpawner IntGrid layer to find water bodies, then spawns `WaterFish` into each body. It handles separation (fleeing when fish are too close) and passes bobber references through to fish via `setBobber()`. Takes an `onCatch` callback in its constructor, wired to each fish at spawn time.
+
+**WaterFish** (`WaterFish.hx`) owns its own bobber-awareness logic. Each fish has a nullable `bobber` reference and an `onCatch` callback. In `update()`, the fish checks its distance to the bobber and autonomously decides to attract (within 32px), get caught (within 4px), or ignore. Fish wander between random water tiles with pause/retarget timers, and flee from other fish that get too close.
+
+**PlayState wiring:** PlayState creates the spawner with `() -> player.catchFish()` as the catch callback, then each frame calls `fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null)`.
 
 ### Analytics & Storage (source/helpers/)
 Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence for achievements and metrics.
@@ -79,7 +88,7 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 - Reference assets via the `AssetPaths` auto-generated class
 - Game window: 640x480, 60 FPS
 - Tile size: 16x16 pixels
-- Entity-specific logic (sprites, state machines, input) belongs in the entity class, not PlayState. Entities receive an `FlxState` reference to manage their own child sprites.
+- Entity-specific logic (sprites, state machines, input) belongs in the entity class, not PlayState or group managers. Entities receive an `FlxState` reference to manage their own child sprites. Group classes (spawners, etc.) should only handle spawning, iteration, and data pass-through — behavioral decisions belong in the entity. Use callbacks or events to notify other systems (e.g., fish catch → player state change).
 - When making sprites visible, set their position before setting `visible = true` to avoid a one-frame flash at the previous location
 - Use `FlxPoint.get()`/`.put()` for pooled points; call `.put()` when done to return to pool
 
