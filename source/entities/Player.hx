@@ -285,7 +285,11 @@ class Player extends FlxSprite {
 		if (reticle == null)
 			return;
 		var reticleOffset = lastInputDir.asVector();
-		reticle.setPosition(last.x + reticleOffset.x * 96 + 4, last.y + reticleOffset.y * 96 + 4);
+		var bounds = FlxG.worldBounds;
+		reticle.setPosition(
+			Math.max(bounds.left, Math.min(bounds.right, last.x + reticleOffset.x * 96 + 4)),
+			Math.max(bounds.top, Math.min(bounds.bottom, last.y + reticleOffset.y * 96 + 4))
+		);
 		reticleOffset.put();
 	}
 
