@@ -43,6 +43,7 @@ class Player extends FlxSprite {
 	var castTarget:FlxPoint;
 	var castPower:Float = 0;
 	var castPowerDir:Float = 1;
+	var castDirSuffix:String = "down";
 
 	// Cast sprites
 	var reticle:FlxSprite;
@@ -234,7 +235,7 @@ class Player extends FlxSprite {
 		if (reticle == null)
 			return;
 		var reticleOffset = lastInputDir.asVector();
-		reticle.setPosition(x + reticleOffset.x * 96 + 4, y + reticleOffset.y * 96 + 4);
+		reticle.setPosition(last.x + reticleOffset.x * 96 + 4, last.y + reticleOffset.y * 96 + 4);
 		reticleOffset.put();
 	}
 
@@ -290,7 +291,7 @@ class Player extends FlxSprite {
 				powerBarBg.setPosition(x - 8, y + 20);
 				powerBarFill.setPosition(x - 8, y + 20);
 
-				if (SimpleController.just_pressed(A)) {
+				if (SimpleController.just_released(A)) {
 					powerBarBg.visible = false;
 					powerBarFill.visible = false;
 
@@ -299,7 +300,8 @@ class Player extends FlxSprite {
 						frozen = false;
 					} else {
 						castState = CAST_ANIM;
-						sendAnimUpdate("cast_" + getDirSuffix(), true);
+						castDirSuffix = getDirSuffix();
+						sendAnimUpdate("cast_" + castDirSuffix, true);
 					}
 				}
 			case CAST_ANIM:
@@ -330,7 +332,7 @@ class Player extends FlxSprite {
 				}
 			case CASTING:
 				if (castBobber != null && castTarget != null) {
-					if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
+					if (SimpleController.just_pressed(A)) {
 						catchFish();
 					} else {
 						var dx = castTarget.x - castBobber.x;
@@ -382,7 +384,7 @@ class Player extends FlxSprite {
 			if (castBobber != null) {
 				castBobber.velocity.set(0, 0);
 			}
-			sendAnimUpdate("catch_" + getDirSuffix(), true);
+			sendAnimUpdate("catch_" + castDirSuffix, true);
 		}
 	}
 

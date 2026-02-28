@@ -22,10 +22,15 @@ class WaterFish extends FlxSprite {
 	public var bobber:FlxSprite;
 	public var onCatch:() -> Void;
 
+	var respawnTimer:Float = 0;
+	var fadeInTimer:Float = 0;
+
 	public function new(x:Float, y:Float, waterTiles:Array<FlxPoint>) {
 		super(x, y);
 		this.waterTiles = waterTiles;
 		makeGraphic(4, 2, FlxColor.BLACK);
+		alpha = 0;
+		fadeInTimer = 1.0;
 		pickTarget();
 	}
 
@@ -74,6 +79,19 @@ class WaterFish extends FlxSprite {
 	}
 
 	override public function update(elapsed:Float) {
+		if (!alive) {
+			respawnTimer -= elapsed;
+			if (respawnTimer <= 0) {
+				respawn();
+			}
+			return;
+		}
+
+		if (fadeInTimer > 0) {
+			fadeInTimer -= elapsed;
+			alpha = Math.min(1.0, 1.0 - fadeInTimer);
+		}
+
 		super.update(elapsed);
 
 		checkBobber();
@@ -119,7 +137,11 @@ class WaterFish extends FlxSprite {
 		var dist = Math.sqrt(dx * dx + dy * dy);
 
 		if (dist < CATCH_DIST) {
-			kill();
+			alive = false;
+			visible = false;
+			velocity.set(0, 0);
+			attracted = false;
+			respawnTimer = 3.0;
 			if (onCatch != null)
 				onCatch();
 			return;
@@ -136,6 +158,17 @@ class WaterFish extends FlxSprite {
 
 	function stopAttract() {
 		attracted = false;
+		pickTarget();
+	}
+
+	function respawn() {
+		var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
+		setPosition(tile.x + FlxG.random.float(0, 12), tile.y + FlxG.random.float(0, 12));
+		velocity.set(0, 0);
+		alpha = 0;
+		fadeInTimer = 1.0;
+		visible = true;
+		revive();
 		pickTarget();
 	}
 
