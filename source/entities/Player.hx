@@ -31,6 +31,7 @@ class Player extends FlxSprite {
 		"assets/aseprite/characters/playerB.json",
 		"assets/aseprite/characters/playerC.json",
 		"assets/aseprite/characters/playerF.json",
+		"assets/aseprite/characters/playerG.json",
 		"assets/aseprite/characters/playerH.json",
 	];
 
