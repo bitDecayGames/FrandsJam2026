@@ -2,14 +2,14 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Prepare + Debug",
+			"name": "HTML5 Debug",
 			"type": "chrome",
 			"request": "launch",
 			"preLaunchTask": "custom build and test",
 			"url": "http://localhost:3000",
 		},
-				{
-			"name": "Prepare + Launch",
+		{
+			"name": "HTML5 Run",
 			"type": "chrome",
 			"request": "launch",
 			"preLaunchTask": "custom build and run",
@@ -18,13 +18,14 @@
 		{
 			"name": "Build + Debug",
 			"type": "lime",
-			"request": "launch"
+			"request": "launch",
+			"preLaunchTask": "Precompile Steps",
 		},
 		{
 			"name": "Debug",
 			"type": "lime",
 			"request": "launch",
-			"preLaunchTask": null
+			"preLaunchTask": "Precompile Steps",
 		},
 		{
 			"name": "Macro",
