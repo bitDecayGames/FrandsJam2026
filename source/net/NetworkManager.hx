@@ -109,11 +109,6 @@ class NetworkManager {
 
 	public function sendMove(x:Float, y:Float) {
 		#if local return; #end
-		sendMessage("move", {x: x, y: y});
-	}
-
-	public function sendMessage(topic:String, msg:Dynamic) {
-		#if local return; #end
 		sendMessage("move", {x: x, y: y}, true);
 	}
 

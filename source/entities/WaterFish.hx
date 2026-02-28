@@ -71,6 +71,8 @@ class WaterFish extends FlxSprite {
 	}
 
 	public function fleeFrom(otherX:Float, otherY:Float) {
+		if (attracted)
+			return;
 		var awayX = x - otherX;
 		var awayY = y - otherY;
 		var len = Math.sqrt(awayX * awayX + awayY * awayY);
@@ -100,10 +102,16 @@ class WaterFish extends FlxSprite {
 				target.put();
 			target = FlxPoint.get(bestTile.x + FlxG.random.float(0, 12), bestTile.y + FlxG.random.float(0, 12));
 			retargetTimer = FlxG.random.float(2, 3);
+
+			var fdx = target.x - x;
+			var fdy = target.y - y;
+			var fdist = Math.sqrt(fdx * fdx + fdy * fdy);
+			if (fdist > 0.1) {
+				velocity.set((fdx / fdist) * SPEED, (fdy / fdist) * SPEED);
+			}
 		}
 
-		velocity.set(0, 0);
-		pauseTimer = FlxG.random.float(0.5, 1.0);
+		pauseTimer = 0;
 	}
 
 	override public function update(elapsed:Float) {
@@ -128,7 +136,7 @@ class WaterFish extends FlxSprite {
 
 		super.update(elapsed);
 
-		if (bobber != null) {
+		if (bobber != null || attracted) {
 			checkBobber();
 		}
 

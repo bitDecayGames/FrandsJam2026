@@ -174,6 +174,7 @@ class PlayState extends FlxTransitionableState {
 
 		var spawnerLayer = level.fishSpawnerLayer;
 		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
+		groundFishGroup.setWaterLayer(spawnerLayer);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -208,14 +209,13 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onFishCaught() {
-		if (!player.inventory.add(Fish)) {
-			var dir = player.lastInputDir.asVector();
-			var dropX = player.x - dir.x * 16;
-			var dropY = player.y - dir.y * 16;
-			dir.put();
-			groundFishGroup.addFish(dropX, dropY);
-		}
-		player.catchFish();
+		player.onFishDelivered = () -> {
+			if (!player.inventory.add(Fish)) {
+				groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishFrame);
+			}
+			player.onFishDelivered = null;
+		};
+		player.catchFish(true);
 	}
 
 	function handleAchieve(def:AchievementDef) {
