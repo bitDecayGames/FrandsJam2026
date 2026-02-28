@@ -1,0 +1,10 @@
+{
+  "data": {},
+  "hash": {
+    "roomcount": {},
+    "roomhistory": {
+      "a5UOY0LGf": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"HVev3NwCL\",\"state\":\"{\\\"players\\\":{\\\"1bw5ewUiz\\\":{\\\"x\\\":56,\\\"y\\\":48}}}\",\"clients\":[{\"sessionId\":\"1bw5ewUiz\",\"reconnectionToken\":\"ZRBvQWVET\"}]}"
+    }
+  },
+  "keys": {}
+}

@@ -156,7 +156,7 @@ class Player extends FlxSprite {
 	function updateCast(elapsed:Float) {
 		switch (castState) {
 			case IDLE:
-				if (FlxG.keys.justPressed.Z) {
+				if (SimpleController.just_pressed(A)) {
 					castState = CHARGING;
 					frozen = true;
 					castPower = 0;
@@ -180,7 +180,7 @@ class Player extends FlxSprite {
 				powerBarBg.setPosition(x - 8, y + 20);
 				powerBarFill.setPosition(x - 8, y + 20);
 
-				if (FlxG.keys.justPressed.Z) {
+				if (SimpleController.just_pressed(A)) {
 					powerBarBg.visible = false;
 					powerBarFill.visible = false;
 					frozen = false;
@@ -196,6 +196,9 @@ class Player extends FlxSprite {
 						reticleDir.put();
 
 						castTarget = FlxPoint.get(targetX, targetY);
+
+						net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
+
 						castBobber = new FlxSprite();
 						castBobber.makeGraphic(8, 8, FlxColor.RED);
 						castBobber.setPosition(x + 4, y + 4);
@@ -227,7 +230,7 @@ class Player extends FlxSprite {
 					}
 				}
 			case LANDED:
-				if (FlxG.keys.justPressed.Z || velocity.x != 0 || velocity.y != 0) {
+				if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
 					castState = RETURNING;
 					castTarget.put();
 					castTarget = null;

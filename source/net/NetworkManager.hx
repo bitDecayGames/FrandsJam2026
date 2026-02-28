@@ -78,6 +78,10 @@ class NetworkManager {
 					onPlayerRemoved(sessionId);
 				}
 			});
+
+			room.onMessage("cast_line", (message) -> {
+				trace('[NetMan] cast_line => ${message.x}, ${message.y}');
+			});
 		});
 	}
 
@@ -86,6 +90,13 @@ class NetworkManager {
 			return;
 		}
 		room.send("move", {x: x, y: y});
+	}
+
+	public function setMessage(topic:String, msg:Dynamic) {
+		if (room == null) {
+			return;
+		}
+		room.send(topic, msg);
 	}
 
 	public function update() {

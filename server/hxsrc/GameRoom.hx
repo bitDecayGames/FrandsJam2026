@@ -1,3 +1,4 @@
+import haxe.Json;
 import colyseus.server.Client;
 import colyseus.server.Room.RoomOf;
 import colyseus.server.Room.CloseCode;
@@ -15,6 +16,10 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				player.x = data.x;
 				player.y = data.y;
 			}
+		});
+		onMessage("cast_line", (client, data) -> {
+			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');
+			broadcast("cast_line", data, {except: client});
 		});
 	}
 
