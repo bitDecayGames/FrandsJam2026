@@ -10,6 +10,6 @@ class GameState extends io.colyseus.serializer.schema.Schema {
 	@:type("map", FishState)
 	public var fish:io.colyseus.serializer.schema.types.MapSchema<FishState> = new io.colyseus.serializer.schema.types.MapSchema<FishState>();
 
-	@:type(RoundState)
+	@:type("object", RoundState)
 	public var round:RoundState = new RoundState();
 }

@@ -55,7 +55,7 @@ class NetworkManager {
 				trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
 			});
 
-			cb.listen(room.state, "round", (round:RoundState) -> {
+			cb.listen("round", (round:RoundState) -> {
 				trace('RoundState: ${round}');
 			});
 
