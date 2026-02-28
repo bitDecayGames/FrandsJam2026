@@ -16,13 +16,15 @@ import events.EventBus;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.addons.transition.FlxTransitionableState;
+import ui.FlashingText;
 
 using states.FlxStateExt;
 
 class PlayState extends FlxTransitionableState {
-	var player:FlxSprite;
+	var player:Player;
 	var midGroundGroup = new FlxGroup();
 	var activeCameraTransition:CameraTransition = null;
+	var hotText:FlashingText;
 
 	var transitions = new FlxTypedGroup<CameraTransition>();
 
@@ -49,6 +51,9 @@ class PlayState extends FlxTransitionableState {
 		add(transitions);
 
 		loadLevel("Level_0");
+
+		hotText = new FlashingText("HOT", 0.15, 3.0);
+		add(hotText);
 	}
 
 	function loadLevel(level:String) {
@@ -103,6 +108,10 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 		handleCameraBounds();
+
+		if (player.hotModeActive && !hotText.isFlashing()) {
+			hotText.start();
+		}
 
 		// TODO helps devs call audio correctly, and helps audio folks find where sounds are needed
 		TODO.sfx('scarySound');
