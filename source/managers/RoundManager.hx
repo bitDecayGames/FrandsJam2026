@@ -1,5 +1,6 @@
 package managers;
 
+import schema.RoundState;
 import rounds.Round;
 import states.PlayState;
 import flixel.util.FlxSignal;
@@ -20,6 +21,10 @@ class RoundManager {
 	public function initialize(state:PlayState) {
 		// do stuff here on initialization of the play state if you need to
 		round.initialize(state);
+
+		GameManager.ME.net.sendMessage("round_update", {
+			status: RoundState.STATUS_ACTIVE,
+		});
 	}
 
 	public function setRound(round:Round) {
@@ -35,8 +40,9 @@ class RoundManager {
 	}
 
 	private function checkForCompletion() {
-		if (complete)
+		if (complete) {
 			return;
+		}
 		if (round.allGoalsRequired) {
 			for (goal in round.goals) {
 				if (!goal.isComplete()) {

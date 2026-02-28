@@ -15,6 +15,8 @@ import bitdecay.flixel.spacial.Cardinal;
 import bitdecay.flixel.graphics.Aseprite;
 import bitdecay.flixel.graphics.AsepriteMacros;
 import flixel.FlxG;
+import entities.Inventory;
+import entities.Inventory.InventoryItem;
 
 class Player extends FlxSprite {
 	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/playerA.json");
@@ -39,6 +41,8 @@ class Player extends FlxSprite {
 	public var hotModeActive:Bool = false;
 
 	var hotModeTimer:Float = 0;
+
+	public var inventory = new Inventory();
 
 	public var lastInputDir:Cardinal = E;
 
@@ -68,9 +72,12 @@ class Player extends FlxSprite {
 	var powerBarBg:FlxSprite;
 	var powerBarFill:FlxSprite;
 
+	// Factory for creating thrown rocks — set by PlayState
+	public var makeRock:(Float, Float) -> Rock;
+
 	// Throw state
 	var throwing:Bool = false;
-	var rockSprite:FlxSprite;
+	var rockSprite:Rock;
 	var rockTarget:FlxPoint;
 	var rockStartPos:FlxPoint;
 	var rockFlightTime:Float = 0;
@@ -246,8 +253,9 @@ class Player extends FlxSprite {
 			playMovementAnim();
 		}
 
-		// Throw rock with B button
-		if (!throwing && castState == IDLE && SimpleController.just_pressed(B)) {
+		// Throw rock with B button (requires a rock in inventory)
+		if (!throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(Rock)) {
+			inventory.remove(Rock);
 			throwing = true;
 			frozen = true;
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
@@ -410,9 +418,7 @@ class Player extends FlxSprite {
 	}
 
 	function launchRock() {
-		rockSprite = new FlxSprite();
-		rockSprite.makeGraphic(6, 6, FlxColor.fromRGB(50, 45, 40));
-		rockSprite.setPosition(x + 4, y + 4);
+		rockSprite = if (makeRock != null) makeRock(x + 4, y + 4) else new Rock(x + 4, y + 4);
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;
@@ -440,13 +446,17 @@ class Player extends FlxSprite {
 		rockSprite.setPosition(groundX, groundY - arcOffset);
 
 		if (t >= 1.0) {
+			var landX = rockTarget.x;
+			var landY = rockTarget.y;
+			var landed = rockSprite;
 			state.remove(rockSprite);
-			rockSprite.destroy();
 			rockSprite = null;
 			rockTarget.put();
 			rockTarget = null;
 			rockStartPos.put();
 			rockStartPos = null;
+			landed.handleLanded(landX, landY);
+			landed.destroy();
 		}
 	}
 
@@ -459,7 +469,7 @@ class Player extends FlxSprite {
 
 		castTarget = FlxPoint.get(targetX, targetY);
 
-		GameManager.ME.net.setMessage("cast_line", {x: castTarget.x, y: castTarget.y});
+		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y});
 
 		castBobber = new FlxSprite();
 		castBobber.makeGraphic(8, 8, FlxColor.RED);
@@ -639,6 +649,10 @@ class Player extends FlxSprite {
 		if (animName != null) {
 			animation.play(animName, false, false, animFrame);
 		}
+	}
+	
+	public function pickupItem(item:InventoryItem):Bool {
+		return inventory.add(item);
 	}
 
 	function getDirSuffix():String {

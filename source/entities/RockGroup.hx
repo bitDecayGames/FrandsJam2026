@@ -1,5 +1,6 @@
 package entities;
 
+import entities.Inventory.InventoryItem;
 import flixel.FlxG;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import levels.ldtk.Level;
@@ -29,6 +30,21 @@ class RockGroup extends FlxTypedGroup<Rock> {
 				add(new Rock(px, py));
 			}
 		}
+	}
+
+	public function checkPickup(player:Player) {
+		FlxG.overlap(player, this, handleOverlap);
+	}
+
+	function handleOverlap(player:Player, rock:Rock) {
+		if (!player.inventory.isFull()) {
+			player.pickupItem(Rock);
+			rock.kill();
+		}
+	}
+
+	public function addRock(x:Float, y:Float) {
+		add(new Rock(x, y));
 	}
 
 	public function clearAll() {

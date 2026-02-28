@@ -13,6 +13,7 @@ import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
 import entities.FishSpawner;
+import entities.Rock;
 import entities.RockGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
@@ -23,6 +24,7 @@ import events.EventBus;
 import flixel.FlxG;
 import flixel.addons.transition.FlxTransitionableState;
 import ui.FlashingText;
+import ui.InventoryHUD;
 
 using states.FlxStateExt;
 
@@ -35,6 +37,7 @@ class PlayState extends FlxTransitionableState {
 	var midGroundGroup = new FlxGroup();
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
+	var inventoryHUD:InventoryHUD;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
 
@@ -128,6 +131,12 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
+		var spawnerLayer = level.fishSpawnerLayer;
+		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
+
+		inventoryHUD = new InventoryHUD(player.inventory);
+		add(inventoryHUD);
+
 		rockGroup.spawn(level);
 		fishSpawner.spawn(level);
 
@@ -188,6 +197,7 @@ class PlayState extends FlxTransitionableState {
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
 		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
+		rockGroup.checkPickup(player);
 	}
 
 	function handleCameraBounds() {

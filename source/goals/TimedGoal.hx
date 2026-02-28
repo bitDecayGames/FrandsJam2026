@@ -1,7 +1,5 @@
 package goals;
 
-import flixel.FlxSprite;
-import flixel.text.FlxText.FlxTextBorderStyle;
 import flixel.text.FlxText.FlxTextAlign;
 import ui.font.BitmapText.PressStart;
 import flixel.util.FlxColor;

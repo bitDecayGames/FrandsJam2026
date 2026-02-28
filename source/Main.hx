@@ -48,7 +48,11 @@ import plugins.GlobalDebugPlugin;
 
 class Main extends Sprite {
 	public static function reset() {
-		new GameManager([new Round([new TimedGoal(), new PersonalFishCountGoal()])]);
+		new GameManager([
+			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
+			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
+			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
+		]);
 	}
 
 	public function new() {
