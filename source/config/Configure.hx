@@ -48,4 +48,54 @@ class Configure {
 		var creditSections:Array<CreditEntry> = cast config.credits.sections;
 		return creditSections;
 	}
+
+	public static function getServerURL():String {
+		#if sys
+		return Sys.getEnv("SERVER_URL");
+		#end
+
+		if (Macros.isDefined("SERVER_URL")) {
+			var define = Macros.getDefine("SERVER_URL");
+			// our define comes back as <val>=<val>
+			// Take the first half explicitly, as splitting on '=' might have unexpected
+			// behavior if the token has '=' characters in it
+			var url = define.substr(0, Std.int(define.length / 2));
+			if (url.length <= 0) {
+				trace("no valid analytics token found in API_KEY define, setting dev mode to true");
+				return "localhost";
+			}
+			return url;
+		} else {
+			return "localhost";
+		}
+	}
+
+	public static function getServerPort():Int {
+		#if sys
+		return Std.parseInt(Sys.getEnv("SERVER_PORT"));
+		#end
+
+		if (Macros.isDefined("SERVER_PORT")) {
+			var define = Macros.getDefine("SERVER_PORT");
+			// our define comes back as <val>=<val>
+			// Take the first half explicitly, as splitting on '=' might have unexpected
+			// behavior if the token has '=' characters in it
+			var port = define.substr(0, Std.int(define.length / 2));
+			if (port.length <= 0) {
+				trace("no valid analytics token found in API_KEY define, setting dev mode to true");
+				return 80;
+			}
+			return Std.parseInt(port);
+		} else {
+			return 80;
+		}
+	}
+
+	public static function getServerProtocol():String {
+		#if sys
+		return Sys.getEnv("SERVER_PROTOCOL");
+		#end
+
+		return "ws://";
+	}
 }

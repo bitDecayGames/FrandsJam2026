@@ -1,5 +1,7 @@
 package entities;
 
+import schema.PlayerState;
+import net.NetworkManager;
 import flixel.FlxSprite;
 import input.InputCalculator;
 import input.SimpleController;
@@ -14,6 +16,13 @@ class Player extends FlxSprite {
 	var speed:Float = 150;
 	var playerNum = 0;
 
+	// Network stuff
+	var net:NetworkManager = null;
+	var mySession:String = "";
+
+	// tracks if this player is controled by the remote client
+	public var isRemote:Bool = false;
+
 	public function new(X:Float, Y:Float) {
 		super(X, Y);
 		// This call can be used once https://github.com/HaxeFlixel/flixel/pull/2860 is merged
@@ -27,18 +36,53 @@ class Player extends FlxSprite {
 		});
 	}
 
+	public function setNetwork(net:NetworkManager, session:String) {
+		cleanupNetwork();
+
+		this.net = net;
+		net.onPCh.add(handleChange);
+	}
+
+	private function handleChange(sessionId:String, state:PlayerState):Void {
+		if (sessionId != mySession) {
+			return;
+		}
+
+		setPosition(state.x, state.y);
+	}
+
 	override public function update(delta:Float) {
 		super.update(delta);
 
-		var inputDir = InputCalculator.getInputCardinal(playerNum);
-		if (inputDir != NONE) {
-			inputDir.asVector(velocity).scale(speed);
-		} else {
-			velocity.set();
+		if (!isRemote) {
+			var inputDir = InputCalculator.getInputCardinal(playerNum);
+			if (inputDir != NONE) {
+				inputDir.asVector(velocity).scale(speed);
+			} else {
+				velocity.set();
+			}
+
+			if (SimpleController.just_pressed(Button.A, playerNum)) {
+				color = color ^ 0xFFFFFF;
+			}
+
+			if (net != null) {
+				net.update();
+				net.sendMove(x, y);
+			}
+		}
+	}
+
+	override function destroy() {
+		cleanupNetwork();
+		super.destroy();
+	}
+
+	private function cleanupNetwork() {
+		if (net == null) {
+			return;
 		}
 
-		if (SimpleController.just_pressed(Button.A, playerNum)) {
-			color = color ^ 0xFFFFFF;
-		}
+		this.net.onPCh.remove(handleChange);
 	}
 }

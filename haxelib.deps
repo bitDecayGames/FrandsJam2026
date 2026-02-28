@@ -32,3 +32,7 @@ flixel-fmod git https://github.com/MondayHopscotch/flixel-fmod.git
 # intentionally get haxefmod second so that flixel-fmod doesn't override it
 haxefmod git https://github.com/Tanz0rz/haxe-fmod.git 1.1.2-beta
 
+# networking libs
+colyseus 0.17.6
+hxWebSockets 1.4.0
+

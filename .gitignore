@@ -1,5 +1,7 @@
 # Build files
 /export
+/server/node_modules
+/server/dist
 
 # local copy of dependencies
 /.haxelib

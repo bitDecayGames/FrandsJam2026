@@ -1,5 +1,7 @@
 package states;
 
+import config.Configure;
+import net.NetworkManager;
 import debug.DebugLayers;
 import bitdecay.flixel.debug.tools.draw.DebugDraw;
 import todo.TODO;
@@ -20,7 +22,12 @@ import flixel.addons.transition.FlxTransitionableState;
 using states.FlxStateExt;
 
 class PlayState extends FlxTransitionableState {
-	var player:FlxSprite;
+	var player:Player;
+
+	// Network things
+	var remotePlayers:Map<String, Player> = new Map();
+	var net:NetworkManager;
+
 	var midGroundGroup = new FlxGroup();
 	var activeCameraTransition:CameraTransition = null;
 
@@ -49,6 +56,34 @@ class PlayState extends FlxTransitionableState {
 		add(transitions);
 
 		loadLevel("Level_0");
+		setupNetwork();
+	}
+
+	function setupNetwork() {
+		net = new NetworkManager();
+		net.onJoined = (sessionId) -> {
+			// trace('PlayState: joined as $sessionId');
+			// player.setNetwork(net, sessionId);
+		};
+		// net.onPlayerAdded = (sessionId, playerState) -> {
+		// 	// TODO: Have server give us the player color, too
+		// 	trace('PlayState: remote player $sessionId appeared');
+		// 	var remote = new Player(playerState.x, playerState.y);
+		// 	remote.isRemote = true;
+		// 	remote.setNetwork(net, sessionId);
+		// 	remotePlayers.set(sessionId, remote);
+		// 	add(remote);
+		// };
+		// net.onPlayerRemoved = (sessionId) -> {
+		// 	trace('PlayState: remote player $sessionId left');
+		// 	var remote = remotePlayers.get(sessionId);
+		// 	if (remote != null) {
+		// 		remove(remote);
+		// 		remote.destroy();
+		// 		remotePlayers.remove(sessionId);
+		// 	}
+		// };
+		net.connect(Configure.getServerURL(), Configure.getServerPort());
 	}
 
 	function loadLevel(level:String) {

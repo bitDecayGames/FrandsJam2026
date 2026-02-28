@@ -1,0 +1,6 @@
+-cp hxsrc
+-lib colyseus-hxjs
+-lib hxnodejs
+-main Main
+-js dist/server.js
+-D js-es=6
