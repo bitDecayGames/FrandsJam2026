@@ -9,7 +9,9 @@ using states.FlxStateExt;
 class AutoPlayState extends FlxTransitionableState {
 	override public function create():Void {
 		super.create();
+		#if !local
 		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
+		#end
 		GameManager.ME.start();
 	}
 }
