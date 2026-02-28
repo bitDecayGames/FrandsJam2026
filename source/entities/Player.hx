@@ -3,7 +3,6 @@ package entities;
 import flixel.FlxSprite;
 import input.InputCalculator;
 import input.SimpleController;
-import bitdecay.flixel.graphics.Aseprite;
 import bitdecay.flixel.spacial.Cardinal;
 import flixel.FlxG;
 
@@ -15,11 +14,17 @@ class Player extends FlxSprite {
 	var hotModeTimer:Float = 0;
 	var lastInputDir:Cardinal = E;
 
+	static inline var FRAME_DOWN = 1;
+	static inline var FRAME_RIGHT = 2;
+	static inline var FRAME_UP = 3;
+	static inline var FRAME_LEFT = 4;
+
 	public function new(X:Float, Y:Float) {
 		super(X, Y);
-		Aseprite.loadAllAnimations(this, AssetPaths.playerA__json);
+		loadGraphic(AssetPaths.playerA__png, true, 48, 48);
 		setSize(16, 16);
 		offset.set(16, 16);
+		animation.frameIndex = FRAME_DOWN;
 	}
 
 	override public function update(delta:Float) {
@@ -28,6 +33,7 @@ class Player extends FlxSprite {
 		var inputDir = InputCalculator.getInputCardinal(playerNum);
 		if (inputDir != NONE) {
 			lastInputDir = inputDir;
+			updateFrame(inputDir);
 		}
 
 		if (FlxG.keys.justPressed.T && !hotModeActive) {
@@ -45,7 +51,7 @@ class Player extends FlxSprite {
 			} else {
 				var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
 				if (moveDir != NONE) {
-					moveDir.asVector(velocity).scale(speed * 2);
+					moveDir.asVector(velocity).scale(speed * 1.5);
 				}
 			}
 		} else {
@@ -58,6 +64,20 @@ class Player extends FlxSprite {
 
 		if (SimpleController.just_pressed(Button.A, playerNum)) {
 			color = color ^ 0xFFFFFF;
+		}
+	}
+
+	function updateFrame(dir:Cardinal) {
+		switch (dir) {
+			case N:
+				animation.frameIndex = FRAME_UP;
+			case S:
+				animation.frameIndex = FRAME_DOWN;
+			case W:
+				animation.frameIndex = FRAME_LEFT;
+			case E:
+				animation.frameIndex = FRAME_RIGHT;
+			default:
 		}
 	}
 }
