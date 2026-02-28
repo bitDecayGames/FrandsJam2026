@@ -40,6 +40,7 @@ class WaterFish extends FlxSprite {
 		}
 		this.isRemote = isRemote;
 		loadGraphic("assets/aseprite/characters/fishShadow.png");
+		centerOffsets();
 		alpha = 0;
 		fadeInTimer = 1.0;
 		pickTarget();
@@ -127,8 +128,11 @@ class WaterFish extends FlxSprite {
 
 		super.update(elapsed);
 
-		if (attracted) {
+		if (bobber != null) {
 			checkBobber();
+		}
+
+		if (attracted) {
 			return;
 		}
 
@@ -163,15 +167,18 @@ class WaterFish extends FlxSprite {
 	function checkBobber() {
 		if (bobber == null) {
 			if (attracted) {
-				stopAttract();
+				attracted = false;
+				fleeFrom(x + velocity.x, y + velocity.y);
 			}
 			return;
 		}
 
 		var bx = bobber.x + bobber.width / 2;
 		var by = bobber.y + bobber.height / 2;
-		var dx = bx - x;
-		var dy = by - y;
+		var fx = x + width / 2;
+		var fy = y + height / 2;
+		var dx = bx - fx;
+		var dy = by - fy;
 		var dist = Math.sqrt(dx * dx + dy * dy);
 
 		if (dist < CATCH_DIST) {

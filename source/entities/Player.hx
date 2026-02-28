@@ -145,8 +145,8 @@ class Player extends FlxSprite {
 			var dy = py - castBobber.y;
 			var dist = Math.sqrt(dx * dx + dy * dy);
 			if (dist > 0) {
-				castBobber.velocity.x = (dx / dist) * 500;
-				castBobber.velocity.y = (dy / dist) * 500;
+				castBobber.velocity.x = (dx / dist) * 125;
+				castBobber.velocity.y = (dy / dist) * 125;
 			}
 		}
 	}
@@ -159,9 +159,9 @@ class Player extends FlxSprite {
 				castState = RETURNING;
 			} else {
 				castState = IDLE;
+				frozen = false;
+				playMovementAnim(true);
 			}
-			frozen = false;
-			playMovementAnim(true);
 		} else if (throwing) {
 			throwing = false;
 			frozen = false;
@@ -313,17 +313,17 @@ class Player extends FlxSprite {
 				case "left": FlxPoint.get(x - 15, y + 2);
 				default: FlxPoint.get(x + 8, y + 8);
 			};
-		} else if (castState == CATCH_ANIM) {
+		} else if (castState == CATCH_ANIM || castState == RETURNING) {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			return switch (castDirSuffix) {
 				case "down":
-					if (frame == 0) FlxPoint.get(x + 10, y + 24) else if (frame == 1) FlxPoint.get(x + 1, y + 3) else FlxPoint.get(x + 1, y + 6);
+					if (frame == 0) FlxPoint.get(x + 10, y + 24) else if (frame == 1) FlxPoint.get(x + 1, y + 3) else FlxPoint.get(x + 0, y - 5);
 				case "right":
-					if (frame == 0) FlxPoint.get(x + 30, y + 2) else if (frame == 1) FlxPoint.get(x + 14, y - 4) else FlxPoint.get(x + 5, y + 7);
+					if (frame == 0) FlxPoint.get(x + 30, y + 2) else if (frame == 1) FlxPoint.get(x + 14, y - 4) else FlxPoint.get(x - 6, y - 6);
 				case "up":
 					if (frame == 0) FlxPoint.get(x + 3, y - 6) else if (frame == 1) FlxPoint.get(x + 13, y - 8) else FlxPoint.get(x + 19, y - 8);
 				case "left":
-					if (frame == 0) FlxPoint.get(x - 15, y + 2) else if (frame == 1) FlxPoint.get(x + 1, y - 4) else FlxPoint.get(x + 12, y + 5);
+					if (frame == 0) FlxPoint.get(x - 15, y + 2) else if (frame == 1) FlxPoint.get(x + 1, y - 4) else FlxPoint.get(x + 21, y - 6);
 				default: FlxPoint.get(x + 8, y + 8);
 			};
 		} else {
@@ -479,7 +479,7 @@ class Player extends FlxSprite {
 		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y});
 
 		castBobber = new FlxSprite();
-		castBobber.makeGraphic(8, 8, FlxColor.RED);
+		castBobber.loadGraphic(AssetPaths.bobber__png);
 		var tip = getRodTipPos();
 		castBobber.setPosition(tip.x, tip.y);
 		tip.put();
@@ -488,7 +488,7 @@ class Player extends FlxSprite {
 		var dx = castTarget.x - castStartPos.x;
 		var dy = castTarget.y - castStartPos.y;
 		var dist = Math.sqrt(dx * dx + dy * dy);
-		castFlightTime = if (dist > 0) dist / 300 else 0.01;
+		castFlightTime = if (dist > 0) dist / 150 else 0.01;
 		castElapsed = 0;
 
 		state.add(castBobber);
@@ -608,9 +608,11 @@ class Player extends FlxSprite {
 						castBobber.destroy();
 						castBobber = null;
 						castState = IDLE;
+						frozen = false;
+						playMovementAnim(true);
 					} else {
-						castBobber.velocity.x = (dx / dist) * 500;
-						castBobber.velocity.y = (dy / dist) * 500;
+						castBobber.velocity.x = (dx / dist) * 125;
+						castBobber.velocity.y = (dy / dist) * 125;
 					}
 				}
 		}
