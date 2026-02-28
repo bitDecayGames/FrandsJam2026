@@ -62,27 +62,30 @@ class PlayState extends FlxTransitionableState {
 	function setupNetwork() {
 		net = new NetworkManager();
 		net.onJoined = (sessionId) -> {
-			// trace('PlayState: joined as $sessionId');
-			// player.setNetwork(net, sessionId);
+			trace('PlayState: joined as $sessionId');
+			player.setNetwork(net, sessionId);
 		};
-		// net.onPlayerAdded = (sessionId, playerState) -> {
-		// 	// TODO: Have server give us the player color, too
-		// 	trace('PlayState: remote player $sessionId appeared');
-		// 	var remote = new Player(playerState.x, playerState.y);
-		// 	remote.isRemote = true;
-		// 	remote.setNetwork(net, sessionId);
-		// 	remotePlayers.set(sessionId, remote);
-		// 	add(remote);
-		// };
-		// net.onPlayerRemoved = (sessionId) -> {
-		// 	trace('PlayState: remote player $sessionId left');
-		// 	var remote = remotePlayers.get(sessionId);
-		// 	if (remote != null) {
-		// 		remove(remote);
-		// 		remote.destroy();
-		// 		remotePlayers.remove(sessionId);
-		// 	}
-		// };
+		net.onPlayerAdded = (sessionId, playerState) -> {
+			if (sessionId == player.sessionId) {
+				return;
+			}
+			// TODO: Have server give us the player color, too
+			trace('PlayState: remote player $sessionId appeared');
+			var remote = new Player(playerState.x, playerState.y);
+			remote.isRemote = true;
+			remote.setNetwork(net, sessionId);
+			remotePlayers.set(sessionId, remote);
+			add(remote);
+		};
+		net.onPlayerRemoved = (sessionId) -> {
+			trace('PlayState: remote player $sessionId left');
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				remove(remote);
+				remote.destroy();
+				remotePlayers.remove(sessionId);
+			}
+		};
 		net.connect(Configure.getServerURL(), Configure.getServerPort());
 	}
 

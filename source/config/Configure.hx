@@ -87,7 +87,7 @@ class Configure {
 			}
 			return Std.parseInt(port);
 		} else {
-			return 80;
+			return 2567;
 		}
 	}
 

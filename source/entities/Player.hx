@@ -18,7 +18,8 @@ class Player extends FlxSprite {
 
 	// Network stuff
 	var net:NetworkManager = null;
-	var mySession:String = "";
+
+	public var sessionId:String = "";
 
 	// tracks if this player is controled by the remote client
 	public var isRemote:Bool = false;
@@ -31,7 +32,7 @@ class Player extends FlxSprite {
 		animation.play(anims.right);
 		animation.onFrameChange.add((anim, frame, index) -> {
 			if (eventData.exists(index)) {
-				trace('frame $index has data ${eventData.get(index)}');
+				// trace('frame $index has data ${eventData.get(index)}');
 			}
 		});
 	}
@@ -41,10 +42,11 @@ class Player extends FlxSprite {
 
 		this.net = net;
 		net.onPCh.add(handleChange);
+		sessionId = session;
 	}
 
-	private function handleChange(sessionId:String, state:PlayerState):Void {
-		if (sessionId != mySession) {
+	private function handleChange(sesId:String, state:PlayerState):Void {
+		if (sesId != sessionId) {
 			return;
 		}
 

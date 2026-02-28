@@ -54,16 +54,18 @@ class NetworkManager {
 					onPlayerAdded(sessionId, player);
 				}
 				cb.listen(player, "x", (_, _) -> {
-					// onPCh.dispatch(sessionId, player);
-					// if (onPlayerChanged != null) {
-					// 	onPlayerChanged(sessionId, player);
-					// }
+					trace('NetMan: (sesh: ${sessionId} x update');
+					onPCh.dispatch(sessionId, player);
+					if (onPlayerChanged != null) {
+						onPlayerChanged(sessionId, player);
+					}
 				});
 				cb.listen(player, "y", (_, _) -> {
-					// onPCh.dispatch(sessionId, player);
-					// if (onPlayerChanged != null) {
-					// 	onPlayerChanged(sessionId, player);
-					// }
+					trace('NetMan: (sesh: ${sessionId} y update');
+					onPCh.dispatch(sessionId, player);
+					if (onPlayerChanged != null) {
+						onPlayerChanged(sessionId, player);
+					}
 				});
 			});
 
