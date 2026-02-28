@@ -10,6 +10,7 @@ class Goal extends FlxObject {
 	public var completed:FlxSignal = new FlxSignal();
 
 	private var complete:Bool = false;
+	private var scores:Map<String, Int> = new Map<String, Int>();
 
 	public function initialize(state:PlayState) {
 		state.add(this);
@@ -31,5 +32,24 @@ class Goal extends FlxObject {
 			complete = true;
 			completed.dispatch();
 		}
+	}
+
+	public function result():Array<Result> {
+		var r:Array<Result> = [];
+		for (k => value in scores) {
+			r.push(new Result(k, value));
+		}
+		r.sort((a, b) -> (a.score - b.score));
+		return r;
+	}
+}
+
+class Result {
+	public var playerId:String;
+	public var score:Int;
+
+	public function new(playerId:String, score:Int) {
+		this.playerId = playerId;
+		this.score = score;
 	}
 }

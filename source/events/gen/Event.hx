@@ -12,7 +12,7 @@ import events.IEvent.EventReducer;
  * Files used to generate these types:
  * ../assets/data/events/types.json
  *
- * Input Hash: bab19087d334f613e2981dd0bf7f8913
+ * Input Hash: fca96042bb400dbd1b1847e9ae9ef06f
  */
 
 class MetaRegistry {
@@ -150,20 +150,6 @@ class DistanceClickSum implements events.IEvent {
 	}
 }
 
-class FishCaught implements events.IEvent {
-	public final type:String = "fish_caught";
-	public final reducers:Array<EventReducer> = [];
-	public var id:Int;
-
-	public var posX:Float;
-	public var posY:Float;
-
-	public function new(posX:Float, posY:Float) {
-		this.posX = posX;
-		this.posY = posY;
-	}
-}
-
 class Achieve implements events.IEvent {
 	public final type:String = "achieve";
 	public final reducers:Array<EventReducer> = [];
@@ -173,5 +159,37 @@ class Achieve implements events.IEvent {
 
 	public function new(name:String) {
 		this.name = name;
+	}
+}
+
+class FishCaught implements events.IEvent {
+	public final type:String = "fish_caught";
+	public final reducers:Array<EventReducer> = [];
+	public var id:Int;
+
+	public var fishId:String;
+	public var ownerId:String;
+	public var posX:Float;
+	public var posY:Float;
+
+	public function new(fishId:String, ownerId:String, posX:Float, posY:Float) {
+		this.fishId = fishId;
+		this.ownerId = ownerId;
+		this.posX = posX;
+		this.posY = posY;
+	}
+}
+
+class FishCollected implements events.IEvent {
+	public final type:String = "fish_collected";
+	public final reducers:Array<EventReducer> = [];
+	public var id:Int;
+
+	public var fishId:String;
+	public var ownerId:String;
+
+	public function new(fishId:String, ownerId:String) {
+		this.fishId = fishId;
+		this.ownerId = ownerId;
 	}
 }
