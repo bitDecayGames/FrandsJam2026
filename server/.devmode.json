@@ -3,7 +3,7 @@
   "hash": {
     "roomcount": {},
     "roomhistory": {
-      "a5UOY0LGf": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"HVev3NwCL\",\"state\":\"{\\\"players\\\":{\\\"1bw5ewUiz\\\":{\\\"x\\\":56,\\\"y\\\":48}}}\",\"clients\":[{\"sessionId\":\"1bw5ewUiz\",\"reconnectionToken\":\"ZRBvQWVET\"}]}"
+      "-OZNgag6a": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"VkXXZjiJE\",\"state\":\"{\\\"hostSessionId\\\":\\\"NM-txT1a7\\\",\\\"players\\\":{\\\"NM-txT1a7\\\":{\\\"x\\\":271.25,\\\"y\\\":48},\\\"4O2qPHMAU\\\":{\\\"x\\\":146,\\\"y\\\":75.5999984741211}},\\\"fish\\\":{}}\",\"clients\":[{\"sessionId\":\"NM-txT1a7\",\"reconnectionToken\":\"3FgIa-jpM\"},{\"sessionId\":\"4O2qPHMAU\",\"reconnectionToken\":\"sIuKq-XxI\"}]}"
     }
   },
   "keys": {}

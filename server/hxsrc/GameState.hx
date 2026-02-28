@@ -24,6 +24,9 @@ class FishState extends Schema {
 }
 
 class GameState extends Schema {
+	@:type("string")
+	public var hostSessionId:String;
+
 	@:type({map: PlayerState})
 	public var players:MapSchema<PlayerState>;
 
