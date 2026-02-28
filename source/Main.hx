@@ -11,8 +11,6 @@ import config.Configure;
 import debug.DebugLayers;
 import debug.events.EventLog;
 import events.MetricReducer;
-import events.derivers.DistanceClickDeriver;
-import events.derivers.SpeedClickDeriver;
 import flixel.FlxG;
 import flixel.FlxGame;
 import flixel.FlxState;
@@ -143,8 +141,6 @@ class Main extends Sprite {
 
 	private function initEvents() {
 		EventBus.init();
-		EventBus.registerDeriver(new SpeedClickDeriver(2000));
-		EventBus.registerDeriver(new DistanceClickDeriver(100));
 		MetricReducer.init();
 
 		Analytics.initEventReporting();

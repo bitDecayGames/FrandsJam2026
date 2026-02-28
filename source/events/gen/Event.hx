@@ -12,17 +12,13 @@ import events.IEvent.EventReducer;
  * Files used to generate these types:
  * ../assets/data/events/types.json
  *
- * Input Hash: f120b78ca86015591d353c723ba50fee
+ * Input Hash: fbd557cc5c08bd4086fcf194233bdb9e
  */
 
 class MetaRegistry {
 	public static var intEvents:Map<String, (Int) -> IEvent> = [
-		"click_count" => ClickCount.new,
-		"speed_click_min" => SpeedClickMin.new,
 	];
 	public static var floatEvents:Map<String, (Float) -> IEvent> = [
-		"distance_click_max" => DistanceClickMax.new,
-		"distance_click_sum" => DistanceClickSum.new,
 	];
 }
 
@@ -64,9 +60,9 @@ class PlayerSpawn implements events.IEvent {
 	}
 }
 
-class Click implements events.IEvent {
-	public final type:String = "click";
-	public final reducers:Array<EventReducer> = [COUNT];
+class FishCaught implements events.IEvent {
+	public final type:String = "fish_caught";
+	public final reducers:Array<EventReducer> = [];
 	public var id:Int;
 
 	public var posX:Float;
@@ -75,78 +71,6 @@ class Click implements events.IEvent {
 	public function new(posX:Float, posY:Float) {
 		this.posX = posX;
 		this.posY = posY;
-	}
-}
-
-class ClickCount implements events.IEvent {
-	public final type:String = "click_count";
-	public final reducers:Array<EventReducer> = [];
-	public var id:Int;
-
-	public var count:Int;
-
-	public function new(count:Int) {
-		this.count = count;
-	}
-}
-
-class SpeedClick implements events.IEvent {
-	public final type:String = "speed_click";
-	public final reducers:Array<EventReducer> = [MIN('time')];
-	public var id:Int;
-
-	public var time:Int;
-
-	public function new(time:Int) {
-		this.time = time;
-	}
-}
-
-class SpeedClickMin implements events.IEvent {
-	public final type:String = "speed_click_min";
-	public final reducers:Array<EventReducer> = [];
-	public var id:Int;
-
-	public var min:Int;
-
-	public function new(min:Int) {
-		this.min = min;
-	}
-}
-
-class DistanceClick implements events.IEvent {
-	public final type:String = "distance_click";
-	public final reducers:Array<EventReducer> = [MAX('distance'),SUM('distance')];
-	public var id:Int;
-
-	public var distance:Float;
-
-	public function new(distance:Float) {
-		this.distance = distance;
-	}
-}
-
-class DistanceClickMax implements events.IEvent {
-	public final type:String = "distance_click_max";
-	public final reducers:Array<EventReducer> = [];
-	public var id:Int;
-
-	public var max:Float;
-
-	public function new(max:Float) {
-		this.max = max;
-	}
-}
-
-class DistanceClickSum implements events.IEvent {
-	public final type:String = "distance_click_sum";
-	public final reducers:Array<EventReducer> = [];
-	public var id:Int;
-
-	public var sum:Float;
-
-	public function new(sum:Float) {
-		this.sum = sum;
 	}
 }
 

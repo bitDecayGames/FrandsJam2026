@@ -103,6 +103,15 @@ Release a held button. Returns `{"held": []}`.
 #### `releaseAll()`
 Release all held buttons. Returns `{"held": []}`.
 
+#### `teleportPlayer(x, y)`
+Instantly move the player to the given coordinates and zero out velocity. Returns `{"x": 100, "y": 200}`.
+
+#### `tapButton(name, holdFrames?)`
+Press a button, hold for N frames (default 1), then auto-release. Handles the press/step/release/step cycle internally. Returns `{"tapped": "A", "holdFrames": 1}`.
+
+#### `walkTo(x, y, threshold?)`
+Automatically press direction buttons and step until the player reaches (x, y) within threshold pixels (default 2). Stops and releases buttons on arrival. Returns `{"walking": true, "targetX": 100, "targetY": 200, "maxFrames": 60}`.
+
 **Example — move player right for 10 frames:**
 ```js
 window.__debug.pressButton("RIGHT")

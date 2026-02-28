@@ -1,18 +1,17 @@
 package states;
 
-import debug.DebugLayers;
-import bitdecay.flixel.debug.tools.draw.DebugDraw;
-import todo.TODO;
 import flixel.group.FlxGroup;
 import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
+import entities.Fish;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
 import entities.Player;
 import events.gen.Event;
 import events.EventBus;
+import input.SimpleController;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.addons.transition.FlxTransitionableState;
@@ -21,8 +20,11 @@ import ui.FlashingText;
 using states.FlxStateExt;
 
 class PlayState extends FlxTransitionableState {
+	static inline var NUM_FISH = 10;
+
 	var player:Player;
 	var midGroundGroup = new FlxGroup();
+	var fishGroup = new FlxTypedGroup<Fish>();
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
 
@@ -40,14 +42,10 @@ class PlayState extends FlxTransitionableState {
 		FlxG.camera.pixelPerfectRender = true;
 
 		Achievements.onAchieve.add(handleAchieve);
-		EventBus.subscribe(ClickCount, (c) -> {
-			QLog.notice('I got me an event about ${c.count} clicks having happened.');
-		});
-
-		// QLog.error('Example error');
 
 		// Build out our render order
 		add(midGroundGroup);
+		add(fishGroup);
 		add(transitions);
 
 		loadLevel("Level_0");
@@ -63,12 +61,18 @@ class PlayState extends FlxTransitionableState {
 		if (level.songEvent != "") {
 			FmodManager.PlaySong(level.songEvent);
 		}
-		midGroundGroup.add(level.terrainLayer);
-		FlxG.worldBounds.copyFrom(level.terrainLayer.getBounds());
+		// Skip loading tilemap — open playfield for now
+		FlxG.worldBounds.set(0, 0, 640, 480);
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y);
 		camera.follow(player);
 		add(player);
+
+		for (_ in 0...NUM_FISH) {
+			var fx = FlxG.random.float(FlxG.worldBounds.x, FlxG.worldBounds.right - 16);
+			var fy = FlxG.random.float(FlxG.worldBounds.y, FlxG.worldBounds.bottom - 16);
+			fishGroup.add(new Fish(fx, fy));
+		}
 
 		for (t in level.camTransitions) {
 			transitions.add(t);
@@ -89,6 +93,11 @@ class PlayState extends FlxTransitionableState {
 		}
 		transitions.clear();
 
+		for (f in fishGroup) {
+			f.destroy();
+		}
+		fishGroup.clear();
+
 		for (o in midGroundGroup) {
 			o.destroy();
 		}
@@ -102,22 +111,18 @@ class PlayState extends FlxTransitionableState {
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
-		if (FlxG.mouse.justPressed) {
-			EventBus.fire(new Click(FlxG.mouse.x, FlxG.mouse.y));
-		}
-
-		FlxG.collide(midGroundGroup, player);
 		handleCameraBounds();
 
 		if (player.hotModeActive && !hotText.isFlashing()) {
 			hotText.start();
 		}
 
-		// TODO helps devs call audio correctly, and helps audio folks find where sounds are needed
-		TODO.sfx('scarySound');
-
-		// DS "Debug Suite" is how we get to all of our debugging tools
-		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
+		FlxG.overlap(player, fishGroup, (p:FlxSprite, f:FlxSprite) -> {
+			var fish:Fish = cast f;
+			if (SimpleController.just_pressed(Button.A)) {
+				fish.hit();
+			}
+		});
 	}
 
 	function handleCameraBounds() {
