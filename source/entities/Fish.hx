@@ -1,30 +1,26 @@
 package entities;
 
 import flixel.FlxSprite;
-import input.InputCalculator;
-import input.SimpleController;
-import bitdecay.flixel.graphics.Aseprite;
-import bitdecay.flixel.graphics.AsepriteMacros;
+import flixel.util.FlxColor;
+import events.EventBus;
+import events.gen.Event;
 
 class Fish extends FlxSprite {
-	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/player.json");
-	public static var layers = AsepriteMacros.layerNames("assets/aseprite/characters/player.json");
-	public static var eventData = AsepriteMacros.frameUserData("assets/aseprite/characters/player.json", "Layer 1");
+	public var hp:Int = 10;
+	public var isLiving:Bool = true;
 
 	public function new(X:Float, Y:Float) {
 		super(X, Y);
-		// This call can be used once https://github.com/HaxeFlixel/flixel/pull/2860 is merged
-		// FlxAsepriteUtil.loadAseAtlasAndTags(this, AssetPaths.player__png, AssetPaths.player__json);
-		Aseprite.loadAllAnimations(this, AssetPaths.player__json);
-		animation.play(anims.right);
-		animation.onFrameChange.add((anim, frame, index) -> {
-			if (eventData.exists(index)) {
-				trace('frame $index has data ${eventData.get(index)}');
-			}
-		});
+		makeGraphic(16, 16, FlxColor.GREEN);
 	}
 
-	override public function update(delta:Float) {
-		super.update(delta);
+	public function hit() {
+		hp -= 1;
+		if (hp <= 0) {
+			isLiving = false;
+			EventBus.fire(new FishCaught(x, y));
+			QLog.notice('Fish caught at ($x, $y)');
+			kill();
+		}
 	}
 }
