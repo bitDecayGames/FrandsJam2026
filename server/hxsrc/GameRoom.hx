@@ -46,12 +46,36 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	override public function onJoin(client:Client, ?options:Dynamic):EitherType<Void, Promise<Dynamic>> {
 		trace('player joined: ${client.sessionId}');
 		state.players.set(client.sessionId, new PlayerState());
+
+		// Set host
+		if (state.hostSessionId == null || state.hostSessionId == "") {
+			state.hostSessionId = client.sessionId;
+			trace('host set ${client.sessionId}');
+		}
+
 		return null;
 	}
 
 	override public function onLeave(client:Client, ?code:CloseCode):EitherType<Void, Promise<Dynamic>> {
 		trace('player left: ${client.sessionId}');
 		trace('successful clear: ${state.players.delete(client.sessionId)}');
+
+		// Clear/rotate host
+		if (client.sessionId == state.hostSessionId) {
+			if (state.players.size <= 0) {
+				state.hostSessionId = null;
+			} else {
+				var sIds = [];
+				for (sId => _ in state.players) {
+					sIds.push(sId);
+				}
+				var sIdx = Std.random(state.players.size);
+				state.hostSessionId = sIds[sIdx];
+			};
+
+			trace('host changed ${client.sessionId} -> ${state.hostSessionId}');
+		}
+
 		return null;
 	}
 }

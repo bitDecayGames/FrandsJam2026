@@ -20,7 +20,18 @@ class WaterFish extends FlxSprite {
 	public var fishId = "";
 
 	static inline var SPEED:Float = 20;
+	static inline var ATTRACT_SPEED:Float = 40;
 	static inline var ARRIVE_DIST:Float = 2;
+	static inline var ATTRACT_DIST:Float = 32; // 2 tiles
+	static inline var CATCH_DIST:Float = 4;
+
+	var attracted:Bool = false;
+
+	public var bobber:FlxSprite;
+	public var onCatch:() -> Void;
+
+	var respawnTimer:Float = 0;
+	var fadeInTimer:Float = 0;
 
 	public function new(x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false) {
 		super(x, y);
@@ -29,6 +40,8 @@ class WaterFish extends FlxSprite {
 		}
 		this.isRemote = isRemote;
 		makeGraphic(4, 2, FlxColor.BLACK);
+		alpha = 0;
+		fadeInTimer = 1.0;
 		pickTarget();
 	}
 
@@ -93,10 +106,29 @@ class WaterFish extends FlxSprite {
 	}
 
 	override public function update(elapsed:Float) {
-		super.update(elapsed);
-
 		if (isRemote) {
 			// TODO: drive animations but network controls main stuff
+			super.update(elapsed);
+			return;
+		}
+
+		if (!alive) {
+			respawnTimer -= elapsed;
+			if (respawnTimer <= 0) {
+				respawn();
+			}
+			return;
+		}
+
+		if (fadeInTimer > 0) {
+			fadeInTimer -= elapsed;
+			alpha = Math.min(1.0, 1.0 - fadeInTimer);
+		}
+
+		super.update(elapsed);
+
+		if (attracted) {
+			checkBobber();
 			return;
 		}
 
@@ -128,6 +160,57 @@ class WaterFish extends FlxSprite {
 		}
 	}
 
+	function checkBobber() {
+		if (bobber == null) {
+			if (attracted) {
+				stopAttract();
+			}
+			return;
+		}
+
+		var bx = bobber.x + bobber.width / 2;
+		var by = bobber.y + bobber.height / 2;
+		var dx = bx - x;
+		var dy = by - y;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+
+		if (dist < CATCH_DIST) {
+			alive = false;
+			visible = false;
+			velocity.set(0, 0);
+			attracted = false;
+			respawnTimer = 3.0;
+			if (onCatch != null) {
+				onCatch();
+			}
+			return;
+		} else if (dist < ATTRACT_DIST) {
+			attracted = true;
+			pauseTimer = 0;
+			if (dist > 0.1) {
+				velocity.set((dx / dist) * ATTRACT_SPEED, (dy / dist) * ATTRACT_SPEED);
+			}
+		} else if (attracted) {
+			stopAttract();
+		}
+	}
+
+	function stopAttract() {
+		attracted = false;
+		pickTarget();
+	}
+
+	function respawn() {
+		var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
+		setPosition(tile.x + FlxG.random.float(0, 12), tile.y + FlxG.random.float(0, 12));
+		velocity.set(0, 0);
+		alpha = 0;
+		fadeInTimer = 1.0;
+		visible = true;
+		revive();
+		pickTarget();
+	}
+
 	override function destroy() {
 		if (target != null) {
 			target.put();
@@ -135,6 +218,8 @@ class WaterFish extends FlxSprite {
 		}
 		// Don't put waterTiles points — they're shared across fish in the same body
 		waterTiles = null;
+		bobber = null;
+		onCatch = null;
 		super.destroy();
 	}
 }

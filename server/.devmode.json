@@ -3,7 +3,7 @@
   "hash": {
     "roomcount": {},
     "roomhistory": {
-      "x5Ek2z-3-": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"E3tPTytuy\",\"state\":\"{\\\"players\\\":{\\\"Msizv84Wp\\\":{\\\"x\\\":56,\\\"y\\\":48},\\\"Kle06hdig\\\":{\\\"x\\\":56,\\\"y\\\":48}},\\\"fish\\\":{\\\"1\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"2\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"3\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"4\\\":{\\\"x\\\":0,\\\"y\\\":0}}}\",\"clients\":[{\"sessionId\":\"Msizv84Wp\",\"reconnectionToken\":\"1UDvpswlF\"},{\"sessionId\":\"Kle06hdig\",\"reconnectionToken\":\"-VpRM6G2_\"}]}"
+      "-uINT6Obm": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"IBpKNJeWW\",\"state\":\"{\\\"players\\\":{\\\"OxaQ39pcZ\\\":{\\\"x\\\":0,\\\"y\\\":0},\\\"DtPr1eiNL\\\":{\\\"x\\\":56,\\\"y\\\":48}},\\\"fish\\\":{}}\",\"clients\":[{\"sessionId\":\"OxaQ39pcZ\",\"reconnectionToken\":\"lS4UuOLuH\"},{\"sessionId\":\"DtPr1eiNL\",\"reconnectionToken\":\"D1JNj1JLv\"}]}"
     }
   },
   "keys": {}

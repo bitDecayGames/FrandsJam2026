@@ -2,6 +2,7 @@ package entities;
 
 import net.NetworkManager;
 import flixel.FlxG;
+import flixel.FlxSprite;
 import flixel.math.FlxPoint;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import levels.ldtk.Level;
@@ -15,8 +16,11 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 
 	var net:NetworkManager;
 
-	public function new() {
+	var catchCallback:() -> Void;
+
+	public function new(onCatch:() -> Void) {
 		super();
+		catchCallback = onCatch;
 	}
 
 	public function setNet(net:NetworkManager) {
@@ -122,9 +126,18 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 					}
 					var fish = new WaterFish(tile.x, tile.y, waterTiles);
 					fishMap.set('${fid}', fish);
+					fish.onCatch = catchCallback;
 					add(fish);
 				}
 			}
+		}
+	}
+
+	public function setBobber(bobber:FlxSprite) {
+		for (fish in members) {
+			if (fish == null || !fish.alive)
+				continue;
+			fish.bobber = bobber;
 		}
 	}
 

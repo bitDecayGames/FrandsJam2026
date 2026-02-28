@@ -1,6 +1,9 @@
 package states;
 
+import schema.FishState;
 import flixel.util.FlxTimer;
+import managers.GameManager;
+import schema.PlayerState;
 import config.Configure;
 import net.NetworkManager;
 import managers.RoundManager;
@@ -11,9 +14,9 @@ import flixel.group.FlxGroup;
 import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
-import entities.FishGroup;
 import entities.FishSpawner;
 import entities.WaterFish;
+import entities.RockGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
@@ -32,11 +35,10 @@ class PlayState extends FlxTransitionableState {
 	// Network things
 	var remotePlayers:Map<String, Player> = new Map();
 	var remoteFish:Map<String, WaterFish> = new Map();
-	var net:NetworkManager;
 
 	var midGroundGroup = new FlxGroup();
-	var fishSpawner = new FishSpawner();
-	var fishGroup = new FishGroup();
+	var fishSpawner:FishSpawner;
+	var rockGroup:RockGroup;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
 
@@ -63,18 +65,21 @@ class PlayState extends FlxTransitionableState {
 
 		// QLog.error('Example error');
 
+		fishSpawner = new FishSpawner(() -> player.catchFish());
+		rockGroup = new RockGroup();
+
 		// Build out our render order
 		add(midGroundGroup);
+		add(rockGroup);
 		add(fishSpawner);
-		add(fishGroup);
 		add(transitions);
 
 		#if !local
 		setupNetwork();
-		net.connect(Configure.getServerURL(), Configure.getServerPort());
+		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
 		#end
 
-		fishSpawner.setNet(net);
+		fishSpawner.setNet(GameManager.ME.net);
 
 		loadLevel("Level_0");
 
@@ -84,42 +89,52 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function setupNetwork() {
-		net = new NetworkManager();
-		net.onJoined = (sessionId) -> {
-			trace('PlayState: joined as $sessionId');
-			player.setNetwork(net, sessionId);
-		};
-		net.onPlayerAdded.add((sessionId, playerState) -> {
-			if (sessionId == player.sessionId) {
-				return;
-			}
-			// TODO: Have server give us the player color, too
-			trace('PlayState: remote player $sessionId appeared');
-			var remote = new Player(playerState.x, playerState.y, this);
-			remote.isRemote = true;
-			remote.setNetwork(net, sessionId);
-			remotePlayers.set(sessionId, remote);
-			add(remote);
-		});
-		net.onPlayerRemoved = (sessionId) -> {
-			trace('PlayState: remote player $sessionId left');
-			var remote = remotePlayers.get(sessionId);
-			if (remote != null) {
-				remove(remote);
-				remote.destroy();
-				remotePlayers.remove(sessionId);
-			}
-		};
-		net.onFishAdded.add((fishId, fishState) -> {
-			if (fishSpawner.fishMap.exists(fishId)) {
-				return;
-			}
+		GameManager.ME.net.onJoined.add(onPlayerJoined);
+		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
+		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
+		GameManager.ME.net.onFishAdded.add(onFishAdded);
+	}
 
-			var newFish = new WaterFish(fishState.x, fishState.y, null, true);
-			newFish.setNetwork(net, fishId);
-			remoteFish.set(fishId, newFish);
-			midGroundGroup.add(newFish);
-		});
+	function onPlayerJoined(sessionId:String) {
+		trace('PlayState: joined as $sessionId');
+		player.setNetwork(sessionId);
+	}
+
+	function onPlayerAdded(sessionId:String, playerState:PlayerState) {
+		if (sessionId == player.sessionId) {
+			return;
+		}
+		// TODO: Have server give us the player color, too
+		trace('PlayState: remote player $sessionId appeared');
+		var remote = new Player(playerState.x, playerState.y, this);
+		remote.isRemote = true;
+		remote.setNetwork(sessionId);
+		remotePlayers.set(sessionId, remote);
+		add(remote);
+	}
+
+	function onPlayerRemoved(sessionId:String) {
+		trace('PlayState: remote player $sessionId left');
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remove(remote);
+			remote.destroy();
+			remotePlayers.remove(sessionId);
+		}
+	}
+
+	function onFishAdded(fishId:String, fishState:FishState) {
+		if (fishSpawner.fishMap.exists(fishId)) {
+			QLog.notice('skipping fish $fishId, it already exists');
+			return;
+		}
+
+		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y}');
+
+		var newFish = new WaterFish(fishState.x, fishState.y, null, true);
+		newFish.setNetwork(GameManager.ME.net, fishId);
+		remoteFish.set(fishId, newFish);
+		midGroundGroup.add(newFish);
 	}
 
 	function loadLevel(level:String) {
@@ -136,10 +151,14 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
-		FlxTimer.wait(2, () -> {
-			fishSpawner.spawn(level);
+		FlxTimer.wait(10, () -> {
+			if (NetworkManager.IS_HOST) {
+				rockGroup.spawn(level);
+				fishSpawner.spawn(level);
+			} else {
+				QLog.notice('skipping fish spawn');
+			}
 		});
-		// fishGroup.spawn(FlxG.worldBounds);
 
 		for (t in level.camTransitions) {
 			transitions.add(t);
@@ -160,8 +179,7 @@ class PlayState extends FlxTransitionableState {
 		}
 		transitions.clear();
 
-		fishGroup.clearAll();
-
+		rockGroup.clearAll();
 		fishSpawner.clearAll();
 
 		for (o in midGroundGroup) {
@@ -194,7 +212,7 @@ class PlayState extends FlxTransitionableState {
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
-		fishGroup.handleOverlap(player);
+		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
 	}
 
 	function handleCameraBounds() {
