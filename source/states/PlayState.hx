@@ -13,6 +13,7 @@ import flixel.math.FlxRect;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import entities.CameraTransition;
 import entities.FishSpawner;
+import entities.Rock;
 import entities.RockGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
@@ -130,8 +131,8 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		add(player);
 
-		player.rockWaterLayer = level.fishSpawnerLayer;
-		player.onRockAdded = rockGroup.addRock;
+		var spawnerLayer = level.fishSpawnerLayer;
+		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);

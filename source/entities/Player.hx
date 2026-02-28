@@ -59,9 +59,8 @@ class Player extends FlxSprite {
 	var powerBarBg:FlxSprite;
 	var powerBarFill:FlxSprite;
 
-	// Dependencies for thrown rocks — set by PlayState
-	public var rockWaterLayer:ldtk.Layer_IntGrid;
-	public var onRockAdded:(Float, Float) -> Void;
+	// Factory for creating thrown rocks — set by PlayState
+	public var makeRock:(Float, Float) -> Rock;
 
 	// Throw state
 	var throwing:Bool = false;
@@ -413,7 +412,7 @@ class Player extends FlxSprite {
 	}
 
 	function launchRock() {
-		rockSprite = new Rock(x + 4, y + 4, rockWaterLayer, onRockAdded);
+		rockSprite = if (makeRock != null) makeRock(x + 4, y + 4) else new Rock(x + 4, y + 4);
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;
