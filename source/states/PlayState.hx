@@ -346,8 +346,7 @@ class PlayState extends FlxTransitionableState {
 		}
 
 		FlxG.collide(midGroundGroup, player);
-		FlxG.collide(bushGroup, player);
-		FlxG.overlap(bushGroup, player, Bush.onOverlap);
+		FlxG.collide(bushGroup, player, Bush.onCollide);
 		ySortGroup.sort((order, a, b) -> {
 			var objA:flixel.FlxObject = cast a;
 			var objB:flixel.FlxObject = cast b;

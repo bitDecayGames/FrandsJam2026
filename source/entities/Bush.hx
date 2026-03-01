@@ -17,18 +17,22 @@ class Bush extends FlxSprite {
 
 	public function new(bx:Float, by:Float, state:FlxState) {
 		super(bx, by);
+		baseX = bx;
 		parentState = state;
 		loadGraphic(AssetPaths.bush__png);
+		setSize(14, 6);
+		offset.set(9, 20);
 		immovable = true;
 	}
 
-	public static function onOverlap(bush:Bush, _:Player) {
+	public static function onCollide(bush:Bush, _:Player) {
 		bush.rustle();
 	}
 
 	public function rustle() {
-		if (cooldownTimer > 0)
+		if (cooldownTimer > 0) {
 			return;
+		}
 		shakeTimer = SHAKE_DURATION;
 		cooldownTimer = COOLDOWN;
 
@@ -40,8 +44,9 @@ class Bush extends FlxSprite {
 	override public function update(dt:Float) {
 		super.update(dt);
 
-		if (cooldownTimer > 0)
+		if (cooldownTimer > 0) {
 			cooldownTimer -= dt;
+		}
 
 		if (shakeTimer > 0) {
 			shakeTimer -= dt;

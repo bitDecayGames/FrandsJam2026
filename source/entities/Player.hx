@@ -658,6 +658,8 @@ class Player extends FlxSprite {
 					castState = LANDED;
 					frozen = false;
 					playMovementAnim(true);
+					if (onBobberLanded != null)
+						onBobberLanded(castTarget.x + 4, castTarget.y + 4);
 				}
 			case CAST_ANIM:
 				// TODO: We can
@@ -774,8 +776,8 @@ class Player extends FlxSprite {
 		var cols:Int = Std.int(sheetW / 48);
 
 		loadGraphic(pngPath, true, 48, 48);
-		setSize(16, 16);
-		offset.set(16, 16);
+		setSize(16, 8);
+		offset.set(16, 28);
 
 		var frames:Array<Dynamic> = json.frames;
 		var tags:Array<Dynamic> = json.meta.frameTags;

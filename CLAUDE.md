@@ -123,6 +123,7 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 - When positioning sprites, always position by center point using `offset` (i.e. `offset.set(-width/2, -height/2)` or `centerOffsets()`), not by top-left corner origin. The x/y passed in should represent the sprite's center.
 - When making sprites visible, set their position before setting `visible = true` to avoid a one-frame flash at the previous location
 - Use `FlxPoint.get()`/`.put()` for pooled points; call `.put()` when done to return to pool
+- Always use curly braces `{}` around single-line `if`/`else`/`for`/`while` bodies, even when not required by the language
 
 ## Key Sprite Assets
 - `assets/aseprite/characters/playerA.json` (and playerB-H) — player skins, 48x48 frames, Aseprite JSON atlas with frame tags for animations
