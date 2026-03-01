@@ -108,8 +108,8 @@ class Shop extends FlxSprite {
 		if (count > 0) {
 			player.score += totalValue;
 			GameManager.ME.scores.set(GameManager.ME.mySessionId, player.score);
-			QLog.notice('Sold $count fish for $$totalValue. Total score: ${player.score}');
-			TextPop.pop(Std.int(x), Std.int(y), '+$$totalValue', new FloatAway(100, 3));
+			QLog.notice('Sold $count fish for ' + "$" + '$totalValue. Total score: ${player.score}');
+			TextPop.pop(Std.int(x), Std.int(y), "+" + "$" + Std.string(totalValue), new FloatAway(100, 3));
 			GameManager.ME.net.sendMessage("score_update", {score: player.score});
 		}
 	}

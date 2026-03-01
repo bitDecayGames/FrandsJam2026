@@ -28,9 +28,9 @@ class PostRoundState extends FlxTransitionableState {
 	static inline var SCORE_LEFT_MARGIN:Int = 40;
 	static inline var SCORE_RIGHT_MARGIN:Int = 40;
 	static inline var SCORE_START_Y:Int = 100;
-	static inline var SCORE_ROW_HEIGHT:Int = 28;
-	static inline var FIRST_PLACE_SIZE:Int = 16;
-	static inline var OTHER_PLACE_SIZE:Int = 12;
+	static inline var SCORE_ROW_HEIGHT:Int = 36;
+	static inline var FIRST_PLACE_SIZE:Int = 20;
+	static inline var OTHER_PLACE_SIZE:Int = 16;
 
 	override public function create():Void {
 		super.create();
