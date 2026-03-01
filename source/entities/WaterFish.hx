@@ -180,7 +180,6 @@ class WaterFish extends FlxSprite {
 		}
 
 		if (attracted) {
-			GameManager.ME.net.sendMessage("fish_move", {id: fishId, x: x, y: y}, true);
 			return;
 		}
 
@@ -249,7 +248,6 @@ class WaterFish extends FlxSprite {
 		// attract toward closest bobber
 		if (!attracted) {
 			attracted = true;
-			GameManager.ME.net.sendMessage("fish_attracted", {fishId: fishId, sessionId: closestSid});
 		}
 		pauseTimer = 0;
 		var dx = (closestBobber.x + closestBobber.width / 2) - (x + width / 2);
