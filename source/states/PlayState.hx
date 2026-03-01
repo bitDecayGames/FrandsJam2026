@@ -78,7 +78,7 @@ class PlayState extends FlxTransitionableState {
 
 	var transitions = new FlxTypedGroup<CameraTransition>();
 
-	var waterLayer:ldtk.Layer_IntGrid;
+	var waterLayer:levels.ldtk.WaterGrid;
 	var sparkleTimer:Float = 0;
 
 	var ldtk = new LdtkProject();
@@ -243,15 +243,14 @@ class PlayState extends FlxTransitionableState {
 		});
 		#end
 
-		var spawnerLayer = level.fishSpawnerLayer;
-		waterLayer = spawnerLayer;
-		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
-		groundFishGroup.setWaterLayer(spawnerLayer);
+		waterLayer = level.waterGrid;
+		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		groundFishGroup.setWaterLayer(waterLayer);
 		#if local
-		spawnBushes(spawnerLayer);
+		spawnBushes();
 		#else
 		if (NetworkManager.IS_HOST) {
-			spawnBushes(spawnerLayer);
+			spawnBushes();
 		}
 		#end
 
@@ -338,7 +337,7 @@ class PlayState extends FlxTransitionableState {
 		pepperPickup.spawn(level, terrainLayer);
 	}
 
-	function spawnBushes(water:ldtk.Layer_IntGrid) {
+	function spawnBushes() {
 		var bounds = FlxG.worldBounds;
 		for (_ in 0...5) {
 			for (_ in 0...20) {
@@ -395,8 +394,8 @@ class PlayState extends FlxTransitionableState {
 		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
 		if (catcherSessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex);
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
 				}
 				player.onFishDelivered = null;
 			};
@@ -457,8 +456,8 @@ class PlayState extends FlxTransitionableState {
 		// Non-host clients receive this to trigger the catch animation
 		if (sessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex);
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
 				}
 				player.onFishDelivered = null;
 			};

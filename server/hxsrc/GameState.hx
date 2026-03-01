@@ -20,6 +20,7 @@ class PlayerState extends Schema {
 	@:type("boolean") public var ready:Bool;
 	@:type("string") public var name:String;
 	@:type("int8") public var skinIndex:Int;
+	@:type("int32") public var score:Int;
 
 	public function new() {
 		super();
@@ -30,6 +31,7 @@ class PlayerState extends Schema {
 		ready = false;
 		name = "";
 		skinIndex = -1;
+		score = 0;
 	}
 }
 

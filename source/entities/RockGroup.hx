@@ -21,7 +21,7 @@ class RockGroup extends FlxTypedGroup<Rock> {
 	}
 
 	public function spawn(level:Level) {
-		var layer = level.fishSpawnerLayer;
+		var layer = level.waterGrid;
 		var w = layer.cWid;
 		var h = layer.cHei;
 		var grid = layer.gridSize;
