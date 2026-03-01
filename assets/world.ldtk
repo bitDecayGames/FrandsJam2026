@@ -415,7 +415,13 @@
 			"padding": 0,
 			"tags": [],
 			"tagsSourceEnumUid": 199,
-			"enumTags": [ { "enumValueId": "SOLID", "tileIds": [1,20,21,23,40,41,42,43,44,63] }, { "enumValueId": "ONEWAY", "tileIds": [] }, { "enumValueId": "NONE", "tileIds": [] }, { "enumValueId": "INVISIBLE", "tileIds": [] } ],
+			"enumTags": [
+				{ "enumValueId": "SOLID", "tileIds": [1,20,21,23,40,41,42,43,44,63] },
+				{ "enumValueId": "ONEWAY", "tileIds": [] },
+				{ "enumValueId": "NONE", "tileIds": [] },
+				{ "enumValueId": "INVISIBLE", "tileIds": [] },
+				{ "enumValueId": "SHALLOW", "tileIds": [2,22,24,25,26,27,28,29,45,46,47,48,49,62,64,67,68,69,103] }
+			],
 			"customData": [],
 			"savedSelections": [],
 			"cachedPixelData": {
@@ -482,7 +488,8 @@
 			{ "id": "SOLID", "tileRect": null, "color": 12470831 },
 			{ "id": "ONEWAY", "tileRect": null, "color": 14120515 },
 			{ "id": "NONE", "tileRect": null, "color": 15389866 },
-			{ "id": "INVISIBLE", "tileRect": null, "color": 14984818 }
+			{ "id": "INVISIBLE", "tileRect": null, "color": 14984818 },
+			{ "id": "SHALLOW", "tileRect": null, "color": 7552569 }
 		], "iconTilesetUid": null, "externalRelPath": null, "externalFileChecksum": null, "tags": [] }
 	], "externalEnums": [
 		{ "identifier": "FmodSongE", "uid": 233, "values": [{ "id": "LetsGo", "tileRect": null, "color": 12470831 }], "iconTilesetUid": null, "externalRelPath": "../source/FmodEnums.hx", "externalFileChecksum": "333f901f641a95862eafe13f0d0ec3ed", "tags": [] },
@@ -1568,7 +1575,7 @@
 						{ "px": [176,336], "src": [48,0], "f": 0, "t": 3, "d": [851], "a": 1 },
 						{ "px": [192,336], "src": [112,48], "f": 0, "t": 67, "d": [852], "a": 1 },
 						{ "px": [208,336], "src": [80,32], "f": 0, "t": 45, "d": [853], "a": 1 },
-						{ "px": [224,336], "src": [32,0], "f": 0, "t": 2, "d": [854], "a": 1 },
+						{ "px": [224,336], "src": [48,80], "f": 0, "t": 103, "d": [854], "a": 1 },
 						{ "px": [240,336], "src": [96,32], "f": 0, "t": 46, "d": [855], "a": 1 },
 						{ "px": [256,336], "src": [128,48], "f": 0, "t": 68, "d": [856], "a": 1 },
 						{ "px": [272,336], "src": [128,48], "f": 0, "t": 68, "d": [857], "a": 1 },
