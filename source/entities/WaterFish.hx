@@ -179,6 +179,8 @@ class WaterFish extends FlxSprite {
 			return;
 		}
 
+		GameManager.ME.net.sendMessage("fish_move", {id: fishId, x: x, y: y}, true);
+
 		if (attracted) {
 			return;
 		}
@@ -204,8 +206,6 @@ class WaterFish extends FlxSprite {
 		} else {
 			velocity.set((dx / dist) * SPEED, (dy / dist) * SPEED);
 		}
-
-		GameManager.ME.net.sendMessage("fish_move", {id: fishId, x: x, y: y}, true);
 	}
 
 	function checkBobber() {
