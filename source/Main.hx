@@ -69,6 +69,7 @@ class Main extends Sprite {
 			startingState = MainMenuState;
 		}
 		#end
+
 		FlxG.signals.preGameStart.add(() -> {
 			configureFlixel();
 			configureDebug();
@@ -89,6 +90,7 @@ class Main extends Sprite {
 
 	private function configureFlixel() {
 		FlxG.fixedTimestep = false;
+		FlxG.autoPause = false;
 
 		#if html5
 		// Disable right-click menu on web
@@ -119,9 +121,6 @@ class Main extends Sprite {
 		Font.registerFont(fnt);
 
 		FlxG.debugger.visible = true;
-
-		// When debugging, it's nice to have the game stay running when it loses focus
-		FlxG.autoPause = false;
 
 		// This lets the slash key auto-focus the input console in the debugger when pressed
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, function(e:KeyboardEvent) {
