@@ -189,6 +189,7 @@ class PlayState extends FlxTransitionableState {
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
+		player.sessionId = GameManager.ME.net.mySessionId;
 		camera.follow(player);
 		ySortGroup.add(player);
 

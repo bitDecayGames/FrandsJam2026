@@ -49,6 +49,7 @@ class Player extends FlxSprite {
 	public var lastInputDir:Cardinal = E;
 
 	static inline var SHALLOW_WATER_OFFSET:Float = 8;
+
 	public var inShallowWater(default, set):Bool = false;
 
 	function set_inShallowWater(value:Bool):Bool {
@@ -281,6 +282,11 @@ class Player extends FlxSprite {
 		setPosition(data.state.x, data.state.y);
 		velocity.set(data.state.velocityX, data.state.velocityY);
 
+		// Zero velocity during frozen cast states — mirrors the local player's `frozen` flag behavior
+		if (castState == CAST_ANIM || castState == CASTING || castState == CATCH_ANIM || castState == RETURNING) {
+			velocity.set(0, 0);
+		}
+
 		if (isRemote && castState != CAST_ANIM && castState != CATCH_ANIM && castState != RETURNING && !throwing) {
 			playMovementAnim();
 		}
@@ -416,17 +422,17 @@ class Player extends FlxSprite {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			return switch (castDirSuffix) {
 				case "down":
-					if (frame == 0) FlxPoint.get(x + 10, y + 12 + wy) else if (frame == 1) FlxPoint.get(x + 8, y - 9 + wy) else FlxPoint.get(x - 1,
-						y - 20 + wy);
+					if (frame == 0) FlxPoint.get(x + 10,
+						y + 12 + wy) else if (frame == 1) FlxPoint.get(x + 8, y - 9 + wy) else FlxPoint.get(x - 1, y - 20 + wy);
 				case "right":
-					if (frame == 0) FlxPoint.get(x + 30, y - 10 + wy) else if (frame == 1) FlxPoint.get(x + 14, y - 16 + wy) else FlxPoint.get(x - 6,
-						y - 18 + wy);
+					if (frame == 0) FlxPoint.get(x + 30,
+						y - 10 + wy) else if (frame == 1) FlxPoint.get(x + 14, y - 16 + wy) else FlxPoint.get(x - 6, y - 18 + wy);
 				case "up":
-					if (frame == 0) FlxPoint.get(x + 3, y - 18 + wy) else if (frame == 1) FlxPoint.get(x + 13, y - 20 + wy) else FlxPoint.get(x + 19,
-						y - 20 + wy);
+					if (frame == 0) FlxPoint.get(x + 3,
+						y - 18 + wy) else if (frame == 1) FlxPoint.get(x + 13, y - 20 + wy) else FlxPoint.get(x + 19, y - 20 + wy);
 				case "left":
-					if (frame == 0) FlxPoint.get(x - 15, y - 10 + wy) else if (frame == 1) FlxPoint.get(x + 1, y - 16 + wy) else FlxPoint.get(x + 21,
-						y - 18 + wy);
+					if (frame == 0) FlxPoint.get(x - 15,
+						y - 10 + wy) else if (frame == 1) FlxPoint.get(x + 1, y - 16 + wy) else FlxPoint.get(x + 21, y - 18 + wy);
 				default: FlxPoint.get(x + 8, y - 4 + wy);
 			};
 		} else {
