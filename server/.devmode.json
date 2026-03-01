@@ -2,7 +2,9 @@
   "data": {},
   "hash": {
     "roomcount": {},
-    "roomhistory": {}
+    "roomhistory": {
+      "RHWt-I3ZW": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"K4vEJ6Np9\",\"state\":\"{\\\"hostSessionId\\\":\\\"GY_2BjmMP\\\",\\\"players\\\":{\\\"GY_2BjmMP\\\":{\\\"x\\\":71,\\\"y\\\":56.29999923706055,\\\"velocityX\\\":0,\\\"velocityY\\\":0},\\\"J_zaJD3rS\\\":{\\\"x\\\":266.1000061035156,\\\"y\\\":89.19999694824219,\\\"velocityX\\\":0,\\\"velocityY\\\":0}},\\\"fish\\\":{\\\"1\\\":{\\\"x\\\":257.374755859375,\\\"y\\\":267.0439147949219},\\\"2\\\":{\\\"x\\\":252.35292053222656,\\\"y\\\":230.81178283691406},\\\"3\\\":{\\\"x\\\":349.6133728027344,\\\"y\\\":280.4030456542969},\\\"4\\\":{\\\"x\\\":313.46026611328125,\\\"y\\\":216.7443084716797}},\\\"round\\\":{\\\"status\\\":\\\"inactive\\\",\\\"currentRound\\\":-1,\\\"totalRounds\\\":-1}}\",\"clients\":[{\"sessionId\":\"GY_2BjmMP\",\"reconnectionToken\":\"aWkSILl0_\"},{\"sessionId\":\"J_zaJD3rS\",\"reconnectionToken\":\"Pv13Cj12L\"}]}"
+    }
   },
   "keys": {}
 }

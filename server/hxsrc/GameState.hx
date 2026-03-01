@@ -4,11 +4,15 @@ import colyseus.server.schema.Schema.MapSchema;
 class PlayerState extends Schema {
 	@:type("float32") public var x:Float;
 	@:type("float32") public var y:Float;
+	@:type("float32") public var velocityX:Float;
+	@:type("float32") public var velocityY:Float;
 
 	public function new() {
 		super();
 		x = 0;
 		y = 0;
+		velocityX = 0;
+		velocityY = 0;
 	}
 }
 

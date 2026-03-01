@@ -242,6 +242,7 @@ class Player extends FlxSprite {
 		// QLog.notice('!!!!!!!!!!!!!!!! x: ${data.state.x}, y: ${data.state.y}, prevX: ${data.prevX}, prevY: ${data.prevY}, deltaX: ${deltaPos.x}, deltaY: ${deltaPos.y}, lastInputDir: ${lastInputDir}');
 
 		setPosition(data.state.x, data.state.y);
+		velocity.set(data.state.velocityX, data.state.velocityY);
 
 		if (isRemote) {
 			playMovementAnim();
@@ -328,7 +329,7 @@ class Player extends FlxSprite {
 
 		clampToWorldBounds();
 
-		GameManager.ME.net.sendMove(x, y);
+		GameManager.ME.net.sendMove(x, y, velocity.x, velocity.y);
 	}
 
 	function clampToWorldBounds() {
