@@ -133,6 +133,15 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("line_pulled", {sessionId: client.sessionId});
 		});
 
+		// sent by the host to assign random spawn positions for all players
+		onMessage("spawn_locations", (client:Client, data:Dynamic) -> {
+			if (client.sessionId != state.hostSessionId) {
+				return;
+			}
+			trace('${client.sessionId}: sent "spawn_locations"');
+			broadcast("spawn_locations", data, {except: client});
+		});
+
 		// sent by the host to establish shared world layout (bushes + shop)
 		onMessage("world_setup", (client:Client, data:Dynamic) -> {
 			if (client.sessionId != state.hostSessionId) {

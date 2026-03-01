@@ -45,6 +45,7 @@ class NetworkManager {
 
 	public var onBushAdded = new FlxTypedSignal<Float->Float->Void>(); // x, y
 	public var onShopPlaced = new FlxTypedSignal<Float->Float->Void>(); // x, y
+	public var onSpawnLocations = new FlxTypedSignal<Dynamic->Void>(); // {sessionId: {x, y}, ...}
 
 	public var onCastLine = new FlxTypedSignal<String->Float->Float->String->Void>(); // sessionId, x, y, dir
 	public var onFishCaught = new FlxTypedSignal<String->String->Int->Void>(); // sessionId (catcher), fishId, fishType
@@ -243,6 +244,11 @@ class NetworkManager {
 				trace('[NetMan] fish_sold => sessionId:${message.sessionId} fishType:${message.fishType} lengthCm:${message.lengthCm} value:${message.value}');
 				onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
 			});
+
+			room.onMessage("spawn_locations", (message:Dynamic) -> {
+				trace('[NetMan] spawn_locations received');
+				onSpawnLocations.dispatch(message);
+			});
 		});
 	}
 
@@ -252,6 +258,10 @@ class NetworkManager {
 			shopX: shopX,
 			shopY: shopY,
 		});
+	}
+
+	public function sendSpawnLocations(locations:Dynamic) {
+		sendMessage("spawn_locations", locations);
 	}
 
 	public function getState():GameState {
