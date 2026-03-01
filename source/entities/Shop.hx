@@ -103,6 +103,21 @@ class Shop extends FlxSprite {
 			var value = FishTypes.calculateValue(fishData.typeIndex, fishData.lengthCm);
 			totalValue += value;
 			count++;
+
+			// Record locally for PostRoundState display
+			GameManager.ME.recordSoldFish(GameManager.ME.mySessionId, {
+				fishType: fishData.typeIndex,
+				lengthCm: fishData.lengthCm,
+				value: value
+			});
+
+			// Broadcast to other clients
+			GameManager.ME.net.sendMessage("fish_sold", {
+				fishType: fishData.typeIndex,
+				lengthCm: fishData.lengthCm,
+				value: value
+			});
+
 			fishData = player.inventory.removeAnyFishFull();
 		}
 		if (count > 0) {

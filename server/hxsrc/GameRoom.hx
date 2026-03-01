@@ -98,6 +98,17 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
+		// sent when a player sells a fish — broadcast to other clients so they can track it
+		onMessage("fish_sold", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "fish_sold" message: fishType=${data.fishType} lengthCm=${data.lengthCm} value=${data.value}');
+			broadcast("fish_sold", {
+				sessionId: client.sessionId,
+				fishType: data.fishType,
+				lengthCm: data.lengthCm,
+				value: data.value,
+			}, {except: client});
+		});
+
 		// sent when a player casts their line
 		onMessage("cast_line", (client, data) -> {
 			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');
