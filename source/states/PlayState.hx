@@ -214,6 +214,13 @@ class PlayState extends FlxTransitionableState {
 		for (index => seshID in GameManager.ME.sessions) {
 			var remote = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 			remote.isRemote = true;
+			if (GameManager.ME.skins.exists(seshID)) {
+				var remoteSkin = GameManager.ME.skins.get(seshID);
+				if (remoteSkin >= 0) {
+					remote.skinIndex = remoteSkin;
+					remote.swapSkin();
+				}
+			}
 			remote.setNetwork(seshID);
 			remotePlayers.set(seshID, remote);
 			ySortGroup.add(remote);
