@@ -70,11 +70,11 @@ class NetworkManager {
 				onFishAdded.dispatch(id, fish);
 
 				cb.listen(fish, "x", (_, _) -> {
-					trace('NetMan: (fish: ${id} x update');
+					// trace('NetMan: (fish: ${id} x update');
 					onFishMove.dispatch(id, fish);
 				});
 				cb.listen(fish, "y", (_, _) -> {
-					trace('NetMan: (fish: ${id} y update');
+					// trace('NetMan: (fish: ${id} y update');
 					onFishMove.dispatch(id, fish);
 				});
 			});
