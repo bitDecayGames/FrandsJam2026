@@ -94,6 +94,7 @@ class GameManager {
 						new Round([new TimedGoal(3), new PersonalFishCountGoal(3)]),
 						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
 					]);
+					nextRoundNumber = currentRoundNumber;
 				}
 				nextStatus = RoundState.STATUS_PRE_ROUND;
 			case RoundState.STATUS_PRE_ROUND:

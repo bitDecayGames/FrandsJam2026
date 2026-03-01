@@ -56,13 +56,13 @@ class NetworkManager {
 	public function connect(host:String, port:Int) {
 		#if local return; #end
 		var addr = '${Configure.getServerProtocol()}$host:$port';
-		if (client != null) {
-			trace('already connected, not re-connecting');
-			return;
-		}
 		trace('attempting to connect to: ${addr}');
 		if (client == null) {
 			client = new Client(addr);
+		}
+		if (room != null) {
+			trace('already connected to a room ${room.roomId}, not re-connecting');
+			return;
 		}
 		client.joinOrCreate(roomName, new Map<String, Dynamic>(), GameState, (err, joinedRoom) -> {
 			if (err != null) {
