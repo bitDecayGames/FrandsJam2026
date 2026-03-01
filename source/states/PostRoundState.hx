@@ -35,11 +35,11 @@ class PostRoundState extends FlxTransitionableState {
 	static inline var OTHER_PLACE_SIZE:Int = 16;
 	static inline var FISH_ICON_NATIVE:Int = 32;
 	static inline var FISH_ICON_SIZE:Int = 64; // displayed size (2x native)
-	static inline var FISH_ICON_PADDING:Int = 8;
+	static inline var FISH_ICON_STEP:Int = 44; // horizontal step between fish (overlapping but with breathing room)
 	static inline var FISH_LABEL_SIZE:Int = 10;
 	static inline var FISH_LABEL_LINE_HEIGHT:Int = 12;
-	// total vertical space for one fish icon + two text lines below it
-	static inline var FISH_BLOCK_HEIGHT:Int = 64 + 12 + 12 + 6; // icon + length + value + gap
+	// total vertical space for two text lines + icon
+	static inline var FISH_BLOCK_HEIGHT:Int = 12 + 12 + 64 + 6; // length + value + icon + gap
 
 	override public function create():Void {
 		super.create();
@@ -165,38 +165,39 @@ class PostRoundState extends FlxTransitionableState {
 
 			currentY += SCORE_ROW_HEIGHT;
 
-			// Fish icons for this player — left to right, icon on top, length + value below
+			// Fish icons for this player — left to right, overlapping, labels above icon
 			var fishEntries = gm.getSoldFish(roundNum, entries[i].sessionId);
 			if (fishEntries.length > 0) {
 				var fishX = SCORE_LEFT_MARGIN + 50;
+				var iconY = currentY + FISH_LABEL_LINE_HEIGHT * 2; // icon sits below the two label rows
 				for (fish in fishEntries) {
-					// Fish sprite
+					// Length label above icon
+					var lenText = new FlxText();
+					lenText.size = FISH_LABEL_SIZE;
+					lenText.color = FlxColor.fromRGB(180, 180, 180);
+					lenText.text = Std.string(fish.lengthCm) + "cm";
+					lenText.setPosition(fishX + FISH_ICON_SIZE / 2 - lenText.width / 2, currentY);
+					add(lenText);
+
+					// Value label between length and icon
+					var valText = new FlxText();
+					valText.size = FISH_LABEL_SIZE;
+					valText.color = FlxColor.fromRGB(180, 180, 180);
+					valText.text = formatMoney(fish.value);
+					valText.setPosition(fishX + FISH_ICON_SIZE / 2 - valText.width / 2, currentY + FISH_LABEL_LINE_HEIGHT);
+					add(valText);
+
+					// Fish sprite below the labels
 					var fishSprite = new FlxSprite();
 					fishSprite.loadGraphic(AssetPaths.fish__png, true, FISH_ICON_NATIVE, FISH_ICON_NATIVE);
 					fishSprite.animation.add("show", [fish.fishType]);
 					fishSprite.animation.play("show");
 					fishSprite.scale.set(FISH_ICON_SIZE / FISH_ICON_NATIVE, FISH_ICON_SIZE / FISH_ICON_NATIVE);
 					fishSprite.updateHitbox();
-					fishSprite.setPosition(fishX, currentY);
+					fishSprite.setPosition(fishX + FISH_ICON_SIZE / 2, iconY);
 					add(fishSprite);
 
-					// Length label below icon
-					var lenText = new FlxText();
-					lenText.size = FISH_LABEL_SIZE;
-					lenText.color = FlxColor.fromRGB(180, 180, 180);
-					lenText.text = Std.string(fish.lengthCm) + "cm";
-					lenText.setPosition(fishX + FISH_ICON_SIZE / 2 - lenText.width / 2, currentY + FISH_ICON_SIZE + 1);
-					add(lenText);
-
-					// Value label below length
-					var valText = new FlxText();
-					valText.size = FISH_LABEL_SIZE;
-					valText.color = FlxColor.fromRGB(180, 180, 180);
-					valText.text = formatMoney(fish.value);
-					valText.setPosition(fishX + FISH_ICON_SIZE / 2 - valText.width / 2, currentY + FISH_ICON_SIZE + 1 + FISH_LABEL_LINE_HEIGHT);
-					add(valText);
-
-					fishX += FISH_ICON_SIZE + FISH_ICON_PADDING;
+					fishX += FISH_ICON_STEP;
 				}
 				currentY += FISH_BLOCK_HEIGHT;
 			}
