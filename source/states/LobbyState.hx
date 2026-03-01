@@ -15,7 +15,6 @@ import flixel.FlxSprite;
 import flixel.text.FlxText;
 import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
-import haxe.io.Path;
 import entities.Player;
 import ui.MenuBuilder;
 
@@ -37,7 +36,8 @@ class LobbyState extends FlxTransitionableState {
 	var _localReady:Bool = false;
 
 	// Layout constants
-	static inline var SKIN_SIZE:Int = 48;
+	static inline var SKIN_ICON_NATIVE:Int = 32; // native pixel size of icons.png frames
+	static inline var SKIN_SIZE:Int = 64; // displayed size (2x scale)
 	static inline var SKIN_PADDING:Int = 12;
 	static inline var BORDER_THICKNESS:Int = 2;
 
@@ -71,11 +71,17 @@ class LobbyState extends FlxTransitionableState {
 		add(_txtReady);
 
 		// Input field centered directly above the Ready button
-		_inputField = new FlxInputText(0, 0, 100, FlxG.save.data.name, 20, FlxColor.WHITE, FlxColor.GRAY);
+		_inputField = new FlxInputText(0, 0, 200, FlxG.save.data.name, 20, FlxColor.WHITE, FlxColor.GRAY);
 		_inputField.maxChars = 20;
 		_inputField.setPosition(FlxG.width / 2 - _inputField.width / 2, _btnDone.y - _inputField.height - 8);
 		_inputField.onTextChange.add(updatePlayerName);
 		add(_inputField);
+
+		var _txtNameLabel = new FlxText();
+		_txtNameLabel.size = 12;
+		_txtNameLabel.text = "Enter your name:";
+		_txtNameLabel.setPosition(FlxG.width / 2 - _txtNameLabel.width / 2, _inputField.y - _txtNameLabel.height - 4);
+		add(_txtNameLabel);
 
 		// Other players text in the lower-right corner
 		_txtOtherPlayers = new FlxText();
@@ -100,13 +106,21 @@ class LobbyState extends FlxTransitionableState {
 
 	private function createSkinSelection():Void {
 		var numSkins = Player.SKINS.length;
-		var totalWidth = numSkins * SKIN_SIZE + (numSkins - 1) * SKIN_PADDING;
+		var cols = 4;
+		var nameHeight = 12; // vertical space reserved above each icon for name labels
+		var rowGap = nameHeight + SKIN_PADDING; // extra gap between rows so row-2 names don't overlap row-1 icons
+		var totalWidth = cols * SKIN_SIZE + (cols - 1) * SKIN_PADDING;
 		var startX = Std.int((FlxG.width - totalWidth) / 2);
-		var skinY = Std.int(FlxG.height / 2 - SKIN_SIZE / 2 - 20);
+		// vertically center the two rows (each row = nameHeight + SKIN_SIZE) in the screen
+		var totalHeight = SKIN_SIZE + rowGap + nameHeight + SKIN_SIZE;
+		var gridStartY = Std.int(FlxG.height / 2 - totalHeight / 2);
 		var borderedSize = SKIN_SIZE + BORDER_THICKNESS * 2;
 
 		for (i in 0...numSkins) {
-			var slotX = startX + i * (SKIN_SIZE + SKIN_PADDING);
+			var col = i % cols;
+			var row = Std.int(i / cols);
+			var slotX = startX + col * (SKIN_SIZE + SKIN_PADDING);
+			var skinY = gridStartY + row * (SKIN_SIZE + rowGap + nameHeight);
 
 			// Border sprite (initially transparent)
 			var border = new FlxSprite();
@@ -115,18 +129,13 @@ class LobbyState extends FlxTransitionableState {
 			add(border);
 			_skinBorders.push(border);
 
-			// Skin preview sprite — load the spritesheet and show stand_down frame
+			// Skin preview sprite — use the icons sheet (frame i = skin i), scaled 2x
 			var skinSprite = new FlxSprite();
-			var jsonPath = Player.SKINS[i];
-			var jsonText:String = openfl.Assets.getText(jsonPath);
-			var json = haxe.Json.parse(jsonText);
-			var pngPath = Path.join([Path.directory(jsonPath), json.meta.image]);
-
-			skinSprite.loadGraphic(pngPath, true, SKIN_SIZE, SKIN_SIZE);
-			// stand_down is frame tag "from": 1 — frame index 1 in the spritesheet
-			// In a 10-column, 48x48 grid, frame 1 is at tile index 1
-			skinSprite.animation.add("stand", [1]);
-			skinSprite.animation.play("stand");
+			skinSprite.loadGraphic(AssetPaths.icons__png, true, SKIN_ICON_NATIVE, SKIN_ICON_NATIVE);
+			skinSprite.animation.add("icon", [i]);
+			skinSprite.animation.play("icon");
+			skinSprite.scale.set(SKIN_SIZE / SKIN_ICON_NATIVE, SKIN_SIZE / SKIN_ICON_NATIVE);
+			skinSprite.updateHitbox();
 			skinSprite.setPosition(slotX, skinY);
 			add(skinSprite);
 			_skinSprites.push(skinSprite);
@@ -136,7 +145,7 @@ class LobbyState extends FlxTransitionableState {
 			nameLabel.size = 8;
 			nameLabel.alignment = FlxTextAlign.CENTER;
 			nameLabel.text = "";
-			nameLabel.setPosition(slotX + SKIN_SIZE / 2, skinY - 12);
+			nameLabel.setPosition(slotX + SKIN_SIZE / 2, skinY - nameHeight);
 			add(nameLabel);
 			_skinNameLabels.push(nameLabel);
 		}
