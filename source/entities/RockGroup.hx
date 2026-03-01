@@ -29,7 +29,8 @@ class RockGroup extends FlxTypedGroup<Rock> {
 		var landTiles:Array<{cx:Int, cy:Int}> = [];
 		for (cy in 0...h) {
 			for (cx in 0...w) {
-				if (layer.getInt(cx, cy) != 1) {
+				// skip deep water and shallow water tiles
+				if (layer.getInt(cx, cy) != 1 && !level.terrainLayer.isShallowAt(cx * grid + grid / 2, cy * grid + grid / 2)) {
 					landTiles.push({cx: cx, cy: cy});
 				}
 			}
