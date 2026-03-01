@@ -148,6 +148,15 @@ class NetworkManager {
 					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
 				});
+				cb.listen(player, "velocityX", (_, prevY:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					onPlayerChanged.dispatch(sessionId, {state: player});
+				});
+				cb.listen(player, "velocitY", (_, prevY:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					onPlayerChanged.dispatch(sessionId, {state: player});
+				});
+
 				cb.listen(player, "name", (_, _) -> {
 					trace('NetMan: sesh: ${sessionId} name: ${player.name}');
 					onPlayerNameChanged.dispatch(sessionId, player.name);
