@@ -1,5 +1,6 @@
 package states;
 
+import schema.RoundState;
 import flixel.util.FlxColor;
 import flixel.FlxSprite;
 import schema.FishState;
@@ -98,7 +99,16 @@ class PlayState extends FlxTransitionableState {
 
 		hotText = new FlashingText("HOT", 0.15, 3.0);
 		add(hotText);
-		round.initialize(this);
+
+		if (round != null) {
+			round.initialize(this);
+		}
+
+		if (NetworkManager.IS_HOST) {
+			GameManager.ME.net.sendMessage("round_update", {
+				status: RoundState.STATUS_ACTIVE,
+			});
+		}
 	}
 
 	function setupNetwork() {

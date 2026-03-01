@@ -4,6 +4,7 @@ import colyseus.server.Client;
 import colyseus.server.Room.RoomOf;
 import colyseus.server.Room.CloseCode;
 import GameState.PlayerState;
+import GameState.RoundState;
 import haxe.extern.EitherType;
 import js.lib.Promise;
 
@@ -11,6 +12,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	override public function onCreate(options:Dynamic):Void {
 		maxClients = 6;
 		setState(new GameState());
+
+		trace('start room: ${roomId}:${roomName}');
 
 		// sent when a player moves
 		onMessage("move", (client:Client, data:{
@@ -72,12 +75,47 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			if (data != null) {
 				if (data.status != null) {
 					state.round.status = data.status;
+					for (sId => pp in state.players) {
+						pp.ready = false;
+					}
 				}
 				if (data.currentRound != null) {
 					state.round.currentRound = data.currentRound;
 				}
 				if (data.totalRounds != null) {
 					state.round.totalRounds = data.totalRounds;
+				}
+			}
+		});
+
+		onMessage("player_ready", (client:Client, _) -> {
+			if (state.round.status != RoundState.STATUS_LOBBY
+				&& state.round.status != RoundState.STATUS_PRE_ROUND
+				&& state.round.status != RoundState.STATUS_POST_ROUND) {
+				return;
+			}
+
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player != null) {
+				player.ready = true;
+			}
+
+			var ready = true;
+			for (sId => pp in state.players) {
+				if (!pp.ready) {
+					ready = false;
+					break;
+				}
+			}
+			if (ready) {
+				broadcast("players_ready", true);
+				for (sId => pp in state.players) {
+					pp.ready = false;
+				}
+
+				if (state.round.status == RoundState.STATUS_LOBBY) {
+					// after we all ready up in the lobby, lock the room so no one can join
+					lock();
 				}
 			}
 		});
@@ -114,6 +152,11 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			};
 
 			trace('host changed ${client.sessionId} -> ${state.hostSessionId}');
+			if (state.hostSessionId == null) {
+				// after the last person leaves a room, just close it down
+				trace('disconnect room: ${roomId}:${roomName}');
+				disconnect();
+			}
 		}
 
 		return null;

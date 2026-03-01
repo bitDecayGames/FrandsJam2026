@@ -6,6 +6,7 @@ class PlayerState extends Schema {
 	@:type("float32") public var y:Float;
 	@:type("float32") public var velocityX:Float;
 	@:type("float32") public var velocityY:Float;
+	@:type("boolean") public var ready:Bool;
 
 	public function new() {
 		super();
@@ -13,6 +14,7 @@ class PlayerState extends Schema {
 		y = 0;
 		velocityX = 0;
 		velocityY = 0;
+		ready = false;
 	}
 }
 
@@ -41,9 +43,9 @@ class RoundState extends Schema {
 
 	public function new() {
 		super();
-		status = STATUS_INACTIVE;
-		currentRound = -1;
-		totalRounds = -1;
+		status = STATUS_LOBBY;
+		currentRound = 0;
+		totalRounds = 0;
 	}
 }
 

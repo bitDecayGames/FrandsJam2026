@@ -1,11 +1,17 @@
 package managers;
 
+import goals.PersonalFishCountGoal;
+import goals.TimedGoal;
+import flixel.util.FlxTimer;
 import schema.RoundState;
 import net.NetworkManager;
 import managers.FishManager.FishDb;
 import rounds.Round;
 import states.VictoryState;
 import states.PlayState;
+import states.PostRoundState;
+import states.PreRoundState;
+import states.LobbyState;
 import flixel.FlxG;
 
 class GameManager {
@@ -15,13 +21,22 @@ class GameManager {
 	public var net:NetworkManager;
 
 	private var round:RoundManager;
-	private var totalRounds:Int = -1;
-	private var currentRoundNumber:Int = -1;
+	private var totalRounds:Int = 0;
+	private var currentRoundNumber:Int = 0;
 
 	private var rounds:Array<Round>;
+	private var roundStatus:String = RoundState.STATUS_INACTIVE;
 
-	public function new(rounds:Array<Round>) {
+	public function new() {
 		ME = this;
+		fish = new FishManager(new FishDb());
+		net = new NetworkManager();
+		net.onRoundUpdate.add(sync);
+		net.onPlayersReady.add(playersReady);
+		net.onHostChanged.add(onHostChange);
+	}
+
+	private function init(rounds:Array<Round>) {
 		if (rounds == null) {
 			throw "rounds cannot be null";
 		}
@@ -35,57 +50,127 @@ class GameManager {
 			}
 		}
 		this.rounds = rounds;
-		this.totalRounds = rounds.length;
+		roundStatus = RoundState.STATUS_LOBBY;
+		totalRounds = rounds.length;
 		currentRoundNumber = 0;
-
-		fish = new FishManager(new FishDb());
-
-		net = new NetworkManager();
+		setCurrentRound(new RoundManager(rounds[0]));
+		GameManager.ME.net.sendMessage("round_update", {
+			status: roundStatus,
+			currentRound: currentRoundNumber,
+			totalRounds: totalRounds,
+		});
 	}
 
-	public function start() {
-		if (currentRoundNumber == 1) {
-			net.sendMessage("round_update", {
-				status: RoundState.STATUS_LOBBY,
-				currentRound: currentRoundNumber,
-				totalRounds: totalRounds,
-			});
+	private function onHostChange(isHost:Bool, prevIsHost:Bool) {
+		// the host has just been changed to you
+		if (isHost && isHost != prevIsHost) {
+			// TODO: MW not sure what to do yet...
 		}
-		setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
 	}
 
 	private function setCurrentRound(round:RoundManager) {
 		if (this.round != null) {
-			this.round.completed.remove(this.checkRound);
+			this.round.completed.remove(this.onRoundDone);
 		}
 		this.round = round;
-		this.round.completed.add(this.checkRound);
-
-		net.sendMessage("round_update", {
-			status: RoundState.STATUS_PRE_ROUND,
-			currentRound: currentRoundNumber,
-		});
-
-		FlxG.switchState(() -> new PlayState(round));
+		this.round.completed.add(this.onRoundDone);
 	}
 
-	private function checkRound() {
-		if (round.isComplete()) {
-			net.sendMessage("round_update", {
-				status: RoundState.STATUS_POST_ROUND,
-			});
-			round.completed.remove(this.checkRound);
-			currentRoundNumber += 1;
-			if (currentRoundNumber >= totalRounds) {
-				net.sendMessage("round_update", {
-					status: RoundState.STATUS_END_GAME,
-				});
-				FlxG.switchState(() -> new VictoryState());
-				currentRoundNumber = 0;
-			} else {
-				// gets called multiple times, but the trick is that currentRoundNumber changes between calling this start function
-				start();
+	private function onRoundDone() {
+		FlxG.switchState(() -> new PostRoundState());
+	}
+
+	private function playersReady() {
+		if (round == null) {
+			setCurrentRound(new RoundManager(rounds[0]));
+		}
+		var nextStatus:String;
+		switch (roundStatus) {
+			case RoundState.STATUS_LOBBY:
+				if (NetworkManager.IS_HOST) {
+					init([
+						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
+						new Round([new TimedGoal(10), new PersonalFishCountGoal(3)]),
+						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
+					]);
+				}
+				nextStatus = RoundState.STATUS_PRE_ROUND;
+			case RoundState.STATUS_PRE_ROUND:
+				nextStatus = RoundState.STATUS_ACTIVE;
+			case RoundState.STATUS_ACTIVE:
+				nextStatus = RoundState.STATUS_POST_ROUND;
+			case RoundState.STATUS_POST_ROUND:
+				trace('current round ${currentRoundNumber} -> ${currentRoundNumber + 1} / ${totalRounds}');
+				currentRoundNumber++;
+				if (currentRoundNumber > totalRounds) {
+					setStatus(RoundState.STATUS_END_GAME);
+					endGame();
+					return;
+				}
+				nextStatus = RoundState.STATUS_PRE_ROUND;
+			case RoundState.STATUS_END_GAME:
+				nextStatus = RoundState.STATUS_LOBBY;
+			case RoundState.STATUS_INACTIVE:
+				nextStatus = RoundState.STATUS_LOBBY;
+			default:
+				throw 'invalid round status: ${roundStatus}';
+		}
+		setStatus(nextStatus);
+		switchStateBasedOnStatus();
+	}
+
+	public function endGame() {
+		trace("end the game");
+		net.disconnect();
+		FlxG.switchState(() -> new VictoryState());
+	}
+
+	public function sync(remoteState:RoundState) {
+		if (totalRounds != remoteState.totalRounds) {
+			trace('sync total rounds: ${totalRounds} -> ${remoteState.totalRounds}');
+			totalRounds = remoteState.totalRounds;
+		}
+		if (currentRoundNumber != remoteState.currentRound || roundStatus != remoteState.status) {
+			if (currentRoundNumber >= 0 && currentRoundNumber < totalRounds && currentRoundNumber != remoteState.currentRound) {
+				trace('sync current round: ${currentRoundNumber} -> ${remoteState.currentRound}');
+				currentRoundNumber = remoteState.currentRound;
+				setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
 			}
+			if (roundStatus != remoteState.status) {
+				trace('sync status: ${roundStatus} -> ${remoteState.status}');
+			}
+			roundStatus = remoteState.status;
+			switchStateBasedOnStatus();
+		}
+	}
+
+	public function setStatus(status:String) {
+		if (NetworkManager.IS_HOST) {
+			trace('set status: ${roundStatus} -> ${status}');
+			roundStatus = status;
+			GameManager.ME.net.sendMessage("round_update", {
+				status: roundStatus,
+			});
+		}
+	}
+
+	private function switchStateBasedOnStatus() {
+		trace('switch state based on status ${roundStatus}');
+		switch (roundStatus) {
+			case RoundState.STATUS_LOBBY:
+				FlxG.switchState(() -> new LobbyState());
+			case RoundState.STATUS_PRE_ROUND:
+				FlxG.switchState(() -> new PreRoundState());
+			case RoundState.STATUS_ACTIVE:
+				FlxG.switchState(() -> new PlayState(round));
+			case RoundState.STATUS_POST_ROUND:
+				FlxG.switchState(() -> new PostRoundState());
+			case RoundState.STATUS_END_GAME:
+				endGame();
+			case RoundState.STATUS_INACTIVE:
+				trace("round status is inactive...");
+			default:
+				throw 'invalid round status: ${roundStatus}';
 		}
 	}
 }
