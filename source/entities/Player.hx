@@ -183,6 +183,14 @@ class Player extends FlxSprite {
 		if (throwing && rockSprite == null && frameNumber == 6) {
 			launchRock();
 		}
+
+		// Bug: animName came back as null in a multiplayer test session. This shouldn't happen,
+		// but guard against it here just in case.
+		if (animName == null) {
+			QLog.warn('Player: onAnimFrameChange animName is null');
+			return;
+		}
+
 		// Footstep effects on foot-plant frames of run animations
 		if (StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
 			var fx = x + width / 2;
