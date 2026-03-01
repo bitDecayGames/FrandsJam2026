@@ -269,13 +269,13 @@ class PlayState extends FlxTransitionableState {
 
 		#if local
 		shop = new Shop();
-		shop.spawnRandom(level);
+		shop.spawnRandom(level, terrainLayer);
 		ySortGroup.add(shop);
 		#else
 		if (NetworkManager.IS_HOST) {
 			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
 			shop = new Shop();
-			shop.spawnRandom(level);
+			shop.spawnRandom(level, terrainLayer);
 			ySortGroup.add(shop);
 			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
 		} else {
@@ -332,8 +332,8 @@ class PlayState extends FlxTransitionableState {
 	function spawnWorldItems(level:Level) {
 		rockGroup.spawn(level);
 		fishSpawner.spawn(level);
-		wadersPickup.spawn(level);
-		pepperPickup.spawn(level);
+		wadersPickup.spawn(level, terrainLayer);
+		pepperPickup.spawn(level, terrainLayer);
 	}
 
 	function spawnBushes(water:ldtk.Layer_IntGrid) {
