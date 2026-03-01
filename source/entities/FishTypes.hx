@@ -19,11 +19,18 @@ class FishTypeData {
 class FishTypes {
 	// Fish type indices correspond to sprite frame indices (0-4) in fish.png
 	public static var TYPES:Array<FishTypeData> = [
-		new FishTypeData("Bluegill", 5, 10, 25),
-		new FishTypeData("Bass", 10, 20, 50),
-		new FishTypeData("Trout", 15, 25, 60),
-		new FishTypeData("Catfish", 20, 30, 80),
-		new FishTypeData("Salmon", 30, 40, 100),
+		new FishTypeData("Minnow", 5, 10, 25),
+		new FishTypeData("Goldfish", 10, 20, 50),
+		new FishTypeData("Anchovy", 15, 25, 60),
+		new FishTypeData("Bones", -10, 20, 30),
+		new FishTypeData("Trout", 20, 30, 45),
+		new FishTypeData("Stone Fish", 25, 30, 45),
+		new FishTypeData("Zebra Fish", 30, 30, 45),
+		new FishTypeData("Sword Fish", 35, 30, 45),
+		new FishTypeData("Bass", 40, 40, 60),
+		new FishTypeData("Golden Bass", 50, 50, 80),
+		new FishTypeData("Eel", 75, 20, 120),
+		new FishTypeData("Boot", -30, 40, 50),
 	];
 
 	/** Generate a random length for the given fish type index. */

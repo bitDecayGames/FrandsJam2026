@@ -1,6 +1,7 @@
 package states;
 
 import entities.FishTypes;
+import flixel.FlxSprite;
 import schema.RoundState;
 import managers.GameManager;
 import net.NetworkManager;
@@ -32,7 +33,13 @@ class PostRoundState extends FlxTransitionableState {
 	static inline var SCORE_ROW_HEIGHT:Int = 36;
 	static inline var FIRST_PLACE_SIZE:Int = 20;
 	static inline var OTHER_PLACE_SIZE:Int = 16;
-	static inline var FISH_DETAIL_ROW_HEIGHT:Int = 16;
+	static inline var FISH_ICON_NATIVE:Int = 32;
+	static inline var FISH_ICON_SIZE:Int = 64; // displayed size (2x native)
+	static inline var FISH_ICON_PADDING:Int = 8;
+	static inline var FISH_LABEL_SIZE:Int = 10;
+	static inline var FISH_LABEL_LINE_HEIGHT:Int = 12;
+	// total vertical space for one fish icon + two text lines below it
+	static inline var FISH_BLOCK_HEIGHT:Int = 64 + 12 + 12 + 6; // icon + length + value + gap
 
 	override public function create():Void {
 		super.create();
@@ -158,34 +165,40 @@ class PostRoundState extends FlxTransitionableState {
 
 			currentY += SCORE_ROW_HEIGHT;
 
-			// Fish details for this player
+			// Fish icons for this player — left to right, icon on top, length + value below
 			var fishEntries = gm.getSoldFish(roundNum, entries[i].sessionId);
 			if (fishEntries.length > 0) {
+				var fishX = SCORE_LEFT_MARGIN + 50;
 				for (fish in fishEntries) {
-					var typeName = if (fish.fishType >= 0 && fish.fishType < FishTypes.TYPES.length) {
-						FishTypes.TYPES[fish.fishType].name;
-					} else {
-						"???";
-					};
+					// Fish sprite
+					var fishSprite = new FlxSprite();
+					fishSprite.loadGraphic(AssetPaths.fish__png, true, FISH_ICON_NATIVE, FISH_ICON_NATIVE);
+					fishSprite.animation.add("show", [fish.fishType]);
+					fishSprite.animation.play("show");
+					fishSprite.scale.set(FISH_ICON_SIZE / FISH_ICON_NATIVE, FISH_ICON_SIZE / FISH_ICON_NATIVE);
+					fishSprite.updateHitbox();
+					fishSprite.setPosition(fishX, currentY);
+					add(fishSprite);
 
-					var detailText = new FlxText();
-					detailText.size = 10;
-					detailText.alignment = FlxTextAlign.LEFT;
-					detailText.color = FlxColor.fromRGB(180, 180, 180);
-					detailText.text = typeName + " - " + Std.string(fish.lengthCm) + "cm";
-					detailText.setPosition(SCORE_LEFT_MARGIN + 70, currentY);
-					add(detailText);
+					// Length label below icon
+					var lenText = new FlxText();
+					lenText.size = FISH_LABEL_SIZE;
+					lenText.color = FlxColor.fromRGB(180, 180, 180);
+					lenText.text = Std.string(fish.lengthCm) + "cm";
+					lenText.setPosition(fishX + FISH_ICON_SIZE / 2 - lenText.width / 2, currentY + FISH_ICON_SIZE + 1);
+					add(lenText);
 
-					var detailValue = new FlxText();
-					detailValue.size = 10;
-					detailValue.alignment = FlxTextAlign.RIGHT;
-					detailValue.color = FlxColor.fromRGB(180, 180, 180);
-					detailValue.text = formatMoney(fish.value);
-					detailValue.setPosition(FlxG.width - SCORE_RIGHT_MARGIN - detailValue.width, currentY);
-					add(detailValue);
+					// Value label below length
+					var valText = new FlxText();
+					valText.size = FISH_LABEL_SIZE;
+					valText.color = FlxColor.fromRGB(180, 180, 180);
+					valText.text = formatMoney(fish.value);
+					valText.setPosition(fishX + FISH_ICON_SIZE / 2 - valText.width / 2, currentY + FISH_ICON_SIZE + 1 + FISH_LABEL_LINE_HEIGHT);
+					add(valText);
 
-					currentY += FISH_DETAIL_ROW_HEIGHT;
+					fishX += FISH_ICON_SIZE + FISH_ICON_PADDING;
 				}
+				currentY += FISH_BLOCK_HEIGHT;
 			}
 		}
 	}
