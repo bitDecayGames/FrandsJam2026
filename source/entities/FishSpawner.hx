@@ -1,5 +1,6 @@
 package entities;
 
+import entities.FishTypes;
 import net.NetworkManager;
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -120,7 +121,7 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 				for (_ in 0...numFish) {
 					var fid = '${nextFishID++}';
 					var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
-					var ftype = FlxG.random.int(0, 4);
+					var ftype = FlxG.random.int(0, FishTypes.TYPES.length - 1);
 					if (net != null) {
 						var data:Dynamic = {
 							id: fid,
