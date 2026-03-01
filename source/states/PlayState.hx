@@ -252,6 +252,11 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onRemoteFishCaught(sessionId:String, fishId:String) {
+		// Hide the remote fish sprite — it will fade back in when the host starts moving it again
+		var fish = remoteFish.get(fishId);
+		if (fish != null)
+			fish.visible = false;
+
 		// Non-host clients receive this to trigger the catch animation
 		if (sessionId == player.sessionId) {
 			player.onFishDelivered = () -> {

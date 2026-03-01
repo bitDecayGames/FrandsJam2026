@@ -2,7 +2,9 @@
   "data": {},
   "hash": {
     "roomcount": {},
-    "roomhistory": {}
+    "roomhistory": {
+      "2GtUIzCaH": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"6e9SfPeRq\",\"state\":\"{\\\"hostSessionId\\\":\\\"J6mZu2Zvo\\\",\\\"players\\\":{\\\"J6mZu2Zvo\\\":{\\\"x\\\":56,\\\"y\\\":48},\\\"fACIqqV8p\\\":{\\\"x\\\":56,\\\"y\\\":48}},\\\"fish\\\":{\\\"1\\\":{\\\"x\\\":365.6535339355469,\\\"y\\\":243.55409240722656},\\\"2\\\":{\\\"x\\\":338.00860595703125,\\\"y\\\":223.22499084472656},\\\"3\\\":{\\\"x\\\":232.05233764648438,\\\"y\\\":232.81207275390625},\\\"4\\\":{\\\"x\\\":284.6419677734375,\\\"y\\\":231.64503479003906}},\\\"round\\\":{\\\"status\\\":\\\"end_game\\\",\\\"currentRound\\\":2,\\\"totalRounds\\\":3}}\",\"clients\":[{\"sessionId\":\"J6mZu2Zvo\",\"reconnectionToken\":\"DGfy7ubjb\"},{\"sessionId\":\"fACIqqV8p\",\"reconnectionToken\":\"9KX7McqdV\"}]}"
+    }
   },
   "keys": {}
 }

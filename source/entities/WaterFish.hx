@@ -57,6 +57,11 @@ class WaterFish extends FlxSprite {
 		}
 
 		setPosition(state.x, state.y);
+		if (!visible) {
+			alpha = 0;
+			fadeInTimer = 1.0;
+			visible = true;
+		}
 	}
 
 	function pickTarget() {

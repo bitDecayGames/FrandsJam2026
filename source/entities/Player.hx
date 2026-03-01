@@ -226,6 +226,10 @@ class Player extends FlxSprite {
 	override public function update(delta:Float) {
 		super.update(delta);
 
+		// Run for both local and remote players
+		updateCast(delta);
+		updateFishingLine();
+
 		if (isRemote) {
 			// events drive this one
 			return;
@@ -295,8 +299,6 @@ class Player extends FlxSprite {
 		}
 
 		updateReticle();
-		updateCast(delta);
-		updateFishingLine();
 		updateRock(delta);
 
 		clampToWorldBounds();
@@ -607,15 +609,6 @@ class Player extends FlxSprite {
 				case CASTING:
 					if (SimpleController.just_pressed(A)) {
 						catchFish();
-					} else if (updateCastArc(elapsed)) {
-						castBobber.setPosition(castTarget.x, castTarget.y);
-						if (castStartPos != null) {
-							castStartPos.put();
-							castStartPos = null;
-						}
-						frozen = false;
-						playMovementAnim(true);
-						castState = LANDED;
 					}
 				case LANDED:
 					if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
@@ -628,6 +621,20 @@ class Player extends FlxSprite {
 
 		// --- START: Used for both local and remote players
 		switch (castState) {
+			case CASTING:
+				// Arc advances and lands for both local and remote players
+				if (updateCastArc(elapsed)) {
+					castBobber.setPosition(castTarget.x, castTarget.y);
+					if (castStartPos != null) {
+						castStartPos.put();
+						castStartPos = null;
+					}
+					castState = LANDED;
+					if (!isRemote) {
+						frozen = false;
+						playMovementAnim(true);
+					}
+				}
 			case CAST_ANIM:
 				// TODO: We can
 				// Arc the bobber toward the target; clamp if it arrives during the animation.
