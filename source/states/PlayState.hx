@@ -109,6 +109,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onCastLine.add(onRemoteCastLine);
 		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
+		GameManager.ME.net.onRockSplash.add(onRemoteRockSplash);
 	}
 
 	function onPlayerJoined(sessionId:String) {
@@ -116,13 +117,13 @@ class PlayState extends FlxTransitionableState {
 		player.setNetwork(sessionId);
 	}
 
-	function onPlayerAdded(sessionId:String, playerState:PlayerState) {
+	function onPlayerAdded(sessionId:String, data:{state:PlayerState}) {
 		if (sessionId == player.sessionId) {
 			return;
 		}
 		// TODO: Have server give us the player color, too
 		trace('PlayState: remote player $sessionId appeared');
-		var remote = new Player(playerState.x, playerState.y, this);
+		var remote = new Player(data.state.x, data.state.y, this);
 		remote.isRemote = true;
 		remote.setNetwork(sessionId);
 		remotePlayers.set(sessionId, remote);
@@ -153,12 +154,22 @@ class PlayState extends FlxTransitionableState {
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
 
+	function onRemoteRockSplash(x:Float, y:Float) {
+		fishSpawner.scareFish(x, y);
+	}
+
+	function onLocalRockSplash(x:Float, y:Float) {
+		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
+		fishSpawner.scareFish(x, y);
+		GameManager.ME.net.sendMessage("rock_splash", {x: x, y: y});
+	}
+
 	function loadLevel(level:String) {
 		unload();
 
 		var level = new Level(level);
 		if (level.songEvent != "") {
-			FmodManager.PlaySong(level.songEvent);
+			// FmodManager.PlaySong(level.songEvent);
 		}
 		midGroundGroup.add(level.terrainLayer);
 		FlxG.worldBounds.copyFrom(level.terrainLayer.getBounds());
@@ -182,7 +193,7 @@ class PlayState extends FlxTransitionableState {
 		#end
 
 		var spawnerLayer = level.fishSpawnerLayer;
-		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
+		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock, onLocalRockSplash);
 		groundFishGroup.setWaterLayer(spawnerLayer);
 
 		shop = new Shop();
@@ -232,8 +243,8 @@ class PlayState extends FlxTransitionableState {
 		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
 		if (catcherSessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish)) {
-					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishFrame);
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
 				}
 				player.onFishDelivered = null;
 			};
@@ -260,8 +271,8 @@ class PlayState extends FlxTransitionableState {
 		// Non-host clients receive this to trigger the catch animation
 		if (sessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish)) {
-					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishFrame);
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
 				}
 				player.onFishDelivered = null;
 			};

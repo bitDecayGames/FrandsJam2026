@@ -33,16 +33,29 @@ class InventoryHUD extends FlxSpriteGroup {
 	}
 
 	function redraw() {
+		var startX = FlxG.width - MARGIN - (SLOT_SIZE + SLOT_GAP) * Inventory.MAX_SLOTS + SLOT_GAP;
 		for (i in 0...Inventory.MAX_SLOTS) {
 			if (i < inventory.items.length) {
-				var color = switch (inventory.items[i]) {
-					case Rock: FlxColor.GRAY;
-					case Fish: FlxColor.GREEN;
-				};
-				slots[i].makeGraphic(SLOT_SIZE, SLOT_SIZE, color);
+				switch (inventory.items[i]) {
+					case Rock:
+						slots[i].loadGraphic(null);
+						slots[i].makeGraphic(SLOT_SIZE, SLOT_SIZE, FlxColor.GRAY);
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
+					case Fish(idx):
+						slots[i].loadGraphic("assets/aseprite/fish.png", true, 32, 32);
+						slots[i].animation.add("fish", [idx]);
+						slots[i].animation.play("fish");
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
+				}
 			} else {
+				slots[i].loadGraphic(null);
 				slots[i].makeGraphic(SLOT_SIZE, SLOT_SIZE, FlxColor.fromRGB(30, 30, 30));
+				slots[i].scale.set(1, 1);
+				slots[i].offset.set(0, 0);
 			}
+			slots[i].setPosition(startX + i * (SLOT_SIZE + SLOT_GAP), MARGIN);
 		}
 	}
 

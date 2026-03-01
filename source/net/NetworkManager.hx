@@ -11,7 +11,8 @@ import schema.FishState;
 import schema.RoundState;
 
 typedef SessionIdSignal = FlxTypedSignal<String->Void>;
-typedef PlayerStateSignal = FlxTypedSignal<String->PlayerState->Void>;
+typedef PlayerUpdateData = {state:PlayerState, ?prevX:Float, ?prevY:Float};
+typedef PlayerStateSignal = FlxTypedSignal<(String, PlayerUpdateData) -> Void>;
 typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>;
 
 class NetworkManager {
@@ -28,6 +29,7 @@ class NetworkManager {
 	public var onPlayerRemoved:SessionIdSignal = new SessionIdSignal();
 	public var onFishMove:FishStateSignal = new FishStateSignal();
 	public var onFishAdded = new FishStateSignal();
+	public var onRockSplash = new FlxTypedSignal<Float->Float->Void>();
 
 	public var onCastLine = new FlxTypedSignal<String->Float->Float->String->Void>(); // sessionId, x, y, dir
 	public var onFishCaught = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
@@ -42,6 +44,7 @@ class NetworkManager {
 		var addr = '${Configure.getServerProtocol()}$host:$port';
 		trace('attempting to connect to: ${addr}');
 		client = new Client(addr);
+
 		client.joinOrCreate(roomName, new Map<String, Dynamic>(), GameState, (err, joinedRoom) -> {
 			if (err != null) {
 				trace('NetworkManager: failed to join room — $err');
@@ -71,11 +74,11 @@ class NetworkManager {
 				onFishAdded.dispatch(id, fish);
 
 				cb.listen(fish, "x", (_, _) -> {
-					trace('NetMan: (fish: ${id} x update');
+					// trace('NetMan: (fish: ${id} x update');
 					onFishMove.dispatch(id, fish);
 				});
 				cb.listen(fish, "y", (_, _) -> {
-					trace('NetMan: (fish: ${id} y update');
+					// trace('NetMan: (fish: ${id} y update');
 					onFishMove.dispatch(id, fish);
 				});
 			});
@@ -85,15 +88,15 @@ class NetworkManager {
 				if (sessionId == mySessionId) {
 					return;
 				}
-				onPlayerAdded.dispatch(sessionId, player);
+				onPlayerAdded.dispatch(sessionId, {state: player});
 
-				cb.listen(player, "x", (_, _) -> {
-					trace('NetMan: (sesh: ${sessionId} x update');
-					onPlayerChanged.dispatch(sessionId, player);
+				cb.listen(player, "x", (_, prevX:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');
+					onPlayerChanged.dispatch(sessionId, {state: player, prevX: prevX});
 				});
-				cb.listen(player, "y", (_, _) -> {
-					trace('NetMan: (sesh: ${sessionId} y update');
-					onPlayerChanged.dispatch(sessionId, player);
+				cb.listen(player, "y", (_, prevY:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
 				});
 			});
 
@@ -125,6 +128,13 @@ class NetworkManager {
 			room.onMessage("line_pulled", (message) -> {
 				trace('[NetMan] line_pulled => sessionId:${message.sessionId}');
 				onLinePulled.dispatch(message.sessionId);
+			});
+
+			room.onMessage("rock_splash", (message:Dynamic) -> {
+				var sx:Float = message.x;
+				var sy:Float = message.y;
+				trace('[NetMan] rock_splash => $sx, $sy');
+				onRockSplash.dispatch(sx, sy);
 			});
 		});
 	}

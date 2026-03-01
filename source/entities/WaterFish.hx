@@ -33,6 +33,7 @@ class WaterFish extends FlxSprite {
 
 	var respawnTimer:Float = 0;
 	var fadeInTimer:Float = 0;
+	var scaredTimer:Float = 0;
 
 	public function new(id:String, x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false) {
 		super(x, y);
@@ -144,6 +145,18 @@ class WaterFish extends FlxSprite {
 
 		super.update(elapsed);
 
+		if (scaredTimer > 0) {
+			scaredTimer -= elapsed;
+			alpha = Math.max(0, scaredTimer / 0.5);
+			if (scaredTimer <= 0) {
+				alive = false;
+				visible = false;
+				velocity.set(0, 0);
+				respawnTimer = 5.5;
+			}
+			return;
+		}
+
 		if (!Lambda.empty(bobbers) || attracted) {
 			checkBobber();
 		}
@@ -224,6 +237,18 @@ class WaterFish extends FlxSprite {
 		var dy = (closestBobber.y + closestBobber.height / 2) - (y + height / 2);
 		if (closestDist > 0.1)
 			velocity.set((dx / closestDist) * ATTRACT_SPEED, (dy / closestDist) * ATTRACT_SPEED);
+	}
+
+	public function scare(fromX:Float, fromY:Float) {
+		attracted = false;
+		fleeFrom(fromX, fromY);
+		velocity.scale(1.5);
+		scaredTimer = 0.5;
+	}
+
+	function stopAttract() {
+		attracted = false;
+		pickTarget();
 	}
 
 	function respawn() {
