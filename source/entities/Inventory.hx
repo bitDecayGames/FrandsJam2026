@@ -55,7 +55,7 @@ class Inventory {
 	public function removeAnyFish():Int {
 		for (i in 0...items.length) {
 			switch (items[i]) {
-				case Fish(idx):
+				case Fish(idx, _):
 					items.splice(i, 1);
 					onChange.dispatch();
 					return idx;
@@ -63,6 +63,20 @@ class Inventory {
 			}
 		}
 		return -1;
+	}
+
+	/** Removes the first Fish and returns {typeIndex, lengthCm}, or null if none. */
+	public function removeAnyFishFull():Null<{typeIndex:Int, lengthCm:Int}> {
+		for (i in 0...items.length) {
+			switch (items[i]) {
+				case Fish(idx, len):
+					items.splice(i, 1);
+					onChange.dispatch();
+					return {typeIndex: idx, lengthCm: len};
+				default:
+			}
+		}
+		return null;
 	}
 
 	public function count():Int {
@@ -77,7 +91,7 @@ class Inventory {
 		return switch [a, b] {
 			case [Rock, Rock]: true;
 			case [BigRock, BigRock]: true;
-			case [Fish(_), Fish(_)]: true;
+			case [Fish(_, _), Fish(_, _)]: true;
 			case [Waders, Waders]: true;
 			default: false;
 		};
@@ -87,6 +101,6 @@ class Inventory {
 enum InventoryItem {
 	Rock;
 	BigRock;
-	Fish(fishSpriteIndex:Int);
+	Fish(fishSpriteIndex:Int, lengthCm:Int);
 	Waders;
 }

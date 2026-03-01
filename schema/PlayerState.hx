@@ -8,4 +8,5 @@ class PlayerState extends io.colyseus.serializer.schema.Schema {
 	@:type("boolean") public var ready:Bool = false;
 	@:type("string") public var name:String = "";
 	@:type("int8") public var skinIndex:Int = -1;
+	@:type("int32") public var score:Int = 0;
 }

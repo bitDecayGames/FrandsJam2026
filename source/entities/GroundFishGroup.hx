@@ -23,12 +23,12 @@ class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 		if (fish.landing)
 			return;
 		if (!player.inventory.isFull()) {
-			player.pickupItem(Fish(fish.fishSpriteIndex));
+			player.pickupItem(Fish(fish.fishSpriteIndex, fish.lengthCm));
 			fish.kill();
 		}
 	}
 
-	public function addFish(startX:Float, startY:Float, fishSpriteIndex:Int = 0) {
+	public function addFish(startX:Float, startY:Float, fishSpriteIndex:Int = 0, lengthCm:Int = 20) {
 		// Pick a random landing spot 16-32px away that isn't water
 		var landX = startX;
 		var landY = startY;
@@ -60,7 +60,7 @@ class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 			landY = startY + FlxG.random.float(-16, 16);
 		}
 
-		add(new GroundFish(startX, startY, landX, landY, fishSpriteIndex));
+		add(new GroundFish(startX, startY, landX, landY, fishSpriteIndex, lengthCm));
 	}
 
 	public function clearAll() {

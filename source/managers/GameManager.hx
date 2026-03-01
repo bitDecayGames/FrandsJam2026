@@ -33,6 +33,7 @@ class GameManager {
 	public var names = new Map<String, String>();
 	public var skins = new Map<String, Int>(); // sessionId -> skinIndex
 	public var readyStates = new Map<String, Bool>(); // sessionId -> ready
+	public var scores = new Map<String, Int>(); // sessionId -> score
 	public var mySessionId = "";
 	public var mySkinIndex:Int = -1; // -1 means no skin selected
 
@@ -48,6 +49,7 @@ class GameManager {
 		net.onPlayerNameChanged.add(playerNameChanged);
 		net.onSkinChanged.add(onSkinChanged);
 		net.onPlayerReadyChanged.add(onPlayerReadyChanged);
+		net.onScoreChanged.add(onScoreChanged);
 		net.onHostChanged.add(onHostChange);
 	}
 
@@ -97,6 +99,10 @@ class GameManager {
 		readyStates.set(sessionId, ready);
 	}
 
+	private function onScoreChanged(sessionId:String, score:Int) {
+		scores.set(sessionId, score);
+	}
+
 	private function onPlayerAdded(sessionId:String, data:PlayerUpdateData) {
 		if (sessionId == mySessionId) {
 			return;
@@ -120,6 +126,7 @@ class GameManager {
 		names.remove(sessionId);
 		skins.remove(sessionId);
 		readyStates.remove(sessionId);
+		scores.remove(sessionId);
 	}
 
 	private function onHostChange(isHost:Bool, prevIsHost:Bool) {

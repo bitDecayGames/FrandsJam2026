@@ -6,6 +6,8 @@ import levels.ldtk.BDTilemap;
 import levels.ldtk.Level;
 import com.bitdecay.textpop.style.builtin.FloatAway;
 import com.bitdecay.textpop.TextPop;
+import entities.FishTypes;
+import managers.GameManager;
 
 class Shop extends FlxSprite {
 	var playerInside:Bool = false;
@@ -94,14 +96,21 @@ class Shop extends FlxSprite {
 	}
 
 	function sellFish(player:Player) {
+		var totalValue = 0;
 		var count = 0;
-		while (player.inventory.removeAnyFish() != -1) {
+		var fishData = player.inventory.removeAnyFishFull();
+		while (fishData != null) {
+			var value = FishTypes.calculateValue(fishData.typeIndex, fishData.lengthCm);
+			totalValue += value;
 			count++;
+			fishData = player.inventory.removeAnyFishFull();
 		}
 		if (count > 0) {
-			player.score += count * 10;
-			QLog.notice('Sold $count fish for ${count * 10} points. Total score: ${player.score}');
-			TextPop.pop(Std.int(x), Std.int(y), '${count}  🐟', new FloatAway(100, 3));
+			player.score += totalValue;
+			GameManager.ME.scores.set(GameManager.ME.mySessionId, player.score);
+			QLog.notice('Sold $count fish for $$totalValue. Total score: ${player.score}');
+			TextPop.pop(Std.int(x), Std.int(y), '+$$totalValue', new FloatAway(100, 3));
+			GameManager.ME.net.sendMessage("score_update", {score: player.score});
 		}
 	}
 }

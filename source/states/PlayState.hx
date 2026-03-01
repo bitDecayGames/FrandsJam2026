@@ -395,8 +395,8 @@ class PlayState extends FlxTransitionableState {
 		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
 		if (catcherSessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex);
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
 				}
 				player.onFishDelivered = null;
 			};
@@ -457,8 +457,8 @@ class PlayState extends FlxTransitionableState {
 		// Non-host clients receive this to trigger the catch animation
 		if (sessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex);
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
 				}
 				player.onFishDelivered = null;
 			};

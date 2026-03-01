@@ -3,6 +3,7 @@ package entities;
 import managers.GameManager;
 import schema.PlayerState;
 import net.NetworkManager;
+import entities.FishTypes;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.math.FlxPoint;
@@ -99,6 +100,7 @@ class Player extends FlxSprite {
 	var remoteWasStationary:Bool = false;
 
 	public var caughtFishSpriteIndex:Int = 0;
+	public var caughtFishLengthCm:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
 
 	// Cast sprites
@@ -909,6 +911,7 @@ class Player extends FlxSprite {
 				castBobber.velocity.set(0, 0);
 				if (hasFish) {
 					caughtFishSpriteIndex = fishType;
+					caughtFishLengthCm = FishTypes.randomLength(fishType);
 					castBobber.loadGraphic("assets/aseprite/fish.png", true, 32, 32);
 					castBobber.animation.add("fish", [caughtFishSpriteIndex]);
 					castBobber.animation.play("fish");

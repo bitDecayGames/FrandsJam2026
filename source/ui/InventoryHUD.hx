@@ -47,7 +47,7 @@ class InventoryHUD extends FlxSpriteGroup {
 						slots[i].loadGraphic(AssetPaths.bigRock__png);
 						slots[i].scale.set(1, 1);
 						slots[i].offset.set(0, 0);
-					case Fish(idx):
+					case Fish(idx, _):
 						slots[i].loadGraphic(AssetPaths.fish__png, true, 32, 32);
 						slots[i].animation.add("fish", [idx]);
 						slots[i].animation.play("fish");

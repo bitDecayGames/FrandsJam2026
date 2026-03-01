@@ -89,6 +89,15 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
+		// sent when a player's score changes
+		onMessage("score_update", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "score_update" message: score=${data.score}');
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player != null) {
+				player.score = data.score;
+			}
+		});
+
 		// sent when a player casts their line
 		onMessage("cast_line", (client, data) -> {
 			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');

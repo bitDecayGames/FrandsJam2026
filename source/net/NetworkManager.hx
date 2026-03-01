@@ -54,6 +54,7 @@ class NetworkManager {
 	public var onLinePulled = new FlxTypedSignal<String->Void>(); // sessionId
 	public var onSkinChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, skinIndex
 	public var onPlayerReadyChanged = new FlxTypedSignal<String->Bool->Void>(); // sessionId, ready
+	public var onScoreChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, score
 
 	public static inline var roomName:String = "game_room";
 
@@ -170,6 +171,10 @@ class NetworkManager {
 				cb.listen(player, "ready", (_, _) -> {
 					trace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
 					onPlayerReadyChanged.dispatch(sessionId, player.ready);
+				});
+				cb.listen(player, "score", (_, _) -> {
+					trace('NetMan: sesh: ${sessionId} score: ${player.score}');
+					onScoreChanged.dispatch(sessionId, player.score);
 				});
 			});
 
