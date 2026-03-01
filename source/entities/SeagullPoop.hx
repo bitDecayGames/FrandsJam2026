@@ -1,10 +1,9 @@
 package entities;
 
-import bitdecay.flixel.debug.tools.draw.DebugDraw;
-import debug.DebugLayers;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
+import flixel.group.FlxGroup;
 import flixel.util.FlxColor;
 import levels.ldtk.BDTilemap;
 
@@ -14,17 +13,19 @@ class SeagullPoop extends FlxSprite {
 
 	var targetY:Float;
 	var parentState:FlxState;
+	var groundGroup:FlxGroup;
 	var terrain:BDTilemap;
 	var fishSpawner:FishSpawner;
 
-	public function new(worldX:Float, worldY:Float, fallDistance:Float, birdVelX:Float, state:FlxState, terrain:BDTilemap,
-			fishSpawner:FishSpawner) {
+	public function new(worldX:Float, worldY:Float, fallDistance:Float, birdVelX:Float, state:FlxState, groundGroup:FlxGroup,
+			terrain:BDTilemap, fishSpawner:FishSpawner) {
 		super(worldX, worldY);
 		makeGraphic(2, 2, FlxColor.WHITE);
 		x -= 1;
 		y -= 1;
 		targetY = worldY + fallDistance;
 		parentState = state;
+		this.groundGroup = groundGroup;
 		this.terrain = terrain;
 		this.fishSpawner = fishSpawner;
 		velocity.x = birdVelX;
@@ -51,7 +52,7 @@ class SeagullPoop extends FlxSprite {
 					fishSpawner.scareFish(landX, landY, SCARE_RADIUS);
 				}
 			} else {
-				parentState.add(new PoopSplat(landX, landY));
+				groundGroup.add(new PoopSplat(landX, landY));
 			}
 			kill();
 		}

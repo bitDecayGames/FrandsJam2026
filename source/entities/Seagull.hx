@@ -3,6 +3,7 @@ package entities;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
+import flixel.group.FlxGroup;
 import flixel.util.FlxColor;
 import flixel.util.FlxSpriteUtil;
 import levels.ldtk.BDTilemap;
@@ -34,13 +35,15 @@ class Seagull extends FlxSprite {
 
 	var shadow:FlxSprite;
 	var parentState:FlxState;
+	var groundGroup:FlxGroup;
 	var terrain:BDTilemap;
 	var fishSpawner:FishSpawner;
 
-	public function new(goingRight:Bool, state:FlxState, terrain:BDTilemap, fishSpawner:FishSpawner) {
+	public function new(goingRight:Bool, state:FlxState, groundGroup:FlxGroup, terrain:BDTilemap, fishSpawner:FishSpawner) {
 		super();
 		this.goingRight = goingRight;
 		this.parentState = state;
+		this.groundGroup = groundGroup;
 		this.terrain = terrain;
 		this.fishSpawner = fishSpawner;
 		loadGraphic(AssetPaths.seagull__png, true, 24, 24);
@@ -113,7 +116,7 @@ class Seagull extends FlxSprite {
 		var worldX = FlxG.camera.scroll.x + x + width / 2;
 		var worldY = FlxG.camera.scroll.y + y + height / 2;
 		var fallDist = shadowOffsetY - height / 2;
-		parentState.add(new SeagullPoop(worldX, worldY, fallDist, velocity.x, parentState, terrain, fishSpawner));
+		parentState.add(new SeagullPoop(worldX, worldY, fallDist, velocity.x, parentState, groundGroup, terrain, fishSpawner));
 	}
 
 	override public function draw() {

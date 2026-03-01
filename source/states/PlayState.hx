@@ -217,6 +217,8 @@ class PlayState extends FlxTransitionableState {
 		for (index => seshID in GameManager.ME.sessions) {
 			var remote = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 			remote.isRemote = true;
+			remote.terrainLayer = terrainLayer;
+			remote.groundEffectsGroup = midGroundGroup;
 			if (GameManager.ME.skins.exists(seshID)) {
 				var remoteSkin = GameManager.ME.skins.get(seshID);
 				if (remoteSkin >= 0) {
@@ -560,7 +562,7 @@ class PlayState extends FlxTransitionableState {
 			return;
 		}
 		seagullTimer = FlxG.random.float(2.0, 6.0);
-		seagullGroup.add(new Seagull(FlxG.random.bool(), this, terrainLayer, fishSpawner));
+		seagullGroup.add(new Seagull(FlxG.random.bool(), this, midGroundGroup, terrainLayer, fishSpawner));
 	}
 
 	function updateSparkles(elapsed:Float) {
