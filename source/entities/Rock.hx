@@ -4,11 +4,11 @@ import flixel.FlxSprite;
 
 class Rock extends FlxSprite {
 	public var big:Bool;
-	var waterLayer:ldtk.Layer_IntGrid;
+	var waterLayer:levels.ldtk.WaterGrid;
 	var onAddToWorld:(Float, Float, Bool) -> Void;
 	var onWaterSplash:(Float, Float, Bool) -> Void;
 
-	public function new(x:Float, y:Float, big:Bool = false, ?waterLayer:ldtk.Layer_IntGrid, ?onAddToWorld:(Float, Float, Bool) -> Void,
+	public function new(x:Float, y:Float, big:Bool = false, ?waterLayer:levels.ldtk.WaterGrid, ?onAddToWorld:(Float, Float, Bool) -> Void,
 			?onWaterSplash:(Float, Float, Bool) -> Void) {
 		super(x, y);
 		this.big = big;

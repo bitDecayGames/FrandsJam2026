@@ -3,6 +3,7 @@ package entities;
 import managers.GameManager;
 import schema.PlayerState;
 import net.NetworkManager;
+import entities.FishTypes;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.math.FlxPoint;
@@ -31,7 +32,7 @@ class Player extends FlxSprite {
 	// 0-indexed frame within the catch animation when the bobber retracts (1 before final)
 	static inline var CATCH_RETRACT_FRAME:Int = 1;
 
-	static var SKINS:Array<String> = [
+	public static var SKINS:Array<String> = [
 		"assets/aseprite/characters/playerA.json",
 		"assets/aseprite/characters/playerB.json",
 		"assets/aseprite/characters/playerC.json",
@@ -40,7 +41,8 @@ class Player extends FlxSprite {
 		"assets/aseprite/characters/playerH.json",
 	];
 
-	var skinIndex:Int = 0;
+	public var skinIndex:Int = 0;
+
 	var speed:Float = 100;
 	var playerNum = 0;
 
@@ -98,6 +100,7 @@ class Player extends FlxSprite {
 	var remoteWasStationary:Bool = false;
 
 	public var caughtFishSpriteIndex:Int = 0;
+	public var caughtFishLengthCm:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
 
 	// Cast sprites
@@ -364,6 +367,7 @@ class Player extends FlxSprite {
 		// Run for both local and remote players
 		updateCast(delta);
 		updateFishingLine();
+		updateRock(delta);
 
 		if (isRemote) {
 			// events drive this one
@@ -384,11 +388,6 @@ class Player extends FlxSprite {
 			var inputDir = InputCalculator.getInputCardinal(playerNum);
 			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
 				lastInputDir = inputDir;
-			}
-
-			if (FlxG.keys.justPressed.T && !hotModeActive) {
-				hotModeActive = true;
-				hotModeTimer = 3.0;
 			}
 
 			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
@@ -438,10 +437,15 @@ class Player extends FlxSprite {
 			var bounds = FlxG.worldBounds;
 			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
 			dir.put();
+			GameManager.ME.net.sendMessage("throw_rock", {
+				targetX: rockTarget.x,
+				targetY: rockTarget.y,
+				big: throwingBigRock,
+				dir: getDirSuffix()
+			});
 		}
 
 		updateReticle();
-		updateRock(delta);
 
 		clampToWorldBounds();
 
@@ -609,6 +613,23 @@ class Player extends FlxSprite {
 		rockFlightTime = if (dist > 0) dist / 200 else 0.01;
 		rockElapsed = 0;
 		state.add(rockSprite);
+	}
+
+	public function remoteThrowRock(targetX:Float, targetY:Float, big:Bool, dir:String) {
+		throwingBigRock = big;
+		lastInputDir = switch (dir) {
+			case "up": N;
+			case "down": S;
+			case "left": W;
+			case "right": E;
+			default: S;
+		};
+		if (rockTarget != null) {
+			rockTarget.put();
+		}
+		rockTarget = FlxPoint.get(targetX, targetY);
+		throwing = true;
+		sendAnimUpdate("throw_" + dir, true);
 	}
 
 	function updateRock(elapsed:Float) {
@@ -890,6 +911,7 @@ class Player extends FlxSprite {
 				castBobber.velocity.set(0, 0);
 				if (hasFish) {
 					caughtFishSpriteIndex = fishType;
+					caughtFishLengthCm = FishTypes.randomLength(fishType);
 					castBobber.loadGraphic("assets/aseprite/fish.png", true, 32, 32);
 					castBobber.animation.add("fish", [caughtFishSpriteIndex]);
 					castBobber.animation.play("fish");
@@ -936,13 +958,20 @@ class Player extends FlxSprite {
 		}
 	}
 
-	function swapSkin() {
+	public function swapSkin() {
 		var curAnim = animation.curAnim;
 		var animName = curAnim != null ? curAnim.name : null;
 		var animFrame = curAnim != null ? curAnim.curFrame : 0;
 		loadSkin(SKINS[skinIndex]);
 		if (animName != null) {
 			animation.play(animName, false, false, animFrame);
+		}
+	}
+
+	public function activateHotMode() {
+		if (!hotModeActive) {
+			hotModeActive = true;
+			hotModeTimer = 3.0;
 		}
 	}
 

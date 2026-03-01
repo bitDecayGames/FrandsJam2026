@@ -51,7 +51,7 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 	}
 
 	public function spawn(level:Level) {
-		var layer = level.fishSpawnerLayer;
+		var layer = level.waterGrid;
 		var w = layer.cWid;
 		var h = layer.cHei;
 		var grid = layer.gridSize;
@@ -122,7 +122,12 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 					var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
 					var ftype = FlxG.random.int(0, 4);
 					if (net != null) {
-						var data:Dynamic = {id: fid, x: tile.x, y: tile.y, fishType: ftype};
+						var data:Dynamic = {
+							id: fid,
+							x: tile.x,
+							y: tile.y,
+							fishType: ftype
+						};
 						QLog.notice('sending fish_spawn message: $data');
 						net.sendMessage("fish_spawn", data);
 					}
@@ -135,13 +140,21 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 		}
 	}
 
+	static inline var Y_SQUASH:Float = 0.55;
+
 	public function scareFish(splashX:Float, splashY:Float, radius:Float = 80) {
+		var radiusY = radius * Y_SQUASH;
+		#if FLX_DEBUG
+		if (FlxG.state != null) {
+			FlxG.state.add(new DebugCircle(splashX, splashY, radius, radiusY));
+		}
+		#end
 		for (fish in members) {
 			if (fish == null || !fish.alive)
 				continue;
-			var dx = fish.x - splashX;
-			var dy = fish.y - splashY;
-			if (dx * dx + dy * dy < radius * radius) {
+			var dx = (fish.x + fish.width / 2) - splashX;
+			var dy = (fish.y + fish.height / 2) - splashY;
+			if (dx * dx / (radius * radius) + dy * dy / (radiusY * radiusY) < 1) {
 				fish.scare(splashX, splashY);
 			}
 		}

@@ -1,5 +1,6 @@
 package net;
 
+import flixel.math.FlxPoint;
 import config.Configure;
 import flixel.util.FlxSignal;
 import io.colyseus.Client;
@@ -18,6 +19,7 @@ typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>; // fishId, fi
 typedef RoundStateSignal = FlxTypedSignal<RoundState->Void>;
 typedef PlayersReadySignal = FlxTypedSignal<Void->Void>;
 typedef HostSignal = FlxTypedSignal<Bool->Bool->Void>; // cur, prev
+typedef RockThrowSignal = FlxTypedSignal<(String, FlxPoint, Bool, String) -> Void>; // sessionId, targetX, targetY, big, dir
 
 class NetworkManager {
 	public static var IS_HOST:Bool = #if local true #else false #end;
@@ -35,7 +37,9 @@ class NetworkManager {
 	public var onPlayerRemoved:SessionIdSignal = new SessionIdSignal();
 	public var onFishMove:FishStateSignal = new FishStateSignal();
 	public var onFishAdded = new FishStateSignal();
-	public var onRockSplash = new FlxTypedSignal<Float->Float->Void>();
+	public var onRockSplash = new FlxTypedSignal<Float->Float->Bool->Void>(); // x, y, big
+
+	public var onThrowRock = new RockThrowSignal();
 	public var onRoundUpdate = new RoundStateSignal();
 	public var onPlayersReady = new PlayersReadySignal();
 
@@ -46,7 +50,11 @@ class NetworkManager {
 	public var onFishCaught = new FlxTypedSignal<String->String->Int->Void>(); // sessionId (catcher), fishId, fishType
 	public var onFishPocketed = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
 	public var onFishBanked = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
+	public var onFishDespawn = new FlxTypedSignal<String->Float->Void>(); // fishId, respawnTime
 	public var onLinePulled = new FlxTypedSignal<String->Void>(); // sessionId
+	public var onSkinChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, skinIndex
+	public var onPlayerReadyChanged = new FlxTypedSignal<String->Bool->Void>(); // sessionId, ready
+	public var onScoreChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, score
 
 	public static inline var roomName:String = "game_room";
 
@@ -143,9 +151,30 @@ class NetworkManager {
 					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
 				});
+				cb.listen(player, "velocityX", (_, prevY:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					onPlayerChanged.dispatch(sessionId, {state: player});
+				});
+				cb.listen(player, "velocitY", (_, prevY:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					onPlayerChanged.dispatch(sessionId, {state: player});
+				});
+
 				cb.listen(player, "name", (_, _) -> {
 					trace('NetMan: sesh: ${sessionId} name: ${player.name}');
 					onPlayerNameChanged.dispatch(sessionId, player.name);
+				});
+				cb.listen(player, "skinIndex", (_, _) -> {
+					trace('NetMan: sesh: ${sessionId} skinIndex: ${player.skinIndex}');
+					onSkinChanged.dispatch(sessionId, player.skinIndex);
+				});
+				cb.listen(player, "ready", (_, _) -> {
+					trace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
+					onPlayerReadyChanged.dispatch(sessionId, player.ready);
+				});
+				cb.listen(player, "score", (_, _) -> {
+					trace('NetMan: sesh: ${sessionId} score: ${player.score}');
+					onScoreChanged.dispatch(sessionId, player.score);
 				});
 			});
 
@@ -188,11 +217,25 @@ class NetworkManager {
 				onLinePulled.dispatch(message.sessionId);
 			});
 
+			room.onMessage("fish_despawn", (message:{id:String, respawnTime:Float}) -> {
+				trace('[NetMan] fish_despawn => fishId:${message.id} respawnTime:${message.respawnTime}');
+				onFishDespawn.dispatch(message.id, message.respawnTime);
+			});
+
 			room.onMessage("rock_splash", (message:Dynamic) -> {
 				var sx:Float = message.x;
 				var sy:Float = message.y;
-				trace('[NetMan] rock_splash => $sx, $sy');
-				onRockSplash.dispatch(sx, sy);
+				var sbig:Bool = message.big;
+				trace('[NetMan] rock_splash => $sx, $sy big=$sbig');
+				onRockSplash.dispatch(sx, sy, sbig);
+			});
+
+			room.onMessage("throw_rock", (message:Dynamic) -> {
+				trace('[NetMan] throw_rock => sessionId:${message.sessionId} target:(${message.targetX},${message.targetY}) big:${message.big} dir:${message.dir}');
+
+				var dest = FlxPoint.get(message.targetX, message.targetY);
+				onThrowRock.dispatch(message.sessionId, dest, message.big, message.dir);
+				dest.put();
 			});
 		});
 	}

@@ -1,15 +1,14 @@
 package entities;
 
-import entities.Inventory.InventoryItem;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import levels.ldtk.BDTilemap;
 import levels.ldtk.Level;
 
-class WadersPickup extends FlxSprite {
+class PepperPickup extends FlxSprite {
 	public function new() {
 		super();
-		loadGraphic(AssetPaths.waders__png);
+		loadGraphic(AssetPaths.pepper__png);
 		visible = false;
 	}
 
@@ -49,10 +48,8 @@ class WadersPickup extends FlxSprite {
 		FlxG.overlap(player, this, handleOverlap);
 	}
 
-	function handleOverlap(player:Player, waders:WadersPickup) {
-		if (!player.inventory.isFull()) {
-			player.pickupItem(Waders);
-			kill();
-		}
+	function handleOverlap(player:Player, pepper:PepperPickup) {
+		player.activateHotMode();
+		kill();
 	}
 }
