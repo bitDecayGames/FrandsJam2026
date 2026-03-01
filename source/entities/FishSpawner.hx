@@ -122,7 +122,12 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 					var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
 					var ftype = FlxG.random.int(0, 4);
 					if (net != null) {
-						var data:Dynamic = {id: fid, x: tile.x, y: tile.y, fishType: ftype};
+						var data:Dynamic = {
+							id: fid,
+							x: tile.x,
+							y: tile.y,
+							fishType: ftype
+						};
 						QLog.notice('sending fish_spawn message: $data');
 						net.sendMessage("fish_spawn", data);
 					}

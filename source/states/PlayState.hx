@@ -1,5 +1,6 @@
 package states;
 
+import flixel.math.FlxPoint;
 import schema.RoundState;
 import flixel.util.FlxColor;
 import flixel.FlxSprite;
@@ -23,6 +24,8 @@ import entities.Rock;
 import entities.GroundFishGroup;
 import entities.Inventory.InventoryItem;
 import entities.RockGroup;
+import entities.PepperPickup;
+import entities.WadersPickup;
 import levels.ldtk.BDTilemap;
 import levels.ldtk.Ldtk.Enum_TileTags;
 import levels.ldtk.Level;
@@ -59,6 +62,8 @@ class PlayState extends FlxTransitionableState {
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
+	var wadersPickup:WadersPickup;
+	var pepperPickup:PepperPickup;
 
 	var shop:Shop;
 	var terrainLayer:BDTilemap;
@@ -100,11 +105,15 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner = new FishSpawner(onFishCaught);
 		rockGroup = new RockGroup(fishSpawner, this);
 		groundFishGroup = new GroundFishGroup();
+		wadersPickup = new WadersPickup();
+		pepperPickup = new PepperPickup();
 
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
 		add(groundFishGroup);
+		add(wadersPickup);
+		add(pepperPickup);
 		add(fishSpawner);
 		add(ySortGroup);
 		add(transitions);
@@ -139,6 +148,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
 		GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onThrowRock.remove(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
 	}
@@ -150,6 +160,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
 		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onThrowRock.add(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
 	}
@@ -193,6 +204,10 @@ class PlayState extends FlxTransitionableState {
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
+		if (GameManager.ME.mySkinIndex >= 0) {
+			player.skinIndex = GameManager.ME.mySkinIndex;
+			player.swapSkin();
+		}
 		player.sessionId = GameManager.ME.net.mySessionId;
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
@@ -202,21 +217,26 @@ class PlayState extends FlxTransitionableState {
 		for (index => seshID in GameManager.ME.sessions) {
 			var remote = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 			remote.isRemote = true;
+			if (GameManager.ME.skins.exists(seshID)) {
+				var remoteSkin = GameManager.ME.skins.get(seshID);
+				if (remoteSkin >= 0) {
+					remote.skinIndex = remoteSkin;
+					remote.swapSkin();
+				}
+			}
 			remote.setNetwork(seshID);
 			remotePlayers.set(seshID, remote);
 			ySortGroup.add(remote);
 		}
 
 		#if local
-		rockGroup.spawn(level);
-		fishSpawner.spawn(level);
+		spawnWorldItems(level);
 		#else
 		FlxTimer.wait(10, () -> {
 			if (NetworkManager.IS_HOST) {
-				rockGroup.spawn(level);
-				fishSpawner.spawn(level);
+				spawnWorldItems(level);
 			} else {
-				QLog.notice('skipping fish spawn');
+				QLog.notice('skipping spawn');
 			}
 		});
 		#end
@@ -249,13 +269,13 @@ class PlayState extends FlxTransitionableState {
 
 		#if local
 		shop = new Shop();
-		shop.spawnRandom(level);
+		shop.spawnRandom(level, terrainLayer);
 		ySortGroup.add(shop);
 		#else
 		if (NetworkManager.IS_HOST) {
 			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
 			shop = new Shop();
-			shop.spawnRandom(level);
+			shop.spawnRandom(level, terrainLayer);
 			ySortGroup.add(shop);
 			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
 		} else {
@@ -307,6 +327,13 @@ class PlayState extends FlxTransitionableState {
 			return "grass";
 		}
 		return "";
+	}
+
+	function spawnWorldItems(level:Level) {
+		rockGroup.spawn(level);
+		fishSpawner.spawn(level);
+		wadersPickup.spawn(level, terrainLayer);
+		pepperPickup.spawn(level, terrainLayer);
 	}
 
 	function spawnBushes(water:ldtk.Layer_IntGrid) {
@@ -407,8 +434,16 @@ class PlayState extends FlxTransitionableState {
 
 	function onRemoteCastLine(sessionId:String, x:Float, y:Float, dir:String) {
 		var remote = remotePlayers.get(sessionId);
-		if (remote != null)
+		if (remote != null) {
 			remote.remoteStartCast(x, y, dir);
+		}
+	}
+
+	function onRemoteThrowRock(sessionId:String, target:FlxPoint, big:Bool, dir:String) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteThrowRock(target.x, target.y, big, dir);
+		}
 	}
 
 	function onRemoteFishCaught(sessionId:String, fishId:String, fishType:Int) {
@@ -509,6 +544,8 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner.setBobbers(bobbers);
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
+		wadersPickup.checkPickup(player);
+		pepperPickup.checkPickup(player);
 		if (shop != null) {
 			shop.checkInteraction(player);
 		}
