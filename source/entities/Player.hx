@@ -435,6 +435,12 @@ class Player extends FlxSprite {
 			var bounds = FlxG.worldBounds;
 			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
 			dir.put();
+			GameManager.ME.net.sendMessage("throw_rock", {
+				targetX: rockTarget.x,
+				targetY: rockTarget.y,
+				big: throwingBigRock,
+				dir: getDirSuffix()
+			});
 		}
 
 		updateReticle();
@@ -605,14 +611,6 @@ class Player extends FlxSprite {
 		rockFlightTime = if (dist > 0) dist / 200 else 0.01;
 		rockElapsed = 0;
 		state.add(rockSprite);
-		if (!isRemote) {
-			GameManager.ME.net.sendMessage("throw_rock", {
-				targetX: rockTarget.x,
-				targetY: rockTarget.y,
-				big: throwingBigRock,
-				dir: getDirSuffix()
-			});
-		}
 	}
 
 	public function remoteThrowRock(targetX:Float, targetY:Float, big:Bool, dir:String) {

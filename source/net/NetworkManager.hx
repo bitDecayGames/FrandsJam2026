@@ -230,6 +230,7 @@ class NetworkManager {
 
 				var dest = FlxPoint.get(message.targetX, message.targetY);
 				onThrowRock.dispatch(message.sessionId, dest, message.big, message.dir);
+				dest.put();
 			});
 		});
 	}
