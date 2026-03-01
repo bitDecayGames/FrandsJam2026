@@ -38,11 +38,13 @@ class PlayerState extends Schema {
 class FishState extends Schema {
 	@:type("float32") public var x:Float;
 	@:type("float32") public var y:Float;
+	@:type("int8") public var fishType:Int;
 
-	public function new(x:Float, y:Float) {
+	public function new(x:Float, y:Float, fishType:Int = 0) {
 		super();
 		this.x = x;
 		this.y = y;
+		this.fishType = fishType;
 	}
 }
 
