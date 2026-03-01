@@ -47,6 +47,8 @@ class NetworkManager {
 	public var onFishPocketed = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
 	public var onFishBanked = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
 	public var onLinePulled = new FlxTypedSignal<String->Void>(); // sessionId
+	public var onSkinChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, skinIndex
+	public var onPlayerReadyChanged = new FlxTypedSignal<String->Bool->Void>(); // sessionId, ready
 
 	public static inline var roomName:String = "game_room";
 
@@ -146,6 +148,14 @@ class NetworkManager {
 				cb.listen(player, "name", (_, _) -> {
 					trace('NetMan: sesh: ${sessionId} name: ${player.name}');
 					onPlayerNameChanged.dispatch(sessionId, player.name);
+				});
+				cb.listen(player, "skinIndex", (_, _) -> {
+					trace('NetMan: sesh: ${sessionId} skinIndex: ${player.skinIndex}');
+					onSkinChanged.dispatch(sessionId, player.skinIndex);
+				});
+				cb.listen(player, "ready", (_, _) -> {
+					trace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
+					onPlayerReadyChanged.dispatch(sessionId, player.ready);
 				});
 			});
 

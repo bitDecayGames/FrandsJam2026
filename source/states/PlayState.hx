@@ -201,6 +201,10 @@ class PlayState extends FlxTransitionableState {
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
+		if (GameManager.ME.mySkinIndex >= 0) {
+			player.skinIndex = GameManager.ME.mySkinIndex;
+			player.swapSkin();
+		}
 		player.sessionId = GameManager.ME.net.mySessionId;
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;

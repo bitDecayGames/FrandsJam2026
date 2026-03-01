@@ -31,7 +31,7 @@ class Player extends FlxSprite {
 	// 0-indexed frame within the catch animation when the bobber retracts (1 before final)
 	static inline var CATCH_RETRACT_FRAME:Int = 1;
 
-	static var SKINS:Array<String> = [
+	public static var SKINS:Array<String> = [
 		"assets/aseprite/characters/playerA.json",
 		"assets/aseprite/characters/playerB.json",
 		"assets/aseprite/characters/playerC.json",
@@ -40,7 +40,8 @@ class Player extends FlxSprite {
 		"assets/aseprite/characters/playerH.json",
 	];
 
-	var skinIndex:Int = 0;
+	public var skinIndex:Int = 0;
+
 	var speed:Float = 100;
 	var playerNum = 0;
 
@@ -931,7 +932,7 @@ class Player extends FlxSprite {
 		}
 	}
 
-	function swapSkin() {
+	public function swapSkin() {
 		var curAnim = animation.curAnim;
 		var animName = curAnim != null ? curAnim.name : null;
 		var animFrame = curAnim != null ? curAnim.curFrame : 0;
