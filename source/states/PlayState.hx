@@ -23,6 +23,7 @@ import entities.Rock;
 import entities.GroundFishGroup;
 import entities.Inventory.InventoryItem;
 import entities.RockGroup;
+import entities.WadersPickup;
 import levels.ldtk.BDTilemap;
 import levels.ldtk.Ldtk.Enum_TileTags;
 import levels.ldtk.Level;
@@ -59,6 +60,7 @@ class PlayState extends FlxTransitionableState {
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
+	var wadersPickup:WadersPickup;
 
 	var shop:Shop;
 	var terrainLayer:BDTilemap;
@@ -100,11 +102,13 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner = new FishSpawner(onFishCaught);
 		rockGroup = new RockGroup(fishSpawner, this);
 		groundFishGroup = new GroundFishGroup();
+		wadersPickup = new WadersPickup();
 
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
 		add(groundFishGroup);
+		add(wadersPickup);
 		add(fishSpawner);
 		add(ySortGroup);
 		add(transitions);
@@ -210,11 +214,13 @@ class PlayState extends FlxTransitionableState {
 		#if local
 		rockGroup.spawn(level);
 		fishSpawner.spawn(level);
+		wadersPickup.spawn(level);
 		#else
 		FlxTimer.wait(10, () -> {
 			if (NetworkManager.IS_HOST) {
 				rockGroup.spawn(level);
 				fishSpawner.spawn(level);
+				wadersPickup.spawn(level);
 			} else {
 				QLog.notice('skipping fish spawn');
 			}
@@ -509,6 +515,7 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner.setBobbers(bobbers);
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
+		wadersPickup.checkPickup(player);
 		if (shop != null) {
 			shop.checkInteraction(player);
 		}
