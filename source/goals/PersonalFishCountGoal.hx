@@ -1,5 +1,6 @@
 package goals;
 
+import managers.GameManager;
 import events.gen.Event.FishCaught;
 import events.EventBus;
 import flixel.text.FlxText.FlxTextAlign;
@@ -21,21 +22,24 @@ class PersonalFishCountGoal extends Goal {
 		this.text = new PressStart(100, 100, "Hello World");
 		this.text.color = FlxColor.RED;
 		this.text.alignment = FlxTextAlign.CENTER;
+
 		// TODO: MW need to add to a specific UI group here for sprite sorting
 		state.add(text);
 
 		// TODO: MW need to change this to FishCollected probably
-		EventBus.subscribe(FishCaught, (event) -> {
-			var count = scores.get(event.ownerId);
-			if (count == null) {
-				count = 0;
-			}
-			count++;
-			scores.set(event.ownerId, count);
-			if (count >= targetCount) {
-				onComplete();
-			}
-		});
+		GameManager.ME.net.onFishCaught.add(onFishCaught);
+	}
+
+	private function onFishCaught(playerId:String, fishId:String) {
+		var count = scores.get(playerId);
+		if (count == null) {
+			count = 0;
+		}
+		count++;
+		scores.set(playerId, count);
+		if (count >= targetCount) {
+			onComplete();
+		}
 	}
 
 	public function manuallySetFishCount(playerId:String, count:Int) {

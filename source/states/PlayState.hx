@@ -216,7 +216,7 @@ class PlayState extends FlxTransitionableState {
 
 		var spawnerLayer = level.fishSpawnerLayer;
 		waterLayer = spawnerLayer;
-		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
 		groundFishGroup.setWaterLayer(spawnerLayer);
 
 		spawnBushes(spawnerLayer);
@@ -312,11 +312,11 @@ class PlayState extends FlxTransitionableState {
 				}
 				player.onFishDelivered = null;
 			};
-			player.catchFish(true);
+			player.catchFish(true, catcherSessionId, fishId);
 		} else {
 			var remote = remotePlayers.get(catcherSessionId);
 			if (remote != null)
-				remote.catchFish(true);
+				remote.catchFish(true, catcherSessionId, fishId);
 		}
 	}
 
@@ -340,21 +340,21 @@ class PlayState extends FlxTransitionableState {
 				}
 				player.onFishDelivered = null;
 			};
-			player.catchFish(true);
+			player.catchFish(true, sessionId, fishId);
 		} else {
 			var remote = remotePlayers.get(sessionId);
 			if (remote != null)
-				remote.catchFish(true);
+				remote.catchFish(true, sessionId, fishId);
 		}
 	}
 
 	function onRemoteLinePulled(sessionId:String) {
 		if (sessionId == player.sessionId) {
-			player.catchFish(false);
+			player.catchFish(false, sessionId, null);
 		} else {
 			var remote = remotePlayers.get(sessionId);
 			if (remote != null)
-				remote.catchFish(false);
+				remote.catchFish(false, sessionId, null);
 		}
 	}
 
