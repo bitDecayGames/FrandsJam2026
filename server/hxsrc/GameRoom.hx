@@ -32,6 +32,15 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
+		onMessage("player_name_changed", (client:Client, data:{
+			name:String,
+		}) -> {
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player != null) {
+				player.name = data.name;
+			}
+		});
+
 		// sent when a client spawns a fish
 		onMessage("fish_spawn", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_spawn" message: ${Json.stringify(data)}');

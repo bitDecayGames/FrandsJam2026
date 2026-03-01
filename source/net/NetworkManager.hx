@@ -31,6 +31,7 @@ class NetworkManager {
 	public var onHostChanged:HostSignal = new HostSignal();
 	public var onPlayerAdded:PlayerStateSignal = new PlayerStateSignal();
 	public var onPlayerChanged:PlayerStateSignal = new PlayerStateSignal();
+	public var onPlayerNameChanged = new FlxTypedSignal<String->String->Void>(); // seshId, name
 	public var onPlayerRemoved:SessionIdSignal = new SessionIdSignal();
 	public var onFishMove:FishStateSignal = new FishStateSignal();
 	public var onFishAdded = new FishStateSignal();
@@ -141,6 +142,10 @@ class NetworkManager {
 				cb.listen(player, "y", (_, prevY:Float) -> {
 					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
+				});
+				cb.listen(player, "name", (_, _) -> {
+					trace('NetMan: sesh: ${sessionId} name: ${player.name}');
+					onPlayerNameChanged.dispatch(sessionId, player.name);
 				});
 			});
 

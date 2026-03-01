@@ -30,6 +30,7 @@ class GameManager {
 	private var roundStatus:String = RoundState.STATUS_INACTIVE;
 
 	public var sessions = new Array<String>();
+	public var names = new Map<String, String>();
 	public var mySessionId = "";
 
 	public function new() {
@@ -41,6 +42,7 @@ class GameManager {
 		net.onPlayerRemoved.add(onPlayerRemoved);
 		net.onRoundUpdate.add(sync);
 		net.onPlayersReady.add(playersReady);
+		net.onPlayerNameChanged.add(playerNameChanged);
 		net.onHostChanged.add(onHostChange);
 	}
 
@@ -74,13 +76,18 @@ class GameManager {
 		mySessionId = sessionId;
 	}
 
-	private function onPlayerAdded(sessionId:String, data:{state:PlayerState}) {
+	private function playerNameChanged(sessionId:String, name:String) {
+		names.set(sessionId, name);
+	}
+
+	private function onPlayerAdded(sessionId:String, data:PlayerUpdateData) {
 		if (sessionId == mySessionId) {
 			return;
 		}
 
 		trace('GameMan: new session added: $sessionId');
 		sessions.push(sessionId);
+		names.set(sessionId, data.state.name);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -90,6 +97,7 @@ class GameManager {
 
 		trace('GameMan: session removed: $sessionId');
 		sessions.remove(sessionId);
+		names.remove(sessionId);
 	}
 
 	private function onHostChange(isHost:Bool, prevIsHost:Bool) {

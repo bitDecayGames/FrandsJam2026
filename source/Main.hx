@@ -55,6 +55,8 @@ class Main extends Sprite {
 		Configure.initAnalytics(false);
 		Storage.load();
 
+		FlxG.save.bind("Fishin Willys", "BitDecayGames");
+
 		new GameManager();
 
 		var startingState:Class<FlxState> = SplashScreenState;

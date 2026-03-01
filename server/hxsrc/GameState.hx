@@ -18,6 +18,7 @@ class PlayerState extends Schema {
 	@:type("float32") public var velocityX:Float;
 	@:type("float32") public var velocityY:Float;
 	@:type("boolean") public var ready:Bool;
+	@:type("string") public var name:String;
 
 	public function new() {
 		super();
@@ -26,6 +27,7 @@ class PlayerState extends Schema {
 		velocityX = 0;
 		velocityY = 0;
 		ready = false;
+		name = "";
 	}
 }
 
