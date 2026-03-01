@@ -44,7 +44,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// sent when a client spawns a fish
 		onMessage("fish_spawn", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_spawn" message: ${Json.stringify(data)}');
-			state.fish.set(data.id, new FishState(data.x, data.y));
+			state.fish.set(data.id, new FishState(data.x, data.y, data.fishType != null ? Std.int(data.fishType) : 0));
 		});
 
 		// sent when a player throws a rock
@@ -156,8 +156,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// sent when a player catches a fish; catcherSessionId may differ from client.sessionId
 		// because the host reports catches on behalf of any player whose bobber a fish swam into
 		onMessage("fish_caught", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_caught": fishId=${data.fishId} catcher=${data.catcherSessionId}');
-			broadcast("fish_caught", {sessionId: data.catcherSessionId, fishId: data.fishId});
+			trace('${client.sessionId}: sent "fish_caught": fishId=${data.fishId} catcher=${data.catcherSessionId} fishType=${data.fishType}');
+			broadcast("fish_caught", {sessionId: data.catcherSessionId, fishId: data.fishId, fishType: data.fishType});
 		});
 
 		// sent when a player pulls in their line
