@@ -1,5 +1,8 @@
 package states;
 
+import ui.font.BitmapText.PressStart;
+import flixel.text.FlxBitmapText;
+import misc.FlxTextFactory;
 import flixel.text.FlxInputText;
 import goals.PersonalFishCountGoal;
 import goals.TimedGoal;
@@ -23,6 +26,7 @@ using states.FlxStateExt;
 class LobbyState extends FlxTransitionableState {
 	var _btnDone:FlxButton;
 	var _txtReady:FlxText;
+	var _txtRoomID:FlxBitmapText;
 
 	var _txtTitle:FlxText;
 	var _inputField:FlxInputText;
@@ -51,6 +55,9 @@ class LobbyState extends FlxTransitionableState {
 		_txtTitle.alignment = FlxTextAlign.CENTER;
 		_txtTitle.text = "Lobby";
 		add(_txtTitle);
+
+		_txtRoomID = FlxTextFactory.make("Room ID: ", 10, 10, 12, FlxTextAlign.LEFT, FlxColor.WHITE, PressStart.font);
+		add(_txtRoomID);
 
 		// Ready button at the bottom center — starts disabled
 		_btnDone = MenuBuilder.createTextButton("Ready", clickReady);
@@ -248,6 +255,13 @@ class LobbyState extends FlxTransitionableState {
 		}
 
 		updateNameLabels();
+
+		@:privateAccess(NetworkManager)
+		{
+			if (GameManager.ME.net.room != null) {
+				_txtRoomID.text = 'Room ID: ${GameManager.ME.net.room.roomId}';
+			}
+		}
 	}
 
 	private function updateNameLabels():Void {
