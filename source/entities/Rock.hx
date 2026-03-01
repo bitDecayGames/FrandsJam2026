@@ -1,7 +1,6 @@
 package entities;
 
 import flixel.FlxSprite;
-import flixel.util.FlxColor;
 
 class Rock extends FlxSprite {
 	var waterLayer:ldtk.Layer_IntGrid;
@@ -11,7 +10,7 @@ class Rock extends FlxSprite {
 		super(x, y);
 		this.waterLayer = waterLayer;
 		this.onAddToWorld = onAddToWorld;
-		makeGraphic(8, 8, FlxColor.GRAY);
+		loadGraphic(AssetPaths.rock__png);
 	}
 
 	public function resolveThrow(landX:Float, landY:Float) {
