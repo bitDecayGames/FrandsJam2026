@@ -117,9 +117,14 @@ class NetworkManager {
 		});
 	}
 
-	public function sendMove(x:Float, y:Float) {
+	public function sendMove(x:Float, y:Float, velocityX:Float, velocityY:Float) {
 		#if local return; #end
-		sendMessage("move", {x: x, y: y}, true);
+		sendMessage("move", {
+			x: x,
+			y: y,
+			velocityX: velocityX,
+			velocityY: velocityY
+		}, true);
 	}
 
 	public function sendMessage(topic:String, msg:Dynamic, mute:Bool = false) {

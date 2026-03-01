@@ -2,7 +2,9 @@
   "data": {},
   "hash": {
     "roomcount": {},
-    "roomhistory": {}
+    "roomhistory": {
+      "rlxyVSI_0": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"AQsvYE1Zr\",\"state\":\"{\\\"hostSessionId\\\":\\\"_95YxKByy\\\",\\\"players\\\":{\\\"_95YxKByy\\\":{\\\"x\\\":56,\\\"y\\\":48,\\\"velocityX\\\":0,\\\"velocityY\\\":0},\\\"3sB_kZRCc\\\":{\\\"x\\\":56,\\\"y\\\":48,\\\"velocityX\\\":0,\\\"velocityY\\\":0}},\\\"fish\\\":{\\\"1\\\":{\\\"x\\\":373.5766906738281,\\\"y\\\":198.94764709472656},\\\"2\\\":{\\\"x\\\":334.59600830078125,\\\"y\\\":231.9677734375},\\\"3\\\":{\\\"x\\\":302.6960754394531,\\\"y\\\":294.2409973144531},\\\"4\\\":{\\\"x\\\":265.5483093261719,\\\"y\\\":235.1044921875}},\\\"round\\\":{\\\"status\\\":\\\"active\\\",\\\"currentRound\\\":1,\\\"totalRounds\\\":3}}\",\"clients\":[{\"sessionId\":\"_95YxKByy\",\"reconnectionToken\":\"hhui-82C7\"},{\"sessionId\":\"3sB_kZRCc\",\"reconnectionToken\":\"KbA1Iv4o3\"}]}"
+    }
   },
   "keys": {}
 }
