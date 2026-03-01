@@ -96,7 +96,7 @@ class Shop extends FlxSprite {
 		if (count > 0) {
 			player.score += count * 10;
 			QLog.notice('Sold $count fish for ${count * 10} points. Total score: ${player.score}');
-			TextPop.pop(Std.int(x), Std.int(y), '${count} feeesh', new FloatAway(100, 3));
+			TextPop.pop(Std.int(x), Std.int(y), '${count}  🐟', new FloatAway(100, 3));
 		}
 	}
 }
