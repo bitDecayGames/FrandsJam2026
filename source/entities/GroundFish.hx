@@ -24,14 +24,16 @@ class GroundFish extends FlxSprite {
 	var arcElapsed:Float = 0;
 
 	public var landing:Bool = false;
+	public var fishSpriteIndex:Int;
 
-	public function new(startX:Float, startY:Float, landX:Float, landY:Float, fishFrame:Int = 0) {
+	public function new(startX:Float, startY:Float, landX:Float, landY:Float, fishSpriteIndex:Int = 0) {
 		super(startX, startY);
+		this.fishSpriteIndex = fishSpriteIndex;
 		loadGraphic("assets/aseprite/fish.png", true, 32, 32);
-		animation.add("fish", [fishFrame]);
+		animation.add("fish", [fishSpriteIndex]);
 		animation.play("fish");
 
-		var size = FISH_SIZES[fishFrame];
+		var size = FISH_SIZES[fishSpriteIndex];
 		origin.set(size[0] / 2, size[1] / 2);
 
 		arcStart = FlxPoint.get(startX, startY);

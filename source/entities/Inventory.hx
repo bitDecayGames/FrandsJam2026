@@ -29,24 +29,52 @@ class Inventory {
 	}
 
 	public function has(item:InventoryItem):Bool {
-		return items.indexOf(item) != -1;
+		for (it in items) {
+			if (matchesItem(it, item))
+				return true;
+		}
+		return false;
 	}
 
 	public function remove(item:InventoryItem):Bool {
-		var idx = items.indexOf(item);
-		if (idx == -1)
-			return false;
-		items.splice(idx, 1);
-		onChange.dispatch();
-		return true;
+		for (i in 0...items.length) {
+			if (matchesItem(items[i], item)) {
+				items.splice(i, 1);
+				onChange.dispatch();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Removes the first Fish from inventory and returns its fishSpriteIndex, or -1 if none. */
+	public function removeAnyFish():Int {
+		for (i in 0...items.length) {
+			switch (items[i]) {
+				case Fish(idx):
+					items.splice(i, 1);
+					onChange.dispatch();
+					return idx;
+				default:
+			}
+		}
+		return -1;
 	}
 
 	public function count():Int {
 		return items.length;
 	}
+
+	static function matchesItem(a:InventoryItem, b:InventoryItem):Bool {
+		return switch [a, b] {
+			case [Rock, Rock]: true;
+			case [Fish(_), Fish(_)]: true;
+			default: false;
+		};
+	}
 }
 
 enum InventoryItem {
 	Rock;
-	Fish;
+	Fish(fishSpriteIndex:Int);
 }

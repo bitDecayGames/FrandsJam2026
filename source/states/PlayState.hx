@@ -223,8 +223,8 @@ class PlayState extends FlxTransitionableState {
 
 	function onFishCaught() {
 		player.onFishDelivered = () -> {
-			if (!player.inventory.add(Fish)) {
-				groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishFrame);
+			if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
+				groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
 			}
 			player.onFishDelivered = null;
 		};

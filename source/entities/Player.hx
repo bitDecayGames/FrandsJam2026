@@ -69,7 +69,7 @@ class Player extends FlxSprite {
 	var castDirSuffix:String = "down";
 	var retractHasFish:Bool = false;
 
-	public var caughtFishFrame:Int = 0;
+	public var caughtFishSpriteIndex:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
 
 	// Cast sprites
@@ -683,9 +683,9 @@ class Player extends FlxSprite {
 			if (castBobber != null) {
 				castBobber.velocity.set(0, 0);
 				if (hasFish) {
-					caughtFishFrame = FlxG.random.int(0, 4);
+					caughtFishSpriteIndex = FlxG.random.int(0, 4);
 					castBobber.loadGraphic("assets/aseprite/fish.png", true, 32, 32);
-					castBobber.animation.add("fish", [caughtFishFrame]);
+					castBobber.animation.add("fish", [caughtFishSpriteIndex]);
 					castBobber.animation.play("fish");
 				}
 			}

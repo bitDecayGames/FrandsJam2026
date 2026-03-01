@@ -3,7 +3,6 @@ package entities;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.util.FlxColor;
-import entities.Inventory.InventoryItem;
 import levels.ldtk.Level;
 
 class Shop extends FlxSprite {
@@ -50,7 +49,7 @@ class Shop extends FlxSprite {
 
 	function sellFish(player:Player) {
 		var count = 0;
-		while (player.inventory.remove(Fish)) {
+		while (player.inventory.removeAnyFish() != -1) {
 			count++;
 		}
 		if (count > 0) {
