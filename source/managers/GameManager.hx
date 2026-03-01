@@ -2,8 +2,10 @@ package managers;
 
 import schema.PlayerState;
 import goals.PersonalFishCountGoal;
+import goals.PersonalFishSoldGoal;
 import goals.TimedGoal;
 import goals.KeypressGoal;
+import flixel.util.FlxSignal.FlxTypedSignal;
 import flixel.util.FlxTimer;
 import schema.RoundState;
 import net.NetworkManager;
@@ -48,6 +50,9 @@ class GameManager {
 	public var wormKills:Array<Map<String, Int>> = [];
 	public var mySessionId = "";
 	public var mySkinIndex:Int = -1; // -1 means no skin selected
+
+	/** Fires whenever any player sells a fish (local or remote): sessionId, entry */
+	public var onFishSoldLocal = new FlxTypedSignal<String->SoldFishEntry->Void>();
 
 	public function new() {
 		ME = this;
@@ -132,6 +137,7 @@ class GameManager {
 			roundMap.set(sessionId, []);
 		}
 		roundMap.get(sessionId).push(entry);
+		onFishSoldLocal.dispatch(sessionId, entry);
 	}
 
 	/** Get sold fish for a specific round and session. */
@@ -244,9 +250,9 @@ class GameManager {
 			case RoundState.STATUS_LOBBY:
 				if (NetworkManager.IS_HOST) {
 					init([
-						new Round([new TimedGoal(), new PersonalFishCountGoal(30), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishCountGoal(30), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishCountGoal(30), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
 					]);
 					// needs to force this back to 0
 					nextRoundNumber = currentRoundNumber;
