@@ -105,7 +105,8 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 ## Compile Flags
 
 - `#if debug` / `#if FLX_DEBUG` — debug-only code
-- `SKIP_SPLASH` — skip splash screen
+- `SKIP_SPLASH` — skip splash screen, go to main menu
+- `maingame` — skip all menus, go straight to PlayState (e.g. `lime build hl -debug -Dmaingame`)
 - `API_KEY` — analytics token for production
 - `dev_analytics` — dev mode analytics
 - `llm_bridge` — enable LLM debug bridge (`window.__debug` API for Playwright introspection)

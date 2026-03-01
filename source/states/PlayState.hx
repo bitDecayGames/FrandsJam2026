@@ -294,7 +294,7 @@ class PlayState extends FlxTransitionableState {
 		if (catcherSessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
 				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
+					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex);
 				}
 				player.onFishDelivered = null;
 			};
@@ -322,7 +322,7 @@ class PlayState extends FlxTransitionableState {
 		if (sessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
 				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
+					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex);
 				}
 				player.onFishDelivered = null;
 			};

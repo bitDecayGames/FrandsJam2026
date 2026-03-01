@@ -152,7 +152,7 @@ class Player extends FlxSprite {
 		// Footstep dust on foot-plant frames of run animations
 		if (onFootstep != null && StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
 			// Spawn dust at player's feet (center-bottom of hitbox)
-			onFootstep(x + width / 2, y + height);
+			onFootstep(x + width / 2, y + 4);
 		}
 
 		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
@@ -318,7 +318,7 @@ class Player extends FlxSprite {
 			// Capture reticle target for the rock
 			var dir = lastInputDir.asVector();
 			var rawX = x + dir.x * 96 + 4;
-			var rawY = y + dir.y * 96 + 4;
+			var rawY = y + dir.y * 96 - 8;
 			var bounds = FlxG.worldBounds;
 			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
 			dir.put();
@@ -344,7 +344,7 @@ class Player extends FlxSprite {
 		var reticleOffset = lastInputDir.asVector();
 		var bounds = FlxG.worldBounds;
 		reticle.setPosition(Math.max(bounds.left, Math.min(bounds.right - reticle.width, last.x + reticleOffset.x * 96 + 4)),
-			Math.max(bounds.top, Math.min(bounds.bottom - reticle.height, last.y + reticleOffset.y * 96 + 4)));
+			Math.max(bounds.top, Math.min(bounds.bottom - reticle.height, last.y + reticleOffset.y * 96 - 8)));
 		reticleOffset.put();
 	}
 
@@ -353,40 +353,40 @@ class Player extends FlxSprite {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			if (castState == CAST_ANIM && frame == CAST_LAUNCH_FRAME) {
 				return switch (castDirSuffix) {
-					case "right": FlxPoint.get(x + 12, y);
-					case "left": FlxPoint.get(x + 4, y);
-					case "down": FlxPoint.get(x, y + 4);
-					case "up": FlxPoint.get(x + 12, y + 4);
+					case "right": FlxPoint.get(x + 12, y - 12);
+					case "left": FlxPoint.get(x + 2, y - 12);
+					case "down": FlxPoint.get(x, y - 8);
+					case "up": FlxPoint.get(x + 12, y - 8);
 					default: null;
 				};
 			}
 			return switch (castDirSuffix) {
-				case "down": FlxPoint.get(x + 10, y + 24);
-				case "right": FlxPoint.get(x + 30, y + 2);
-				case "up": FlxPoint.get(x + 3, y - 4);
-				case "left": FlxPoint.get(x - 15, y + 2);
-				default: FlxPoint.get(x + 8, y + 8);
+				case "down": FlxPoint.get(x + 10, y + 12);
+				case "right": FlxPoint.get(x + 30, y - 10);
+				case "up": FlxPoint.get(x + 3, y - 16);
+				case "left": FlxPoint.get(x - 15, y - 10);
+				default: FlxPoint.get(x + 8, y - 4);
 			};
 		} else if (castState == CATCH_ANIM || castState == RETURNING) {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			return switch (castDirSuffix) {
 				case "down":
-					if (frame == 0) FlxPoint.get(x + 10, y + 24) else if (frame == 1) FlxPoint.get(x + 1, y + 3) else FlxPoint.get(x + 0, y - 5);
+					if (frame == 0) FlxPoint.get(x + 10, y + 12) else if (frame == 1) FlxPoint.get(x + 8, y - 9) else FlxPoint.get(x - 1, y - 20);
 				case "right":
-					if (frame == 0) FlxPoint.get(x + 30, y + 2) else if (frame == 1) FlxPoint.get(x + 14, y - 4) else FlxPoint.get(x - 6, y - 6);
+					if (frame == 0) FlxPoint.get(x + 30, y - 10) else if (frame == 1) FlxPoint.get(x + 14, y - 16) else FlxPoint.get(x - 6, y - 18);
 				case "up":
-					if (frame == 0) FlxPoint.get(x + 3, y - 6) else if (frame == 1) FlxPoint.get(x + 13, y - 8) else FlxPoint.get(x + 19, y - 8);
+					if (frame == 0) FlxPoint.get(x + 3, y - 18) else if (frame == 1) FlxPoint.get(x + 13, y - 20) else FlxPoint.get(x + 19, y - 20);
 				case "left":
-					if (frame == 0) FlxPoint.get(x - 15, y + 2) else if (frame == 1) FlxPoint.get(x + 1, y - 4) else FlxPoint.get(x + 21, y - 6);
-				default: FlxPoint.get(x + 8, y + 8);
+					if (frame == 0) FlxPoint.get(x - 15, y - 10) else if (frame == 1) FlxPoint.get(x + 1, y - 16) else FlxPoint.get(x + 21, y - 18);
+				default: FlxPoint.get(x + 8, y - 4);
 			};
 		} else {
 			return switch (castDirSuffix) {
-				case "down": FlxPoint.get(x + 2, y + 10);
-				case "right": FlxPoint.get(x + 15, y - 5);
-				case "up": FlxPoint.get(x + 11, y - 6);
-				case "left": FlxPoint.get(x + 0, y - 5);
-				default: FlxPoint.get(x + 8, y + 8);
+				case "down": FlxPoint.get(x + 1, y - 13);
+				case "right": FlxPoint.get(x + 15, y - 17);
+				case "up": FlxPoint.get(x + 11, y - 18);
+				case "left": FlxPoint.get(x + 0, y - 17);
+				default: FlxPoint.get(x + 8, y - 4);
 			};
 		}
 	}
@@ -479,7 +479,7 @@ class Player extends FlxSprite {
 	}
 
 	function launchRock() {
-		rockSprite = if (makeRock != null) makeRock(x + 4, y + 4) else new Rock(x + 4, y + 4);
+		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8) else new Rock(x + 4, y - 8);
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;
@@ -540,7 +540,7 @@ class Player extends FlxSprite {
 		var reticleDir = lastInputDir.asVector();
 		var castDist = castPower * 96;
 		var targetX = x + reticleDir.x * castDist + 4;
-		var targetY = y + reticleDir.y * castDist + 4;
+		var targetY = y + reticleDir.y * castDist - 8;
 		reticleDir.put();
 		castTarget = FlxPoint.get(targetX, targetY);
 		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
@@ -618,8 +618,8 @@ class Player extends FlxSprite {
 						castPowerDir = 1;
 					}
 					powerBarFill.scale.x = castPower;
-					powerBarBg.setPosition(x - 8, y + 20);
-					powerBarFill.setPosition(x - 8, y + 20);
+					powerBarBg.setPosition(x - 8, y + 8);
+					powerBarFill.setPosition(x - 8, y + 8);
 
 					if (SimpleController.just_released(A)) {
 						powerBarBg.visible = false;
@@ -828,11 +828,11 @@ class Player extends FlxSprite {
 
 	function getRetractTarget():FlxPoint {
 		return switch (castDirSuffix) {
-			case "right": FlxPoint.get(x + 8, y - 2);
-			case "left": FlxPoint.get(x + 8, y - 2);
-			case "down": FlxPoint.get(x, y + 4);
-			case "up": FlxPoint.get(x + 12, y + 4);
-			default: FlxPoint.get(x + 4, y + 4);
+			case "right": FlxPoint.get(x + 8, y - 14);
+			case "left": FlxPoint.get(x + 8, y - 14);
+			case "down": FlxPoint.get(x, y - 8);
+			case "up": FlxPoint.get(x + 12, y - 8);
+			default: FlxPoint.get(x + 4, y - 8);
 		};
 	}
 

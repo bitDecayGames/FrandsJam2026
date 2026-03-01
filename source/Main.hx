@@ -42,6 +42,9 @@ import states.LobbyState;
 #if credits
 import states.CreditsState;
 #end
+#if maingame
+import states.PlayState;
+#end
 #if FLX_DEBUG
 import plugins.GlobalDebugPlugin;
 #end
@@ -70,6 +73,9 @@ class Main extends Sprite {
 			configureLogging();
 			initEvents();
 			Achievements.initAchievements();
+			#if maingame
+			FlxG.switchState(() -> new PlayState(null));
+			#end
 		});
 		addChild(new FlxGame(0, 0, startingState, 60, 60, true, false));
 		#if fullscreen
