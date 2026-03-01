@@ -20,6 +20,7 @@ class PreRoundState extends FlxTransitionableState {
 
 	override public function create():Void {
 		super.create();
+		trace('yaaaa boii');
 		bgColor = FlxColor.TRANSPARENT;
 
 		_txtTitle = new FlxText();
