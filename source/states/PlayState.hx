@@ -126,8 +126,6 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function setupNetwork() {
-		GameManager.ME.net.onJoined.add(onPlayerJoined);
-		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.add(onFishAdded);
 		GameManager.ME.net.onCastLine.add(onRemoteCastLine);
@@ -136,26 +134,8 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
 	}
 
-	function onPlayerJoined(sessionId:String) {
-		trace('PlayState: joined as $sessionId');
-		player.setNetwork(sessionId);
-	}
-
-	function onPlayerAdded(sessionId:String, data:{state:PlayerState}) {
-		if (sessionId == player.sessionId) {
-			return;
-		}
-		// TODO: Have server give us the player color, too
-		trace('PlayState: remote player $sessionId appeared');
-		var remote = new Player(data.state.x, data.state.y, this);
-		remote.isRemote = true;
-		remote.setNetwork(sessionId);
-		remotePlayers.set(sessionId, remote);
-		add(remote);
-	}
-
 	function onPlayerRemoved(sessionId:String) {
-		trace('PlayState: remote player $sessionId left');
+		trace('PlayState: remote player $sessionId left, removing remote player');
 		var remote = remotePlayers.get(sessionId);
 		if (remote != null) {
 			remove(remote);
@@ -191,6 +171,14 @@ class PlayState extends FlxTransitionableState {
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 		camera.follow(player);
 		ySortGroup.add(player);
+
+		for (index => seshID in GameManager.ME.sessions) {
+			var remote = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
+			remote.isRemote = true;
+			remote.setNetwork(seshID);
+			remotePlayers.set(seshID, remote);
+			ySortGroup.add(remote);
+		}
 
 		#if local
 		rockGroup.spawn(level);

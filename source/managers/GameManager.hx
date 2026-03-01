@@ -1,5 +1,6 @@
 package managers;
 
+import schema.PlayerState;
 import goals.PersonalFishCountGoal;
 import goals.TimedGoal;
 import goals.KeypressGoal;
@@ -28,10 +29,16 @@ class GameManager {
 	private var rounds:Array<Round>;
 	private var roundStatus:String = RoundState.STATUS_INACTIVE;
 
+	public var sessions = new Array<String>();
+	public var mySessionId = "";
+
 	public function new() {
 		ME = this;
 		fish = new FishManager(new FishDb());
 		net = new NetworkManager();
+		net.onJoined.add(onPlayerJoined);
+		net.onPlayerAdded.add(onPlayerAdded);
+		net.onPlayerRemoved.add(onPlayerRemoved);
 		net.onRoundUpdate.add(sync);
 		net.onPlayersReady.add(playersReady);
 		net.onHostChanged.add(onHostChange);
@@ -60,6 +67,29 @@ class GameManager {
 			currentRound: currentRoundNumber,
 			totalRounds: totalRounds,
 		});
+	}
+
+	private function onPlayerJoined(sessionId:String) {
+		trace('GameMan: joined as $sessionId');
+		mySessionId = sessionId;
+	}
+
+	private function onPlayerAdded(sessionId:String, data:{state:PlayerState}) {
+		if (sessionId == mySessionId) {
+			return;
+		}
+
+		trace('GameMan: new session added: $sessionId');
+		sessions.push(sessionId);
+	}
+
+	function onPlayerRemoved(sessionId:String) {
+		if (sessionId == mySessionId) {
+			return;
+		}
+
+		trace('GameMan: session removed: $sessionId');
+		sessions.remove(sessionId);
 	}
 
 	private function onHostChange(isHost:Bool, prevIsHost:Bool) {

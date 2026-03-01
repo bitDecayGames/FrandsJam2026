@@ -2,9 +2,7 @@
   "data": {},
   "hash": {
     "roomcount": {},
-    "roomhistory": {
-      "FAxir42Zm": "{\"clientOptions\":{\"h\":{}},\"roomName\":\"game_room\",\"processId\":\"9HqQKAWSs\",\"state\":\"{\\\"hostSessionId\\\":\\\"8UImjrACR\\\",\\\"players\\\":{\\\"8UImjrACR\\\":{\\\"x\\\":56,\\\"y\\\":48,\\\"velocityX\\\":0,\\\"velocityY\\\":0},\\\"zHJIBKEl9\\\":{\\\"x\\\":56,\\\"y\\\":48,\\\"velocityX\\\":0,\\\"velocityY\\\":0},\\\"w1rSCP15l\\\":{\\\"x\\\":56,\\\"y\\\":48,\\\"velocityX\\\":0,\\\"velocityY\\\":0}},\\\"fish\\\":{\\\"1\\\":{\\\"x\\\":373.1106262207031,\\\"y\\\":229.4739532470703},\\\"2\\\":{\\\"x\\\":355.363037109375,\\\"y\\\":290.0143737792969},\\\"3\\\":{\\\"x\\\":280.06500244140625,\\\"y\\\":216.85130310058594},\\\"4\\\":{\\\"x\\\":247.31851196289062,\\\"y\\\":244.987060546875}},\\\"round\\\":{\\\"status\\\":\\\"active\\\",\\\"currentRound\\\":1,\\\"totalRounds\\\":3}}\",\"clients\":[{\"sessionId\":\"w1rSCP15l\"}]}"
-    }
+    "roomhistory": {}
   },
   "keys": {}
 }
