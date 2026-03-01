@@ -148,6 +148,9 @@ class WaterFish extends FlxSprite {
 			checkBobber();
 		}
 
+		if (!alive)
+			return;
+
 		if (attracted) {
 			return;
 		}

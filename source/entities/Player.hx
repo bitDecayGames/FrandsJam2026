@@ -630,10 +630,8 @@ class Player extends FlxSprite {
 						castStartPos = null;
 					}
 					castState = LANDED;
-					if (!isRemote) {
-						frozen = false;
-						playMovementAnim(true);
-					}
+					frozen = false;
+					playMovementAnim(true);
 				}
 			case CAST_ANIM:
 				// TODO: We can
