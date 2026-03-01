@@ -30,7 +30,6 @@ import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
 import entities.Bush;
 import entities.CloudShadow;
-import entities.FootDust;
 import entities.Player;
 import entities.Ripple;
 import entities.Seagull;
@@ -194,6 +193,8 @@ class PlayState extends FlxTransitionableState {
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 		player.sessionId = GameManager.ME.net.mySessionId;
+		player.terrainLayer = terrainLayer;
+		player.groundEffectsGroup = midGroundGroup;
 		camera.follow(player);
 		ySortGroup.add(player);
 
@@ -235,10 +236,6 @@ class PlayState extends FlxTransitionableState {
 		player.onBobberLanded = (bx, by) -> {
 			add(new Ripple(bx, by));
 			FlxG.camera.shake(0.002, 0.1);
-		};
-		player.onFootstep = (fx, fy) -> {
-			for (_ in 0...4)
-				ySortGroup.add(new FootDust(fx + FlxG.random.float(-3, 3), fy + FlxG.random.float(-1, 1)));
 		};
 
 		CloudShadow.randomizeWind();
