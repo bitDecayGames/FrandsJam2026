@@ -81,6 +81,10 @@ class Player extends FlxSprite {
 	// Factory for creating thrown rocks — set by PlayState
 	public var makeRock:(Float, Float) -> Rock;
 
+	// Effect callbacks — set by PlayState
+	public var onBobberLanded:Null<(Float, Float) -> Void> = null;
+	public var onFootstep:Null<(Float, Float) -> Void> = null;
+
 	// Throw state
 	var throwing:Bool = false;
 	var rockSprite:Rock;
@@ -141,6 +145,12 @@ class Player extends FlxSprite {
 		if (throwing && rockSprite == null && frameNumber == 6) {
 			launchRock();
 		}
+		// Footstep dust on foot-plant frames of run animations
+		if (onFootstep != null && StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
+			// Spawn dust at player's feet (center-bottom of hitbox)
+			onFootstep(x + width / 2, y + height);
+		}
+
 		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
 			if (retractHasFish) {
 				// Set up arc retract
@@ -636,6 +646,8 @@ class Player extends FlxSprite {
 					frozen = false;
 					playMovementAnim(true);
 					castState = LANDED;
+					if (onBobberLanded != null)
+						onBobberLanded(castTarget.x + 4, castTarget.y + 4);
 				}
 			case LANDED:
 				if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {

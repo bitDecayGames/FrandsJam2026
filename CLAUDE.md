@@ -120,6 +120,7 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 - Game window: 640x480, 60 FPS
 - Tile size: 16x16 pixels
 - Entity-specific logic (sprites, state machines, input) belongs in the entity class, not PlayState or group managers. Entities receive an `FlxState` reference to manage their own child sprites. Group classes (spawners, etc.) should only handle spawning, iteration, and data pass-through — behavioral decisions belong in the entity. Use callbacks or events to notify other systems (e.g., fish catch → player state change).
+- When positioning sprites, always position by center point using `offset` (i.e. `offset.set(-width/2, -height/2)` or `centerOffsets()`), not by top-left corner origin. The x/y passed in should represent the sprite's center.
 - When making sprites visible, set their position before setting `visible = true` to avoid a one-frame flash at the previous location
 - Use `FlxPoint.get()`/`.put()` for pooled points; call `.put()` when done to return to pool
 

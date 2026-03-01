@@ -25,12 +25,18 @@ import entities.RockGroup;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
+import entities.Bush;
+import entities.CloudShadow;
+import entities.FootDust;
 import entities.Player;
+import entities.Ripple;
 import entities.Shop;
+import entities.WaterSparkle;
 import events.gen.Event;
 import events.EventBus;
 import flixel.FlxG;
 import flixel.addons.transition.FlxTransitionableState;
+import flixel.util.FlxSort;
 import ui.FlashingText;
 import ui.InventoryHUD;
 import ui.ScoreHUD;
@@ -45,9 +51,12 @@ class PlayState extends FlxTransitionableState {
 	var remoteFish:Map<String, WaterFish> = new Map();
 
 	var midGroundGroup = new FlxGroup();
+	var ySortGroup = new FlxGroup();
+	var bushGroup = new FlxTypedGroup<Bush>();
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
+	var dustGroup = new FlxGroup();
 	var shop:Shop;
 	var inventoryHUD:InventoryHUD;
 	var scoreHUD:ScoreHUD;
@@ -55,6 +64,9 @@ class PlayState extends FlxTransitionableState {
 	var hotText:FlashingText;
 
 	var transitions = new FlxTypedGroup<CameraTransition>();
+
+	var waterLayer:ldtk.Layer_IntGrid;
+	var sparkleTimer:Float = 0;
 
 	var ldtk = new LdtkProject();
 
@@ -78,7 +90,7 @@ class PlayState extends FlxTransitionableState {
 		// QLog.error('Example error');
 
 		fishSpawner = new FishSpawner(onFishCaught);
-		rockGroup = new RockGroup();
+		rockGroup = new RockGroup(fishSpawner, this);
 		groundFishGroup = new GroundFishGroup();
 
 		// Build out our render order
@@ -86,7 +98,9 @@ class PlayState extends FlxTransitionableState {
 		add(rockGroup);
 		add(groundFishGroup);
 		add(fishSpawner);
+		add(ySortGroup);
 		add(transitions);
+		add(dustGroup);
 
 		#if !local
 		setupNetwork();
@@ -106,7 +120,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.add(onFishAdded);
-		GameManager.ME.net.onRockSplash.add(onRemoteRockSplash);
+		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
 	}
 
 	function onPlayerJoined(sessionId:String) {
@@ -151,16 +165,6 @@ class PlayState extends FlxTransitionableState {
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
 
-	function onRemoteRockSplash(x:Float, y:Float) {
-		fishSpawner.scareFish(x, y);
-	}
-
-	function onLocalRockSplash(x:Float, y:Float) {
-		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
-		fishSpawner.scareFish(x, y);
-		GameManager.ME.net.sendMessage("rock_splash", {x: x, y: y});
-	}
-
 	function loadLevel(level:String) {
 		unload();
 
@@ -173,7 +177,7 @@ class PlayState extends FlxTransitionableState {
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 		camera.follow(player);
-		add(player);
+		ySortGroup.add(player);
 
 		#if local
 		rockGroup.spawn(level);
@@ -190,8 +194,24 @@ class PlayState extends FlxTransitionableState {
 		#end
 
 		var spawnerLayer = level.fishSpawnerLayer;
-		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock, onLocalRockSplash);
+		waterLayer = spawnerLayer;
+		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
 		groundFishGroup.setWaterLayer(spawnerLayer);
+
+		spawnBushes(spawnerLayer);
+
+		player.onBobberLanded = (bx, by) -> {
+			add(new Ripple(bx, by));
+			FlxG.camera.shake(0.002, 0.1);
+		};
+		player.onFootstep = (fx, fy) -> {
+			for (_ in 0...4)
+				dustGroup.add(new FootDust(fx + FlxG.random.float(-3, 3), fy + FlxG.random.float(-1, 1)));
+		};
+
+		CloudShadow.randomizeWind();
+		for (_ in 0...5)
+			add(new CloudShadow());
 
 		shop = new Shop();
 		shop.spawnRandom(level);
@@ -214,6 +234,26 @@ class PlayState extends FlxTransitionableState {
 		}
 
 		EventBus.fire(new PlayerSpawn(player.x, player.y));
+	}
+
+	function spawnBushes(water:ldtk.Layer_IntGrid) {
+		var bounds = FlxG.worldBounds;
+		var grid = water.gridSize;
+		for (_ in 0...5) {
+			// Try up to 20 times to find a non-water tile
+			for (_ in 0...20) {
+				var bx = FlxG.random.float(bounds.x, bounds.right - 32);
+				var by = FlxG.random.float(bounds.y, bounds.bottom - 32);
+				var tileX = Std.int(bx / grid);
+				var tileY = Std.int(by / grid);
+				if (water.getInt(tileX, tileY) != 1) {
+					var bush = new Bush(bx, by, this);
+					bushGroup.add(bush);
+					ySortGroup.add(bush);
+					break;
+				}
+			}
+		}
 	}
 
 	function unload() {
@@ -254,6 +294,13 @@ class PlayState extends FlxTransitionableState {
 		}
 
 		FlxG.collide(midGroundGroup, player);
+		FlxG.collide(bushGroup, player);
+		FlxG.overlap(bushGroup, player, Bush.onOverlap);
+		ySortGroup.sort((order, a, b) -> {
+			var objA:flixel.FlxObject = cast a;
+			var objB:flixel.FlxObject = cast b;
+			return FlxSort.byValues(order, objA.y + objA.height, objB.y + objB.height);
+		});
 		handleCameraBounds();
 
 		if (player.hotModeActive && !hotText.isFlashing()) {
@@ -270,6 +317,26 @@ class PlayState extends FlxTransitionableState {
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
 		shop.checkInteraction(player);
+
+		updateSparkles(elapsed);
+	}
+
+	function updateSparkles(elapsed:Float) {
+		if (waterLayer == null)
+			return;
+		sparkleTimer -= elapsed;
+		if (sparkleTimer > 0)
+			return;
+		sparkleTimer = FlxG.random.float(0.08, 0.2);
+
+		var wx = FlxG.random.float(camera.scroll.x, camera.scroll.x + camera.width);
+		var wy = FlxG.random.float(camera.scroll.y, camera.scroll.y + camera.height);
+		var grid = waterLayer.gridSize;
+		var tileX = Std.int(wx / grid);
+		var tileY = Std.int(wy / grid);
+		if (waterLayer.getInt(tileX, tileY) == 1) {
+			add(new WaterSparkle(wx, wy));
+		}
 	}
 
 	function handleCameraBounds() {
