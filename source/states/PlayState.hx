@@ -23,6 +23,7 @@ import entities.Rock;
 import entities.GroundFishGroup;
 import entities.Inventory.InventoryItem;
 import entities.RockGroup;
+import entities.WadersPickup;
 import levels.ldtk.BDTilemap;
 import levels.ldtk.Ldtk.Enum_TileTags;
 import levels.ldtk.Level;
@@ -59,6 +60,7 @@ class PlayState extends FlxTransitionableState {
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
+	var wadersPickup:WadersPickup;
 
 	var shop:Shop;
 	var terrainLayer:BDTilemap;
@@ -100,11 +102,13 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner = new FishSpawner(onFishCaught);
 		rockGroup = new RockGroup(fishSpawner, this);
 		groundFishGroup = new GroundFishGroup();
+		wadersPickup = new WadersPickup();
 
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
 		add(groundFishGroup);
+		add(wadersPickup);
 		add(fishSpawner);
 		add(ySortGroup);
 		add(transitions);
@@ -172,7 +176,7 @@ class PlayState extends FlxTransitionableState {
 
 		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y}');
 
-		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true);
+		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true, fishState.fishType);
 		remoteFish.set(fishId, newFish);
 		fishSpawner.add(newFish);
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
@@ -210,11 +214,13 @@ class PlayState extends FlxTransitionableState {
 		#if local
 		rockGroup.spawn(level);
 		fishSpawner.spawn(level);
+		wadersPickup.spawn(level);
 		#else
 		FlxTimer.wait(10, () -> {
 			if (NetworkManager.IS_HOST) {
 				rockGroup.spawn(level);
 				fishSpawner.spawn(level);
+				wadersPickup.spawn(level);
 			} else {
 				QLog.notice('skipping fish spawn');
 			}
@@ -225,7 +231,6 @@ class PlayState extends FlxTransitionableState {
 		waterLayer = spawnerLayer;
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
 		groundFishGroup.setWaterLayer(spawnerLayer);
-
 		#if local
 		spawnBushes(spawnerLayer);
 		#else
@@ -359,9 +364,9 @@ class PlayState extends FlxTransitionableState {
 		midGroundGroup.clear();
 	}
 
-	function onFishCaught(fishId:String, catcherSessionId:String) {
+	function onFishCaught(fishId:String, catcherSessionId:String, fishType:Int) {
 		#if !local
-		GameManager.ME.net.sendFishCaught(fishId, catcherSessionId);
+		GameManager.ME.net.sendFishCaught(fishId, catcherSessionId, fishType);
 		#end
 
 		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
@@ -372,11 +377,11 @@ class PlayState extends FlxTransitionableState {
 				}
 				player.onFishDelivered = null;
 			};
-			player.catchFish(true, catcherSessionId, fishId);
+			player.catchFish(true, catcherSessionId, fishId, fishType);
 		} else {
 			var remote = remotePlayers.get(catcherSessionId);
 			if (remote != null)
-				remote.catchFish(true, catcherSessionId, fishId);
+				remote.catchFish(true, catcherSessionId, fishId, fishType);
 		}
 	}
 
@@ -412,7 +417,7 @@ class PlayState extends FlxTransitionableState {
 			remote.remoteStartCast(x, y, dir);
 	}
 
-	function onRemoteFishCaught(sessionId:String, fishId:String) {
+	function onRemoteFishCaught(sessionId:String, fishId:String, fishType:Int) {
 		// Hide the remote fish sprite — it will fade back in when the host starts moving it again
 		var fish = remoteFish.get(fishId);
 		if (fish != null)
@@ -426,11 +431,11 @@ class PlayState extends FlxTransitionableState {
 				}
 				player.onFishDelivered = null;
 			};
-			player.catchFish(true, sessionId, fishId);
+			player.catchFish(true, sessionId, fishId, fishType);
 		} else {
 			var remote = remotePlayers.get(sessionId);
 			if (remote != null)
-				remote.catchFish(true, sessionId, fishId);
+				remote.catchFish(true, sessionId, fishId, fishType);
 		}
 	}
 
@@ -510,6 +515,7 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner.setBobbers(bobbers);
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
+		wadersPickup.checkPickup(player);
 		if (shop != null) {
 			shop.checkInteraction(player);
 		}

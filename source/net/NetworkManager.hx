@@ -43,7 +43,7 @@ class NetworkManager {
 	public var onShopPlaced = new FlxTypedSignal<Float->Float->Void>(); // x, y
 
 	public var onCastLine = new FlxTypedSignal<String->Float->Float->String->Void>(); // sessionId, x, y, dir
-	public var onFishCaught = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
+	public var onFishCaught = new FlxTypedSignal<String->String->Int->Void>(); // sessionId (catcher), fishId, fishType
 	public var onFishPocketed = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
 	public var onFishBanked = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
 	public var onLinePulled = new FlxTypedSignal<String->Void>(); // sessionId
@@ -169,9 +169,10 @@ class NetworkManager {
 				onCastLine.dispatch(message.sessionId, message.x, message.y, message.dir);
 			});
 
-			room.onMessage("fish_caught", (message) -> {
-				trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId}');
-				onFishCaught.dispatch(message.sessionId, message.fishId);
+			room.onMessage("fish_caught", (message:Dynamic) -> {
+				trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId} fishType:${message.fishType}');
+				var ft:Int = message.fishType != null ? Std.int(message.fishType) : 0;
+				onFishCaught.dispatch(message.sessionId, message.fishId, ft);
 			});
 			room.onMessage("fish_pocketed", (message) -> {
 				trace('[NetMan] fish_pocketed => sessionId:${message.sessionId} fishId:${message.fishId}');
@@ -208,8 +209,8 @@ class NetworkManager {
 		return room != null ? room.state : null;
 	}
 
-	public function sendFishCaught(fishId:String, catcherSessionId:String) {
-		sendMessage("fish_caught", {fishId: fishId, catcherSessionId: catcherSessionId});
+	public function sendFishCaught(fishId:String, catcherSessionId:String, fishType:Int) {
+		sendMessage("fish_caught", {fishId: fishId, catcherSessionId: catcherSessionId, fishType: fishType});
 	}
 
 	public function sendFishPocketed(fishId:String, catcherSessionId:String) {

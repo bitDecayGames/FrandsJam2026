@@ -3,4 +3,5 @@ package schema;
 class FishState extends io.colyseus.serializer.schema.Schema {
 	@:type("float32") public var x:Float = 0;
 	@:type("float32") public var y:Float = 0;
+	@:type("int32") public var fishType:Int = 0;
 }

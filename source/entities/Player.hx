@@ -728,6 +728,7 @@ class Player extends FlxSprite {
 					if (SimpleController.just_pressed(A)) {
 						castState = CHARGING;
 						frozen = true;
+						sendAnimUpdate("stand_" + getDirSuffix(), true);
 						castPower = 0;
 						castPowerDir = 1;
 						var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
@@ -866,7 +867,7 @@ class Player extends FlxSprite {
 		return castState == LANDED && castBobber != null;
 	}
 
-	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null) {
+	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null, fishType:Int = 0) {
 		if (castState == LANDED || castState == CASTING) {
 			if (!isRemote && !hasFish) {
 				GameManager.ME.net.sendLinePulled();
@@ -888,7 +889,7 @@ class Player extends FlxSprite {
 			if (castBobber != null) {
 				castBobber.velocity.set(0, 0);
 				if (hasFish) {
-					caughtFishSpriteIndex = FlxG.random.int(0, 4);
+					caughtFishSpriteIndex = fishType;
 					castBobber.loadGraphic("assets/aseprite/fish.png", true, 32, 32);
 					castBobber.animation.add("fish", [caughtFishSpriteIndex]);
 					castBobber.animation.play("fish");
