@@ -63,7 +63,6 @@ class PlayState extends FlxTransitionableState {
 	var bushGroup = new FlxTypedGroup<Bush>();
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
-	var thrownRockGroup = new FlxTypedGroup<Rock>();
 	var groundFishGroup:GroundFishGroup;
 	var wadersPickup:WadersPickup;
 	var pepperPickup:PepperPickup;
@@ -116,7 +115,6 @@ class PlayState extends FlxTransitionableState {
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
-		add(thrownRockGroup);
 		add(groundFishGroup);
 		add(wadersPickup);
 		add(pepperPickup);
@@ -302,7 +300,7 @@ class PlayState extends FlxTransitionableState {
 		#end
 
 		waterLayer = level.waterGrid;
-		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, addThrownRock, rockGroup.onLocalSplash);
+		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
 		groundFishGroup.setWaterLayer(waterLayer);
 		#if local
 		spawnBushes();
@@ -439,19 +437,6 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
-	function addThrownRock(x:Float, y:Float, big:Bool) {
-		thrownRockGroup.add(new Rock(x, y, big));
-	}
-
-	function checkThrownRockPickup() {
-		FlxG.overlap(player, thrownRockGroup, (p:Player, rock:Rock) -> {
-			if (!p.inventory.isFull()) {
-				p.pickupItem(rock.big ? BigRock : Rock);
-				rock.kill();
-			}
-		});
-	}
-
 	function broadcastWorldItems() {
 		var rocks:Array<{x:Float, y:Float, big:Bool}> = [];
 		for (rock in rockGroup) {
@@ -556,10 +541,6 @@ class PlayState extends FlxTransitionableState {
 		transitions.clear();
 
 		rockGroup.clearAll();
-		for (r in thrownRockGroup) {
-			r.destroy();
-		}
-		thrownRockGroup.clear();
 		groundFishGroup.clearAll();
 		fishSpawner.clearAll();
 
@@ -764,7 +745,6 @@ class PlayState extends FlxTransitionableState {
 		#end
 		fishSpawner.setBobbers(bobbers);
 		rockGroup.checkPickup(player);
-		checkThrownRockPickup();
 		groundFishGroup.checkPickup(player);
 		wadersPickup.checkPickup(player);
 		pepperPickup.checkPickup(player);
