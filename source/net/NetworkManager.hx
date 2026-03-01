@@ -139,49 +139,49 @@ class NetworkManager {
 			});
 
 			cb.onAdd(room.state, "players", (player:PlayerState, sessionId:String) -> {
-				trace('NetworkManager: player added $sessionId');
+				playerDebugTrace('NetworkManager: player added $sessionId');
 				if (sessionId == mySessionId) {
 					return;
 				}
 				onPlayerAdded.dispatch(sessionId, {state: player});
 
 				cb.listen(player, "x", (_, prevX:Float) -> {
-					trace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');
+					playerDebugTrace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');
 					onPlayerChanged.dispatch(sessionId, {state: player, prevX: prevX});
 				});
 				cb.listen(player, "y", (_, prevY:Float) -> {
-					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
 				});
 				cb.listen(player, "velocityX", (_, prevY:Float) -> {
-					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player});
 				});
 				cb.listen(player, "velocitY", (_, prevY:Float) -> {
-					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player});
 				});
 
 				cb.listen(player, "name", (_, _) -> {
-					trace('NetMan: sesh: ${sessionId} name: ${player.name}');
+					playerDebugTrace('NetMan: sesh: ${sessionId} name: ${player.name}');
 					onPlayerNameChanged.dispatch(sessionId, player.name);
 				});
 				cb.listen(player, "skinIndex", (_, _) -> {
-					trace('NetMan: sesh: ${sessionId} skinIndex: ${player.skinIndex}');
+					playerDebugTrace('NetMan: sesh: ${sessionId} skinIndex: ${player.skinIndex}');
 					onSkinChanged.dispatch(sessionId, player.skinIndex);
 				});
 				cb.listen(player, "ready", (_, _) -> {
-					trace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
+					playerDebugTrace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
 					onPlayerReadyChanged.dispatch(sessionId, player.ready);
 				});
 				cb.listen(player, "score", (_, _) -> {
-					trace('NetMan: sesh: ${sessionId} score: ${player.score}');
+					playerDebugTrace('NetMan: sesh: ${sessionId} score: ${player.score}');
 					onScoreChanged.dispatch(sessionId, player.score);
 				});
 			});
 
 			cb.onRemove(room.state, "players", (player:PlayerState, sessionId:String) -> {
-				trace('NetworkManager: player removed $sessionId');
+				playerDebugTrace('NetworkManager: player removed $sessionId');
 				if (sessionId == mySessionId) {
 					return;
 				}
@@ -311,6 +311,12 @@ class NetworkManager {
 	public function update() {
 		#if sys
 		// colyseus-hx polls internally via the connection thread; no manual recv needed
+		#end
+	}
+
+	private function playerDebugTrace(value:Dynamic, ?params:Array<Dynamic>) {
+		#if playerDebugTrace
+		trace(value, params);
 		#end
 	}
 }
