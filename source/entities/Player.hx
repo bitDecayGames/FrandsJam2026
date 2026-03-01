@@ -386,11 +386,6 @@ class Player extends FlxSprite {
 				lastInputDir = inputDir;
 			}
 
-			if (FlxG.keys.justPressed.T && !hotModeActive) {
-				hotModeActive = true;
-				hotModeTimer = 3.0;
-			}
-
 			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
 			if (hotModeActive) {
 				hotModeTimer -= delta;
@@ -943,6 +938,13 @@ class Player extends FlxSprite {
 		loadSkin(SKINS[skinIndex]);
 		if (animName != null) {
 			animation.play(animName, false, false, animFrame);
+		}
+	}
+
+	public function activateHotMode() {
+		if (!hotModeActive) {
+			hotModeActive = true;
+			hotModeTimer = 3.0;
 		}
 	}
 

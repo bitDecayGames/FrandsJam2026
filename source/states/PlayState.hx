@@ -23,6 +23,7 @@ import entities.Rock;
 import entities.GroundFishGroup;
 import entities.Inventory.InventoryItem;
 import entities.RockGroup;
+import entities.PepperPickup;
 import entities.WadersPickup;
 import levels.ldtk.BDTilemap;
 import levels.ldtk.Ldtk.Enum_TileTags;
@@ -61,6 +62,7 @@ class PlayState extends FlxTransitionableState {
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
 	var wadersPickup:WadersPickup;
+	var pepperPickup:PepperPickup;
 
 	var shop:Shop;
 	var terrainLayer:BDTilemap;
@@ -103,12 +105,14 @@ class PlayState extends FlxTransitionableState {
 		rockGroup = new RockGroup(fishSpawner, this);
 		groundFishGroup = new GroundFishGroup();
 		wadersPickup = new WadersPickup();
+		pepperPickup = new PepperPickup();
 
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
 		add(groundFishGroup);
 		add(wadersPickup);
+		add(pepperPickup);
 		add(fishSpawner);
 		add(ySortGroup);
 		add(transitions);
@@ -212,17 +216,13 @@ class PlayState extends FlxTransitionableState {
 		}
 
 		#if local
-		rockGroup.spawn(level);
-		fishSpawner.spawn(level);
-		wadersPickup.spawn(level);
+		spawnWorldItems(level);
 		#else
 		FlxTimer.wait(10, () -> {
 			if (NetworkManager.IS_HOST) {
-				rockGroup.spawn(level);
-				fishSpawner.spawn(level);
-				wadersPickup.spawn(level);
+				spawnWorldItems(level);
 			} else {
-				QLog.notice('skipping fish spawn');
+				QLog.notice('skipping spawn');
 			}
 		});
 		#end
@@ -313,6 +313,13 @@ class PlayState extends FlxTransitionableState {
 			return "grass";
 		}
 		return "";
+	}
+
+	function spawnWorldItems(level:Level) {
+		rockGroup.spawn(level);
+		fishSpawner.spawn(level);
+		wadersPickup.spawn(level);
+		pepperPickup.spawn(level);
 	}
 
 	function spawnBushes(water:ldtk.Layer_IntGrid) {
@@ -516,6 +523,7 @@ class PlayState extends FlxTransitionableState {
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
 		wadersPickup.checkPickup(player);
+		pepperPickup.checkPickup(player);
 		if (shop != null) {
 			shop.checkInteraction(player);
 		}
