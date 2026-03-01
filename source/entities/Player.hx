@@ -76,6 +76,11 @@ class Player extends FlxSprite {
 		if (inShallowWater) {
 			if (hotModeActive && inventory.hasWaders()) {
 				hotModeActive = false;
+				#if !local
+				if (!isRemote) {
+					GameManager.ME.net.sendHotPepper(false);
+				}
+				#end
 			}
 			offset.y -= SHALLOW_WATER_OFFSET;
 			clipRect = flixel.math.FlxRect.get(0, 0, 48, 28);
@@ -442,6 +447,59 @@ class Player extends FlxSprite {
 		updateFishingLine();
 		updateRock(delta);
 
+		// Hot mode timer and butt fire — run for both local and remote players
+		if (hotModeActive) {
+			hotModeTimer -= delta;
+			if (hotModeTimer <= 0) {
+				hotModeActive = false;
+				#if !local
+				if (!isRemote) {
+					GameManager.ME.net.sendHotPepper(false);
+				}
+				#end
+			} else {
+				fireEmitTimer += delta;
+				if (fireEmitTimer >= 0.03) {
+					fireEmitTimer = 0;
+					// Use the visual sprite center (not hitbox center, which is at the feet)
+					var cx = x - offset.x + frameWidth / 2;
+					var cy = y - offset.y + frameHeight / 2;
+					var dirX:Float = 0;
+					var dirY:Float = 0;
+					// Offset fire origin to the player's butt. Left/right/up views
+					// need cy -= 4 to align with the butt rather than the feet.
+					switch (lastInputDir) {
+						case N:
+							cy += 2;
+							dirY = 1;
+						case S:
+							cy -= 2;
+							dirY = -1;
+						case W:
+							cx += 6;
+							dirX = 1;
+						case E:
+							cx -= 6;
+							dirX = -1;
+						default:
+							cy += 2;
+							dirY = 1;
+					}
+					for (_ in 0...3) {
+						var fire = new ButtFire(cx + FlxG.random.float(-2, 2), cy + FlxG.random.float(-1, 1), dirX, dirY);
+						var effectsTarget:FlxGroup = groundEffectsGroup != null ? groundEffectsGroup : null;
+						if (effectsTarget != null) {
+							effectsTarget.add(fire);
+						} else {
+							state.add(fire);
+						}
+					}
+				}
+			}
+		} else {
+			fireEmitTimer = 0;
+		}
+
 		if (isRemote) {
 			updateRemoteInterpolation();
 			return;
@@ -464,18 +522,11 @@ class Player extends FlxSprite {
 			}
 
 			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
+			// Timer already ticked in the shared hot mode block above; just apply the velocity boost
 			if (hotModeActive) {
-				hotModeTimer -= delta;
-				if (hotModeTimer <= 0) {
-					hotModeActive = false;
-					if (inputDir == NONE) {
-						velocity.set();
-					}
-				} else {
-					var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
-					if (moveDir != NONE) {
-						moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
-					}
+				var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
+				if (moveDir != NONE) {
+					moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
 				}
 			} else {
 				if (inputDir != NONE) {
@@ -484,49 +535,6 @@ class Player extends FlxSprite {
 					velocity.set();
 				}
 			}
-		}
-
-		// Butt fire particles during hot mode
-		if (hotModeActive) {
-			fireEmitTimer += delta;
-			if (fireEmitTimer >= 0.03) {
-				fireEmitTimer = 0;
-				// Use the visual sprite center (not hitbox center, which is at the feet)
-				var cx = x - offset.x + frameWidth / 2;
-				var cy = y - offset.y + frameHeight / 2;
-				var dirX:Float = 0;
-				var dirY:Float = 0;
-				// Offset fire origin to the player's butt. Left/right/up views
-				// need cy -= 4 to align with the butt rather than the feet.
-				switch (lastInputDir) {
-					case N:
-						cy += 2;
-						dirY = 1;
-					case S:
-						cy -= 2;
-						dirY = -1;
-					case W:
-						cx += 6;
-						dirX = 1;
-					case E:
-						cx -= 6;
-						dirX = -1;
-					default:
-						cy += 2;
-						dirY = 1;
-				}
-				for (_ in 0...3) {
-					var fire = new ButtFire(cx + FlxG.random.float(-2, 2), cy + FlxG.random.float(-1, 1), dirX, dirY);
-					var effectsTarget:FlxGroup = groundEffectsGroup != null ? groundEffectsGroup : null;
-					if (effectsTarget != null) {
-						effectsTarget.add(fire);
-					} else {
-						state.add(fire);
-					}
-				}
-			}
-		} else {
-			fireEmitTimer = 0;
 		}
 
 		// Only update movement animations when fully idle (not casting, catching, or throwing)
@@ -1089,7 +1097,16 @@ class Player extends FlxSprite {
 		if (!hotModeActive) {
 			hotModeActive = true;
 			hotModeTimer = 3.0;
+			#if !local
+			if (!isRemote) {
+				GameManager.ME.net.sendHotPepper(true);
+			}
+			#end
 		}
+	}
+
+	public function deactivateHotMode() {
+		hotModeActive = false;
 	}
 
 	public function pickupItem(item:InventoryItem):Bool {

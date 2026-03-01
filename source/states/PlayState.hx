@@ -160,6 +160,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
 		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
+		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 	}
 
@@ -177,6 +178,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
 		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
+		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -534,6 +536,18 @@ class PlayState extends FlxTransitionableState {
 			if (bush != null && bush.alive) {
 				bush.rustleFrom(dirX, dirY);
 			}
+		}
+	}
+
+	function onRemoteHotPepper(sessionId:String, isStart:Bool) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote == null) {
+			return;
+		}
+		if (isStart) {
+			remote.activateHotMode();
+		} else {
+			remote.deactivateHotMode();
 		}
 	}
 

@@ -62,6 +62,7 @@ class NetworkManager {
 	public var onWorldItems = new FlxTypedSignal<Dynamic->Void>();
 	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
 	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
+	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
 
 	public static inline var roomName:String = "game_room";
 
@@ -275,6 +276,11 @@ class NetworkManager {
 				onWormKilled.dispatch(message.sessionId);
 			});
 
+			room.onMessage("hot_pepper", (message:Dynamic) -> {
+				trace('[NetMan] hot_pepper => sessionId:${message.sessionId} isStart:${message.isStart}');
+				onHotPepper.dispatch(message.sessionId, message.isStart == true);
+			});
+
 			room.onMessage("spawn_locations", (message:Dynamic) -> {
 				trace('[NetMan] spawn_locations received');
 				onSpawnLocations.dispatch(message);
@@ -320,6 +326,10 @@ class NetworkManager {
 
 	public function sendItemPickup(itemType:String, index:Int) {
 		sendMessage("item_pickup", {itemType: itemType, index: index});
+	}
+
+	public function sendHotPepper(isStart:Bool) {
+		sendMessage("hot_pepper", {isStart: isStart});
 	}
 
 	public function sendWeedBurst(index:Int) {

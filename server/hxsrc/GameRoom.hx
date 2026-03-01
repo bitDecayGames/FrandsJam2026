@@ -131,6 +131,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("worm_killed", {sessionId: client.sessionId}, {except: client});
 		});
 
+		// sent when a player activates or deactivates hot pepper mode
+		onMessage("hot_pepper", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "hot_pepper": isStart=${data.isStart}');
+			broadcast("hot_pepper", {sessionId: client.sessionId, isStart: data.isStart}, {except: client});
+		});
+
 		// sent when a player sells a fish — broadcast to other clients so they can track it
 		onMessage("fish_sold", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_sold" message: fishType=${data.fishType} lengthCm=${data.lengthCm} value=${data.value}');
