@@ -55,6 +55,7 @@ class NetworkManager {
 	public var onSkinChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, skinIndex
 	public var onPlayerReadyChanged = new FlxTypedSignal<String->Bool->Void>(); // sessionId, ready
 	public var onScoreChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, score
+	public var onFishSold = new FlxTypedSignal<String->Int->Int->Int->Void>(); // sessionId, fishType, lengthCm, value
 
 	public static inline var roomName:String = "game_room";
 
@@ -236,6 +237,11 @@ class NetworkManager {
 				var dest = FlxPoint.get(message.targetX, message.targetY);
 				onThrowRock.dispatch(message.sessionId, dest, message.big, message.dir);
 				dest.put();
+			});
+
+			room.onMessage("fish_sold", (message:Dynamic) -> {
+				trace('[NetMan] fish_sold => sessionId:${message.sessionId} fishType:${message.fishType} lengthCm:${message.lengthCm} value:${message.value}');
+				onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
 			});
 		});
 	}

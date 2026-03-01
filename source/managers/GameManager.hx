@@ -16,6 +16,12 @@ import states.PreRoundState;
 import states.LobbyState;
 import flixel.FlxG;
 
+typedef SoldFishEntry = {
+	fishType:Int,
+	lengthCm:Int,
+	value:Int
+};
+
 class GameManager {
 	public static var ME:GameManager;
 
@@ -34,6 +40,8 @@ class GameManager {
 	public var skins = new Map<String, Int>(); // sessionId -> skinIndex
 	public var readyStates = new Map<String, Bool>(); // sessionId -> ready
 	public var scores = new Map<String, Int>(); // sessionId -> score
+	// soldFish: round -> sessionId -> Array<SoldFishEntry>
+	public var soldFish:Array<Map<String, Array<SoldFishEntry>>> = [];
 	public var mySessionId = "";
 	public var mySkinIndex:Int = -1; // -1 means no skin selected
 
@@ -50,6 +58,7 @@ class GameManager {
 		net.onSkinChanged.add(onSkinChanged);
 		net.onPlayerReadyChanged.add(onPlayerReadyChanged);
 		net.onScoreChanged.add(onScoreChanged);
+		net.onFishSold.add(onFishSold);
 		net.onHostChanged.add(onHostChange);
 	}
 
@@ -101,6 +110,40 @@ class GameManager {
 
 	private function onScoreChanged(sessionId:String, score:Int) {
 		scores.set(sessionId, score);
+	}
+
+	private function onFishSold(sessionId:String, fishType:Int, lengthCm:Int, value:Int) {
+		recordSoldFish(sessionId, {fishType: fishType, lengthCm: lengthCm, value: value});
+	}
+
+	/** Record a sold fish for the current round. */
+	public function recordSoldFish(sessionId:String, entry:SoldFishEntry) {
+		// Ensure the soldFish array has an entry for the current round
+		while (soldFish.length <= currentRoundNumber) {
+			soldFish.push(new Map<String, Array<SoldFishEntry>>());
+		}
+		var roundMap = soldFish[currentRoundNumber];
+		if (!roundMap.exists(sessionId)) {
+			roundMap.set(sessionId, []);
+		}
+		roundMap.get(sessionId).push(entry);
+	}
+
+	/** Get sold fish for a specific round and session. */
+	public function getSoldFish(roundNum:Int, sessionId:String):Array<SoldFishEntry> {
+		if (roundNum < 0 || roundNum >= soldFish.length) {
+			return [];
+		}
+		var roundMap = soldFish[roundNum];
+		if (!roundMap.exists(sessionId)) {
+			return [];
+		}
+		return roundMap.get(sessionId);
+	}
+
+	/** Get the current round number (0-indexed). */
+	public function getCurrentRoundNumber():Int {
+		return currentRoundNumber;
 	}
 
 	private function onPlayerAdded(sessionId:String, data:PlayerUpdateData) {
