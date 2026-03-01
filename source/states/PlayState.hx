@@ -301,6 +301,9 @@ class PlayState extends FlxTransitionableState {
 
 		waterLayer = level.waterGrid;
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		for (_ => remote in remotePlayers) {
+			remote.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onRemoteSplash);
+		}
 		groundFishGroup.setWaterLayer(waterLayer);
 		#if local
 		spawnBushes();
