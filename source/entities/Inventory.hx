@@ -9,10 +9,11 @@ class Inventory {
 	public var onChange = new FlxSignal();
 
 	public function new() {
-		#if rocks
-		for (_ in 0...MAX_SLOTS) {
-			items.push(Rock);
-		}
+		#if rock
+		items.push(Rock);
+		#end
+		#if bigrock
+		items.push(BigRock);
 		#end
 		#if waders
 		items.push(Waders);
@@ -75,6 +76,7 @@ class Inventory {
 	static function matchesItem(a:InventoryItem, b:InventoryItem):Bool {
 		return switch [a, b] {
 			case [Rock, Rock]: true;
+			case [BigRock, BigRock]: true;
 			case [Fish(_), Fish(_)]: true;
 			case [Waders, Waders]: true;
 			default: false;
@@ -84,6 +86,7 @@ class Inventory {
 
 enum InventoryItem {
 	Rock;
+	BigRock;
 	Fish(fishSpriteIndex:Int);
 	Waders;
 }

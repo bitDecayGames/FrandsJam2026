@@ -218,7 +218,7 @@ class PlayState extends FlxTransitionableState {
 
 		var spawnerLayer = level.fishSpawnerLayer;
 		waterLayer = spawnerLayer;
-		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
 		groundFishGroup.setWaterLayer(spawnerLayer);
 
 		spawnBushes(spawnerLayer);

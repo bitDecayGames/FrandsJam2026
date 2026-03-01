@@ -101,7 +101,7 @@ class Player extends FlxSprite {
 	var powerBarFill:FlxSprite;
 
 	// Factory for creating thrown rocks — set by PlayState
-	public var makeRock:(Float, Float) -> Rock;
+	public var makeRock:(Float, Float, Bool) -> Rock;
 
 	// Effect callbacks — set by PlayState
 	public var onBobberLanded:Null<(Float, Float) -> Void> = null;
@@ -109,6 +109,7 @@ class Player extends FlxSprite {
 
 	// Throw state
 	var throwing:Bool = false;
+	var throwingBigRock:Bool = false;
 	var rockSprite:Rock;
 	var rockTarget:FlxPoint;
 	var rockStartPos:FlxPoint;
@@ -346,9 +347,15 @@ class Player extends FlxSprite {
 			playMovementAnim();
 		}
 
-		// Throw rock with B button (requires a rock in inventory)
-		if (!throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(Rock)) {
-			inventory.remove(Rock);
+		// Throw rock with B button (prefers big rock, falls back to small)
+		if (!throwing && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
+			if (inventory.has(BigRock)) {
+				inventory.remove(BigRock);
+				throwingBigRock = true;
+			} else {
+				inventory.remove(Rock);
+				throwingBigRock = false;
+			}
 			throwing = true;
 			frozen = true;
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
@@ -522,7 +529,7 @@ class Player extends FlxSprite {
 
 	function launchRock() {
 		var rockWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
-		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8 + rockWy) else new Rock(x + 4, y - 8 + rockWy);
+		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8 + rockWy, throwingBigRock) else new Rock(x + 4, y - 8 + rockWy, throwingBigRock);
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;
