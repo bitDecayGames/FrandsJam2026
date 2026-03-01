@@ -32,3 +32,6 @@ dump/
 /scratch/
 .playwright-mcp/
 .Trash
+
+# claude
+.claude/settings.local.json

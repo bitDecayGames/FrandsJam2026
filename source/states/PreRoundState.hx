@@ -1,5 +1,8 @@
 package states;
 
+import schema.RoundState;
+import managers.GameManager;
+import net.NetworkManager;
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.FlxG;
 import flixel.text.FlxText;
@@ -10,7 +13,7 @@ import ui.MenuBuilder;
 
 using states.FlxStateExt;
 
-class VictoryState extends FlxTransitionableState {
+class PreRoundState extends FlxTransitionableState {
 	var _btnDone:FlxButton;
 
 	var _txtTitle:FlxText;
@@ -23,14 +26,16 @@ class VictoryState extends FlxTransitionableState {
 		_txtTitle.setPosition(FlxG.width / 2, FlxG.height / 4);
 		_txtTitle.size = 40;
 		_txtTitle.alignment = FlxTextAlign.CENTER;
-		_txtTitle.text = "Victory!";
+		_txtTitle.text = "Pre Round";
 
 		add(_txtTitle);
 
-		_btnDone = MenuBuilder.createTextButton("Main Menu", clickMainMenu);
+		_btnDone = MenuBuilder.createTextButton("Ready", clickReady);
 		_btnDone.setPosition(FlxG.width / 2 - _btnDone.width / 2, FlxG.height - _btnDone.height - 40);
 		_btnDone.updateHitbox();
 		add(_btnDone);
+
+		GameManager.ME.setStatus(RoundState.STATUS_PRE_ROUND);
 	}
 
 	override public function update(elapsed:Float):Void {
@@ -38,8 +43,8 @@ class VictoryState extends FlxTransitionableState {
 		_txtTitle.x = FlxG.width / 2 - _txtTitle.width / 2;
 	}
 
-	function clickMainMenu():Void {
-		FlxFmod.switchState(MainMenuState.new);
+	function clickReady():Void {
+		GameManager.ME.net.sendMessage("player_ready", true);
 	}
 
 	override public function onFocusLost() {
