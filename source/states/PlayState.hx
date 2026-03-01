@@ -241,7 +241,7 @@ class PlayState extends FlxTransitionableState {
 
 		shop = new Shop();
 		shop.spawnRandom(level);
-		add(shop);
+		ySortGroup.add(shop);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -383,6 +383,7 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 		FlxG.collide(bushGroup, player, Bush.onCollide);
+		FlxG.collide(shop, player, Shop.onCollide);
 
 		if (player.inventory.hasWaders() && terrainLayer != null) {
 			player.inShallowWater = terrainLayer.isFullyInTaggedArea(player, [SHALLOW, SOLID]);

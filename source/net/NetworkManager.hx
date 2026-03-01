@@ -95,11 +95,6 @@ class NetworkManager {
 				onPlayersReady.dispatch();
 			});
 
-			cb.listen("ready", (round:RoundState) -> {
-				trace('RoundState: ${round}');
-				onRoundUpdate.dispatch(round);
-			});
-
 			cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
 				trace('NetworkManager: fish added ${id}');
 				onFishAdded.dispatch(id, fish);

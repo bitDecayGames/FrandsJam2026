@@ -2,6 +2,7 @@ package managers;
 
 import goals.PersonalFishCountGoal;
 import goals.TimedGoal;
+import goals.KeypressGoal;
 import flixel.util.FlxTimer;
 import schema.RoundState;
 import net.NetworkManager;
@@ -90,10 +91,11 @@ class GameManager {
 			case RoundState.STATUS_LOBBY:
 				if (NetworkManager.IS_HOST) {
 					init([
-						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
-						new Round([new TimedGoal(3), new PersonalFishCountGoal(3)]),
-						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
+						new Round([new TimedGoal(), new PersonalFishCountGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishCountGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishCountGoal(3), new KeypressGoal()]),
 					]);
+					// needs to force this back to 0
 					nextRoundNumber = currentRoundNumber;
 				}
 				nextStatus = RoundState.STATUS_PRE_ROUND;
@@ -102,7 +104,6 @@ class GameManager {
 			case RoundState.STATUS_ACTIVE:
 				nextStatus = RoundState.STATUS_POST_ROUND;
 			case RoundState.STATUS_POST_ROUND:
-				trace('current round ${currentRoundNumber} -> ${currentRoundNumber + 1} / ${totalRounds}');
 				nextRoundNumber = currentRoundNumber + 1;
 				if (nextRoundNumber >= totalRounds) {
 					setStatus(RoundState.STATUS_END_GAME, nextRoundNumber);
@@ -117,6 +118,7 @@ class GameManager {
 			default:
 				throw 'invalid round status: ${roundStatus}';
 		}
+		trace('players ready: ${roundStatus} -> ${nextStatus}');
 		setStatus(nextStatus, nextRoundNumber);
 		if (rounds != null && rounds.length > 0) {
 			setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
@@ -150,8 +152,8 @@ class GameManager {
 	}
 
 	public function setStatus(status:String, ?currentRound:Int = -1) {
+		roundStatus = status;
 		if (NetworkManager.IS_HOST) {
-			roundStatus = status;
 			if (currentRound >= 0 && currentRound != currentRoundNumber) {
 				trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRoundNumber}');
 				currentRoundNumber = currentRound;
@@ -174,7 +176,11 @@ class GameManager {
 			case RoundState.STATUS_LOBBY:
 				FlxG.switchState(() -> new LobbyState());
 			case RoundState.STATUS_PRE_ROUND:
-				FlxG.switchState(() -> new PreRoundState());
+				trace('scooby doo 1');
+				FlxG.switchState(() -> {
+					trace('scooby doo 2');
+					return new PreRoundState();
+				});
 			case RoundState.STATUS_ACTIVE:
 				FlxG.switchState(() -> new PlayState(round));
 			case RoundState.STATUS_POST_ROUND:

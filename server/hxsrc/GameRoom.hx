@@ -73,18 +73,26 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		onMessage("round_update", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "round_update" message: ${Json.stringify(data)}');
 			if (data != null) {
+				var newData = new RoundState();
+				newData.status = state.round.status;
+				newData.currentRound = state.round.currentRound;
+				newData.totalRounds = state.round.totalRounds;
+
 				if (data.status != null) {
-					state.round.status = data.status;
+					trace('update round status: ${state.round.status} -> ${data.status}');
+					newData.status = data.status;
+
 					for (sId => pp in state.players) {
 						pp.ready = false;
 					}
 				}
 				if (data.currentRound != null) {
-					state.round.currentRound = data.currentRound;
+					newData.currentRound = data.currentRound;
 				}
 				if (data.totalRounds != null) {
-					state.round.totalRounds = data.totalRounds;
+					newData.totalRounds = data.totalRounds;
 				}
+				state.round = newData;
 			}
 		});
 
