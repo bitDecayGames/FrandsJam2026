@@ -186,23 +186,24 @@ class WaterFish extends FlxSprite {
 
 		if (pauseTimer > 0) {
 			pauseTimer -= elapsed;
+			return;
+		}
+
+		retargetTimer -= elapsed;
+		if (retargetTimer <= 0) {
+			pickTarget();
+		}
+
+		var dx = target.x - x;
+		var dy = target.y - y;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+
+		if (dist < ARRIVE_DIST) {
+			velocity.set(0, 0);
+			pauseTimer = FlxG.random.float(1, 3);
+			pickTarget();
 		} else {
-			retargetTimer -= elapsed;
-			if (retargetTimer <= 0) {
-				pickTarget();
-			}
-
-			var dx = target.x - x;
-			var dy = target.y - y;
-			var dist = Math.sqrt(dx * dx + dy * dy);
-
-			if (dist < ARRIVE_DIST) {
-				velocity.set(0, 0);
-				pauseTimer = FlxG.random.float(1, 3);
-				pickTarget();
-			} else {
-				velocity.set((dx / dist) * SPEED, (dy / dist) * SPEED);
-			}
+			velocity.set((dx / dist) * SPEED, (dy / dist) * SPEED);
 		}
 
 		GameManager.ME.net.sendMessage("fish_move", {id: fishId, x: x, y: y}, true);
