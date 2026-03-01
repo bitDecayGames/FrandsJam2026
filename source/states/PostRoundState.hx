@@ -222,7 +222,7 @@ class PostRoundState extends FlxTransitionableState {
 			var weedText = new FlxText();
 			weedText.size = 10;
 			weedText.color = FlxColor.fromRGB(180, 180, 180);
-			weedText.text = 'Most Weeds: $name ($bestWeedCount)';
+			weedText.text = 'Weed crusher: $name ($bestWeedCount)';
 			weedText.setPosition(10, statY);
 			add(weedText);
 			statY += 14;
@@ -246,7 +246,7 @@ class PostRoundState extends FlxTransitionableState {
 			var wormText = new FlxText();
 			wormText.size = 10;
 			wormText.color = FlxColor.fromRGB(180, 180, 180);
-			wormText.text = 'Most Worms: $name ($bestWormCount)';
+			wormText.text = 'Worm murderer: $name ($bestWormCount)';
 			wormText.setPosition(10, statY);
 			add(wormText);
 		}

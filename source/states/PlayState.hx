@@ -63,6 +63,7 @@ class PlayState extends FlxTransitionableState {
 	var bushGroup = new FlxTypedGroup<Bush>();
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
+	var thrownRockGroup = new FlxTypedGroup<Rock>();
 	var groundFishGroup:GroundFishGroup;
 	var wadersPickup:WadersPickup;
 	var pepperPickup:PepperPickup;
@@ -115,6 +116,7 @@ class PlayState extends FlxTransitionableState {
 		// Build out our render order
 		add(midGroundGroup);
 		add(rockGroup);
+		add(thrownRockGroup);
 		add(groundFishGroup);
 		add(wadersPickup);
 		add(pepperPickup);
@@ -159,6 +161,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onWorldItems.remove(onRemoteWorldItems);
 		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
+		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 	}
 
@@ -175,6 +178,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onWorldItems.add(onRemoteWorldItems);
 		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
+		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -298,7 +302,7 @@ class PlayState extends FlxTransitionableState {
 		#end
 
 		waterLayer = level.waterGrid;
-		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, addThrownRock, rockGroup.onLocalSplash);
 		groundFishGroup.setWaterLayer(waterLayer);
 		#if local
 		spawnBushes();
@@ -435,6 +439,19 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	function addThrownRock(x:Float, y:Float, big:Bool) {
+		thrownRockGroup.add(new Rock(x, y, big));
+	}
+
+	function checkThrownRockPickup() {
+		FlxG.overlap(player, thrownRockGroup, (p:Player, rock:Rock) -> {
+			if (!p.inventory.isFull()) {
+				p.pickupItem(rock.big ? BigRock : Rock);
+				rock.kill();
+			}
+		});
+	}
+
 	function broadcastWorldItems() {
 		var rocks:Array<{x:Float, y:Float, big:Bool}> = [];
 		for (rock in rockGroup) {
@@ -523,6 +540,15 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.recordWeedKill(sessionId);
 	}
 
+	function onRemoteBushRustle(index:Int, dirX:Float, dirY:Float) {
+		if (index >= 0 && index < bushGroup.members.length) {
+			var bush = bushGroup.members[index];
+			if (bush != null && bush.alive) {
+				bush.rustleFrom(dirX, dirY);
+			}
+		}
+	}
+
 	function unload() {
 		for (t in transitions) {
 			t.destroy();
@@ -530,6 +556,10 @@ class PlayState extends FlxTransitionableState {
 		transitions.clear();
 
 		rockGroup.clearAll();
+		for (r in thrownRockGroup) {
+			r.destroy();
+		}
+		thrownRockGroup.clear();
 		groundFishGroup.clearAll();
 		fishSpawner.clearAll();
 
@@ -673,7 +703,16 @@ class PlayState extends FlxTransitionableState {
 		}
 
 		FlxG.collide(midGroundGroup, player);
-		FlxG.collide(bushGroup, player, Bush.onCollide);
+		FlxG.collide(bushGroup, player, (bush:Bush, p:Player) -> {
+			var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
+			var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
+			var dist = Math.sqrt(dx * dx + dy * dy);
+			var dirX = dist > 0 ? dx / dist : 1.0;
+			var dirY = dist > 0 ? dy / dist : 0.0;
+			bush.rustleFrom(dirX, dirY);
+			var index = bushGroup.members.indexOf(bush);
+			GameManager.ME.net.sendBushRustle(index, dirX, dirY);
+		});
 		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
 			var index = weedGroup.members.indexOf(weed);
 			weed.burst();
@@ -725,6 +764,7 @@ class PlayState extends FlxTransitionableState {
 		#end
 		fishSpawner.setBobbers(bobbers);
 		rockGroup.checkPickup(player);
+		checkThrownRockPickup();
 		groundFishGroup.checkPickup(player);
 		wadersPickup.checkPickup(player);
 		pepperPickup.checkPickup(player);

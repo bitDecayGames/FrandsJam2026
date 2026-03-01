@@ -61,6 +61,7 @@ class NetworkManager {
 	public var onWormKilled = new FlxTypedSignal<String->Void>(); // sessionId
 	public var onWorldItems = new FlxTypedSignal<Dynamic->Void>();
 	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
+	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
 
 	public static inline var roomName:String = "game_room";
 
@@ -264,6 +265,11 @@ class NetworkManager {
 				onItemPickup.dispatch(message.sessionId, message.itemType, Std.int(message.index));
 			});
 
+			room.onMessage("bush_rustle", (message:Dynamic) -> {
+				trace('[NetMan] bush_rustle => index:${message.index} dir:(${message.dirX},${message.dirY})');
+				onBushRustle.dispatch(Std.int(message.index), message.dirX, message.dirY);
+			});
+
 			room.onMessage("worm_killed", (message:Dynamic) -> {
 				trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
 				onWormKilled.dispatch(message.sessionId);
@@ -318,6 +324,10 @@ class NetworkManager {
 
 	public function sendWeedBurst(index:Int) {
 		sendMessage("weed_burst", {index: index});
+	}
+
+	public function sendBushRustle(index:Int, dirX:Float, dirY:Float) {
+		sendMessage("bush_rustle", {index: index, dirX: dirX, dirY: dirY});
 	}
 
 	public function sendMove(x:Float, y:Float, velocityX:Float, velocityY:Float) {

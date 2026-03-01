@@ -119,6 +119,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("weed_burst", {sessionId: client.sessionId, index: data.index}, {except: client});
 		});
 
+		// sent when a player walks into a bush
+		onMessage("bush_rustle", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "bush_rustle": index=${data.index}');
+			broadcast("bush_rustle", {index: data.index, dirX: data.dirX, dirY: data.dirY}, {except: client});
+		});
+
 		// sent when a player kills a worm
 		onMessage("worm_killed", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "worm_killed"');
