@@ -156,6 +156,7 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onLocalRockSplash(x:Float, y:Float) {
+		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
 		fishSpawner.scareFish(x, y);
 		GameManager.ME.net.sendMessage("rock_splash", {x: x, y: y});
 	}
@@ -165,7 +166,7 @@ class PlayState extends FlxTransitionableState {
 
 		var level = new Level(level);
 		if (level.songEvent != "") {
-			FmodManager.PlaySong(level.songEvent);
+			// FmodManager.PlaySong(level.songEvent);
 		}
 		midGroundGroup.add(level.terrainLayer);
 		FlxG.worldBounds.copyFrom(level.terrainLayer.getBounds());
