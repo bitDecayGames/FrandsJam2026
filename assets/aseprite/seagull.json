@@ -1,0 +1,65 @@
+{ "frames": [
+   {
+    "filename": "seagull 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 24, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 24 },
+    "sourceSize": { "w": 24, "h": 24 },
+    "duration": 100
+   },
+   {
+    "filename": "seagull 1.aseprite",
+    "frame": { "x": 24, "y": 0, "w": 24, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 24 },
+    "sourceSize": { "w": 24, "h": 24 },
+    "duration": 100
+   },
+   {
+    "filename": "seagull 2.aseprite",
+    "frame": { "x": 48, "y": 0, "w": 24, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 24 },
+    "sourceSize": { "w": 24, "h": 24 },
+    "duration": 100
+   },
+   {
+    "filename": "seagull 3.aseprite",
+    "frame": { "x": 0, "y": 24, "w": 24, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 24 },
+    "sourceSize": { "w": 24, "h": 24 },
+    "duration": 100
+   },
+   {
+    "filename": "seagull 4.aseprite",
+    "frame": { "x": 24, "y": 24, "w": 24, "h": 24 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 24, "h": 24 },
+    "sourceSize": { "w": 24, "h": 24 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.14.4-x64",
+  "image": "seagull.png",
+  "format": "RGBA8888",
+  "size": { "w": 72, "h": 48 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "soar", "from": 0, "to": 0, "direction": "forward", "repeat": "1", "color": "#000000ff" },
+   { "name": "fly", "from": 1, "to": 4, "direction": "forward", "color": "#000000ff" }
+  ],
+  "layers": [
+   { "name": "Layer 1", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
+  ]
+ }
+}
