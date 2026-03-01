@@ -131,6 +131,16 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	override function destroy() {
+		super.destroy();
+		GameManager.ME.net.onPlayerRemoved.remove(onPlayerRemoved);
+		GameManager.ME.net.onFishAdded.remove(onFishAdded);
+		GameManager.ME.net.onCastLine.remove(onRemoteCastLine);
+		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
+		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
+		GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
+	}
+
 	function setupNetwork() {
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.add(onFishAdded);
