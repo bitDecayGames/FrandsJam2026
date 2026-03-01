@@ -523,7 +523,7 @@ class PlayState extends FlxTransitionableState {
 			return;
 		}
 		seagullTimer = FlxG.random.float(2.0, 6.0);
-		seagullGroup.add(new Seagull(FlxG.random.bool()));
+		seagullGroup.add(new Seagull(FlxG.random.bool(), this, terrainLayer, fishSpawner));
 	}
 
 	function updateSparkles(elapsed:Float) {
