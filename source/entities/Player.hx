@@ -794,7 +794,7 @@ class Player extends FlxSprite {
 		return castState == LANDED && castBobber != null;
 	}
 
-	public function catchFish(hasFish:Bool = false) {
+	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null) {
 		if (castState == LANDED || castState == CASTING) {
 			if (!isRemote && !hasFish) {
 				GameManager.ME.net.sendLinePulled();

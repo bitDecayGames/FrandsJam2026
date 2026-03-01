@@ -10,13 +10,13 @@ import schema.PlayerState;
 import schema.FishState;
 import schema.RoundState;
 
-typedef SessionIdSignal = FlxTypedSignal<String->Void>;
+typedef SessionIdSignal = FlxTypedSignal<String->Void>; // clientId
 typedef PlayerUpdateData = {state:PlayerState, ?prevX:Float, ?prevY:Float};
-typedef PlayerStateSignal = FlxTypedSignal<(String, PlayerUpdateData) -> Void>;
-typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>;
+typedef PlayerStateSignal = FlxTypedSignal<(String, PlayerUpdateData) -> Void>; // clientId, playerData
+typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>; // fishId, fishState
 typedef RoundStateSignal = FlxTypedSignal<RoundState->Void>;
 typedef PlayersReadySignal = FlxTypedSignal<Void->Void>;
-typedef HostSignal = FlxTypedSignal<Bool->Bool->Void>;
+typedef HostSignal = FlxTypedSignal<Bool->Bool->Void>; // cur, prev
 
 class NetworkManager {
 	public static var IS_HOST:Bool = #if local true #else false #end;
@@ -39,6 +39,8 @@ class NetworkManager {
 
 	public var onCastLine = new FlxTypedSignal<String->Float->Float->String->Void>(); // sessionId, x, y, dir
 	public var onFishCaught = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
+	public var onFishPocketed = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
+	public var onFishBanked = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
 	public var onLinePulled = new FlxTypedSignal<String->Void>(); // sessionId
 
 	public static inline var roomName:String = "game_room";
@@ -150,6 +152,14 @@ class NetworkManager {
 				trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId}');
 				onFishCaught.dispatch(message.sessionId, message.fishId);
 			});
+			room.onMessage("fish_pocketed", (message) -> {
+				trace('[NetMan] fish_pocketed => sessionId:${message.sessionId} fishId:${message.fishId}');
+				onFishPocketed.dispatch(message.sessionId, message.fishId);
+			});
+			room.onMessage("fish_banked", (message) -> {
+				trace('[NetMan] fish_banked => sessionId:${message.sessionId} fishId:${message.fishId}');
+				onFishBanked.dispatch(message.sessionId, message.fishId);
+			});
 
 			room.onMessage("line_pulled", (message) -> {
 				trace('[NetMan] line_pulled => sessionId:${message.sessionId}');
@@ -167,6 +177,14 @@ class NetworkManager {
 
 	public function sendFishCaught(fishId:String, catcherSessionId:String) {
 		sendMessage("fish_caught", {fishId: fishId, catcherSessionId: catcherSessionId});
+	}
+
+	public function sendFishPocketed(fishId:String, catcherSessionId:String) {
+		sendMessage("fish_pocketed", {fishId: fishId, catcherSessionId: catcherSessionId});
+	}
+
+	public function sendFishBanked(fishId:String, catcherSessionId:String) {
+		sendMessage("fish_banked", {fishId: fishId, catcherSessionId: catcherSessionId});
 	}
 
 	public function sendLinePulled() {
