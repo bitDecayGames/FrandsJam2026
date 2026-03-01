@@ -356,6 +356,7 @@ class Player extends FlxSprite {
 		// Run for both local and remote players
 		updateCast(delta);
 		updateFishingLine();
+		updateRock(delta);
 
 		if (isRemote) {
 			// events drive this one
@@ -433,7 +434,6 @@ class Player extends FlxSprite {
 		}
 
 		updateReticle();
-		updateRock(delta);
 
 		clampToWorldBounds();
 
@@ -601,6 +601,31 @@ class Player extends FlxSprite {
 		rockFlightTime = if (dist > 0) dist / 200 else 0.01;
 		rockElapsed = 0;
 		state.add(rockSprite);
+		if (!isRemote) {
+			GameManager.ME.net.sendMessage("throw_rock", {
+				targetX: rockTarget.x,
+				targetY: rockTarget.y,
+				big: throwingBigRock,
+				dir: getDirSuffix()
+			});
+		}
+	}
+
+	public function remoteThrowRock(targetX:Float, targetY:Float, big:Bool, dir:String) {
+		throwingBigRock = big;
+		lastInputDir = switch (dir) {
+			case "up": N;
+			case "down": S;
+			case "left": W;
+			case "right": E;
+			default: S;
+		};
+		if (rockTarget != null) {
+			rockTarget.put();
+		}
+		rockTarget = FlxPoint.get(targetX, targetY);
+		throwing = true;
+		sendAnimUpdate("throw_" + dir, true);
 	}
 
 	function updateRock(elapsed:Float) {

@@ -1,5 +1,6 @@
 package states;
 
+import flixel.math.FlxPoint;
 import schema.RoundState;
 import flixel.util.FlxColor;
 import flixel.FlxSprite;
@@ -138,6 +139,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
 		GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onThrowRock.remove(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
 	}
@@ -149,6 +151,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
 		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onThrowRock.add(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
 	}
@@ -375,8 +378,16 @@ class PlayState extends FlxTransitionableState {
 
 	function onRemoteCastLine(sessionId:String, x:Float, y:Float, dir:String) {
 		var remote = remotePlayers.get(sessionId);
-		if (remote != null)
+		if (remote != null) {
 			remote.remoteStartCast(x, y, dir);
+		}
+	}
+
+	function onRemoteThrowRock(sessionId:String, target:FlxPoint, big:Bool, dir:String) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteThrowRock(target.x, target.y, big, dir);
+		}
 	}
 
 	function onRemoteFishCaught(sessionId:String, fishId:String) {

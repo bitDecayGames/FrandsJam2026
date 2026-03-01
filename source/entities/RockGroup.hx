@@ -78,13 +78,14 @@ class RockGroup extends FlxTypedGroup<Rock> {
 	public function onLocalSplash(x:Float, y:Float, big:Bool) {
 		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
 		fishSpawner.scareFish(x, y, big ? 160 : 80);
-		GameManager.ME.net.sendMessage("rock_splash", {x: x, y: y});
+		GameManager.ME.net.sendMessage("rock_splash", {x: x, y: y, big: big});
 		spawnSplash(x, y, big);
 	}
 
-	public function onRemoteSplash(x:Float, y:Float) {
-		fishSpawner.scareFish(x, y);
-		spawnSplash(x, y, false);
+	public function onRemoteSplash(x:Float, y:Float, big:Bool) {
+		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
+		fishSpawner.scareFish(x, y, big ? 160 : 80);
+		spawnSplash(x, y, big);
 	}
 
 	function spawnSplash(x:Float, y:Float, big:Bool) {

@@ -47,6 +47,24 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			state.fish.set(data.id, new FishState(data.x, data.y));
 		});
 
+		// sent when a player throws a rock
+		onMessage("throw_rock", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "throw_rock": targetX=${data.targetX} targetY=${data.targetY} big=${data.big} dir=${data.dir}');
+			broadcast("throw_rock", {
+				sessionId: client.sessionId,
+				targetX: data.targetX,
+				targetY: data.targetY,
+				big: data.big,
+				dir: data.dir
+			}, {except: client});
+		});
+
+		// sent when a rock lands in water
+		onMessage("rock_splash", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "rock_splash": x=${data.x} y=${data.y} big=${data.big}');
+			broadcast("rock_splash", {x: data.x, y: data.y, big: data.big}, {except: client});
+		});
+
 		// sent when a fish moves
 		onMessage("fish_move", (client:Client, data:Dynamic) -> {
 			var fish:FishState = state.fish.get(data.id);
@@ -54,6 +72,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				fish.x = data.x;
 				fish.y = data.y;
 			}
+		});
+
+		// sent by the host when a scared fish finishes fading and despawns
+		onMessage("fish_despawn", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "fish_despawn": id=${data.id} respawnTime=${data.respawnTime}');
+			broadcast("fish_despawn", {id: data.id, respawnTime: data.respawnTime}, {except: client});
 		});
 
 		// sent when a player casts their line

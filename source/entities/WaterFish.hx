@@ -44,12 +44,23 @@ class WaterFish extends FlxSprite {
 		this.isRemote = isRemote;
 		if (isRemote) {
 			GameManager.ME.net.onFishMove.add(handleChange);
+			GameManager.ME.net.onFishDespawn.add(handleDespawn);
 		}
 		loadGraphic("assets/aseprite/characters/fishShadow.png");
 		centerOffsets();
 		alpha = 0;
 		fadeInTimer = 1.0;
 		pickTarget();
+	}
+
+	private function handleDespawn(id:String, respawnTime:Float):Void {
+		if (fishId != id) {
+			return;
+		}
+		alive = false;
+		visible = false;
+		velocity.set(0, 0);
+		respawnTimer = respawnTime;
 	}
 
 	private function handleChange(id:String, state:FishState):Void {
@@ -153,6 +164,7 @@ class WaterFish extends FlxSprite {
 				visible = false;
 				velocity.set(0, 0);
 				respawnTimer = 5.5;
+				GameManager.ME.net.sendMessage("fish_despawn", {id: fishId, respawnTime: 5.5});
 			}
 			return;
 		}
