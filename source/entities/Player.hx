@@ -68,6 +68,7 @@ class Player extends FlxSprite {
 	var castPowerDir:Float = 1;
 	var castDirSuffix:String = "down";
 	var retractHasFish:Bool = false;
+	var remoteWasStationary:Bool = false;
 
 	public var caughtFishSpriteIndex:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
@@ -231,10 +232,25 @@ class Player extends FlxSprite {
 
 		// QLog.notice('!!!!!!!!!!!!!!!! x: ${data.state.x}, y: ${data.state.y}, prevX: ${data.prevX}, prevY: ${data.prevY}, deltaX: ${deltaPos.x}, deltaY: ${deltaPos.y}, lastInputDir: ${lastInputDir}');
 
+		// Once the remote player stops (frozen during catch anim) then starts moving
+		// again, their retract is done — clean up any lingering bobber
+		if (castBobber != null && (castState == CATCH_ANIM || castState == RETURNING)) {
+			var speedSq = data.state.velocityX * data.state.velocityX + data.state.velocityY * data.state.velocityY;
+			if (speedSq < 100) { // < ~10px/s  — player is frozen/stationary
+				remoteWasStationary = true;
+			} else if (remoteWasStationary) { // was stationary, now moving → catch anim done
+				state.remove(castBobber);
+				castBobber.destroy();
+				castBobber = null;
+				castState = IDLE;
+				playMovementAnim(true);
+			}
+		}
+
 		setPosition(data.state.x, data.state.y);
 		velocity.set(data.state.velocityX, data.state.velocityY);
 
-		if (isRemote) {
+		if (isRemote && castState != CAST_ANIM && castState != CATCH_ANIM && castState != RETURNING && !throwing) {
 			playMovementAnim();
 		}
 	}
@@ -566,6 +582,12 @@ class Player extends FlxSprite {
 	}
 
 	public function remoteStartCast(targetX:Float, targetY:Float, dir:String) {
+		// Clean up any bobber still retracting from a previous catch
+		if (castBobber != null) {
+			state.remove(castBobber);
+			castBobber.destroy();
+			castBobber = null;
+		}
 		castDirSuffix = dir;
 		lastInputDir = switch (dir) {
 			case "up": N;
@@ -730,6 +752,9 @@ class Player extends FlxSprite {
 				GameManager.ME.net.sendLinePulled();
 			}
 			castState = CATCH_ANIM;
+			if (isRemote) {
+				remoteWasStationary = false;
+			}
 			frozen = true;
 			retractHasFish = hasFish;
 			if (castTarget != null) {
