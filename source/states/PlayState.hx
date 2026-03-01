@@ -228,7 +228,7 @@ class PlayState extends FlxTransitionableState {
 
 		shop = new Shop();
 		shop.spawnRandom(level);
-		add(shop);
+		ySortGroup.add(shop);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -357,6 +357,7 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 		FlxG.collide(bushGroup, player, Bush.onCollide);
+		FlxG.collide(shop, player, Shop.onCollide);
 		ySortGroup.sort((order, a, b) -> {
 			var objA:flixel.FlxObject = cast a;
 			var objB:flixel.FlxObject = cast b;

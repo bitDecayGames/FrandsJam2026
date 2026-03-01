@@ -240,8 +240,6 @@ class Player extends FlxSprite {
 		}
 		lastInputDir = Cardinal.closest(deltaPos);
 
-		// QLog.notice('!!!!!!!!!!!!!!!! x: ${data.state.x}, y: ${data.state.y}, prevX: ${data.prevX}, prevY: ${data.prevY}, deltaX: ${deltaPos.x}, deltaY: ${deltaPos.y}, lastInputDir: ${lastInputDir}');
-
 		// Once the remote player stops (frozen during catch anim) then starts moving
 		// again, their retract is done — clean up any lingering bobber
 		if (castBobber != null && (castState == CATCH_ANIM || castState == RETURNING)) {
