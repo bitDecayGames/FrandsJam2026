@@ -579,7 +579,7 @@
 					"layerDefUid": 6,
 					"pxOffsetX": 0,
 					"pxOffsetY": 0,
-					"visible": false,
+					"visible": true,
 					"optionalRules": [],
 					"intGridCsv": [],
 					"autoLayerTiles": [],
@@ -634,6 +634,22 @@
 							"fieldInstances": [{ "__identifier": "numFish", "__type": "Int", "__value": 4, "__tile": null, "defUid": 240, "realEditorValues": [{ "id": "V_Int", "params": [4] }] }],
 							"__worldX": 304,
 							"__worldY": 240
+						},
+						{
+							"__identifier": "FishSpawner",
+							"__grid": [37,28],
+							"__pivot": [0,0],
+							"__tags": [],
+							"__tile": null,
+							"__smartColor": "#D77643",
+							"iid": "a08d1230-fa90-11f0-89f6-15cbf824980c",
+							"width": 16,
+							"height": 16,
+							"defUid": 239,
+							"px": [592,448],
+							"fieldInstances": [{ "__identifier": "numFish", "__type": "Int", "__value": 2, "__tile": null, "defUid": 240, "realEditorValues": [{ "id": "V_Int", "params": [2] }] }],
+							"__worldX": 592,
+							"__worldY": 448
 						}
 					]
 				},
