@@ -1,3 +1,4 @@
+import GameState.BushState;
 import GameState.FishState;
 import haxe.Json;
 import colyseus.server.Client;
@@ -68,6 +69,20 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		onMessage("line_pulled", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "line_pulled" message');
 			broadcast("line_pulled", {sessionId: client.sessionId});
+		});
+
+		// sent by the host to establish shared world layout (bushes + shop)
+		onMessage("world_setup", (client:Client, data:Dynamic) -> {
+			if (client.sessionId != state.hostSessionId) {
+				return;
+			}
+			var bushArray:Array<Dynamic> = data.bushes;
+			for (i => bush in bushArray) {
+				state.bushes.set(Std.string(i), new BushState(bush.x, bush.y));
+			}
+			state.shopX = data.shopX;
+			state.shopY = data.shopY;
+			state.shopReady = true;
 		});
 
 		onMessage("round_update", (client:Client, data:Dynamic) -> {

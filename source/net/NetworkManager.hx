@@ -5,6 +5,7 @@ import flixel.util.FlxSignal;
 import io.colyseus.Client;
 import io.colyseus.Room;
 import io.colyseus.serializer.schema.Callbacks;
+import schema.BushState;
 import schema.GameState;
 import schema.PlayerState;
 import schema.FishState;
@@ -36,6 +37,9 @@ class NetworkManager {
 	public var onRockSplash = new FlxTypedSignal<Float->Float->Void>();
 	public var onRoundUpdate = new RoundStateSignal();
 	public var onPlayersReady = new PlayersReadySignal();
+
+	public var onBushAdded = new FlxTypedSignal<Float->Float->Void>(); // x, y
+	public var onShopPlaced = new FlxTypedSignal<Float->Float->Void>(); // x, y
 
 	public var onCastLine = new FlxTypedSignal<String->Float->Float->String->Void>(); // sessionId, x, y, dir
 	public var onFishCaught = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
@@ -111,6 +115,18 @@ class NetworkManager {
 				});
 			});
 
+			cb.onAdd(room.state, "bushes", (bush:BushState, id:String) -> {
+				trace('NetworkManager: bush added ${id} at ${bush.x}, ${bush.y}');
+				onBushAdded.dispatch(bush.x, bush.y);
+			});
+
+			cb.listen("shopReady", (val:Bool, _:Bool) -> {
+				if (val) {
+					trace('NetworkManager: shop placed at ${room.state.shopX}, ${room.state.shopY}');
+					onShopPlaced.dispatch(room.state.shopX, room.state.shopY);
+				}
+			});
+
 			cb.onAdd(room.state, "players", (player:PlayerState, sessionId:String) -> {
 				trace('NetworkManager: player added $sessionId');
 				if (sessionId == mySessionId) {
@@ -173,6 +189,18 @@ class NetworkManager {
 				onRockSplash.dispatch(sx, sy);
 			});
 		});
+	}
+
+	public function sendWorldSetup(bushPositions:Array<{x:Float, y:Float}>, shopX:Float, shopY:Float) {
+		sendMessage("world_setup", {
+			bushes: bushPositions,
+			shopX: shopX,
+			shopY: shopY,
+		});
+	}
+
+	public function getState():GameState {
+		return room != null ? room.state : null;
 	}
 
 	public function sendFishCaught(fishId:String, catcherSessionId:String) {

@@ -88,7 +88,6 @@ class Shop extends FlxSprite {
 		}
 	}
 
-	s
 	function sellFish(player:Player) {
 		var count = 0;
 		while (player.inventory.removeAnyFish() != -1) {

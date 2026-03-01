@@ -1,6 +1,17 @@
 import colyseus.server.schema.Schema;
 import colyseus.server.schema.Schema.MapSchema;
 
+class BushState extends Schema {
+	@:type("float32") public var x:Float;
+	@:type("float32") public var y:Float;
+
+	public function new(x:Float, y:Float) {
+		super();
+		this.x = x;
+		this.y = y;
+	}
+}
+
 class PlayerState extends Schema {
 	@:type("float32") public var x:Float;
 	@:type("float32") public var y:Float;
@@ -62,10 +73,26 @@ class GameState extends Schema {
 	@:type(RoundState)
 	public var round:RoundState;
 
+	@:type({map: BushState})
+	public var bushes:MapSchema<BushState>;
+
+	@:type("float32")
+	public var shopX:Float;
+
+	@:type("float32")
+	public var shopY:Float;
+
+	@:type("boolean")
+	public var shopReady:Bool;
+
 	public function new() {
 		super();
 		players = new MapSchema<PlayerState>();
 		fish = new MapSchema<FishState>();
 		round = new RoundState();
+		bushes = new MapSchema<BushState>();
+		shopX = 0;
+		shopY = 0;
+		shopReady = false;
 	}
 }

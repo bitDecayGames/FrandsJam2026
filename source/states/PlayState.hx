@@ -139,6 +139,8 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
 		GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
+		GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
 	}
 
 	function setupNetwork() {
@@ -148,6 +150,8 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
 		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
+		GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -220,7 +224,13 @@ class PlayState extends FlxTransitionableState {
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, spawnerLayer, rockGroup.addRock, rockGroup.onLocalSplash);
 		groundFishGroup.setWaterLayer(spawnerLayer);
 
+		#if local
 		spawnBushes(spawnerLayer);
+		#else
+		if (NetworkManager.IS_HOST) {
+			spawnBushes(spawnerLayer);
+		}
+		#end
 
 		player.onBobberLanded = (bx, by) -> {
 			add(new Ripple(bx, by));
@@ -238,9 +248,28 @@ class PlayState extends FlxTransitionableState {
 
 		add(seagullGroup);
 
+		#if local
 		shop = new Shop();
 		shop.spawnRandom(level);
 		ySortGroup.add(shop);
+		#else
+		if (NetworkManager.IS_HOST) {
+			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
+			shop = new Shop();
+			shop.spawnRandom(level);
+			ySortGroup.add(shop);
+			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
+		} else {
+			// Check if world state already arrived (e.g. late joiner)
+			var state = GameManager.ME.net.getState();
+			if (state != null && state.shopReady) {
+				placeShopAt(state.shopX, state.shopY);
+				for (_ => bush in state.bushes) {
+					placeBushAt(bush.x, bush.y);
+				}
+			}
+		}
+		#end
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -321,6 +350,32 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	function placeBushAt(bx:Float, by:Float) {
+		var bush = new Bush(bx, by, this);
+		bushGroup.add(bush);
+		ySortGroup.add(bush);
+	}
+
+	function placeShopAt(sx:Float, sy:Float) {
+		shop = new Shop();
+		shop.setPosition(sx, sy);
+		ySortGroup.add(shop);
+	}
+
+	function onRemoteBushAdded(x:Float, y:Float) {
+		if (NetworkManager.IS_HOST) {
+			return;
+		}
+		placeBushAt(x, y);
+	}
+
+	function onRemoteShopPlaced(x:Float, y:Float) {
+		if (NetworkManager.IS_HOST) {
+			return;
+		}
+		placeShopAt(x, y);
+	}
+
 	function onRemoteCastLine(sessionId:String, x:Float, y:Float, dir:String) {
 		var remote = remotePlayers.get(sessionId);
 		if (remote != null)
@@ -382,7 +437,9 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 		FlxG.collide(bushGroup, player, Bush.onCollide);
-		FlxG.collide(shop, player, Shop.onCollide);
+		if (shop != null) {
+			FlxG.collide(shop, player, Shop.onCollide);
+		}
 
 		if (player.inventory.hasWaders() && terrainLayer != null) {
 			player.inShallowWater = terrainLayer.isFullyInTaggedArea(player, [SHALLOW, SOLID]);
@@ -420,7 +477,9 @@ class PlayState extends FlxTransitionableState {
 		fishSpawner.setBobbers(bobbers);
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
-		shop.checkInteraction(player);
+		if (shop != null) {
+			shop.checkInteraction(player);
+		}
 
 		updateSparkles(elapsed);
 		updateSeagulls(elapsed);
