@@ -509,10 +509,14 @@ class PlayState extends FlxTransitionableState {
 		FlxG.collide(bushGroup, player, Bush.onCollide);
 		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
 			weed.burst();
+			GameManager.ME.net.sendMessage("weed_killed", {});
+			GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
 		});
 		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
 			midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
 			worm.kill();
+			GameManager.ME.net.sendMessage("worm_killed", {});
+			GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
 		});
 		if (shop != null) {
 			FlxG.collide(shop, player, Shop.onCollide);

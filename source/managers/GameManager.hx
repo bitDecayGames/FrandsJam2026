@@ -42,6 +42,10 @@ class GameManager {
 	public var scores = new Map<String, Int>(); // sessionId -> score
 	// soldFish: round -> sessionId -> Array<SoldFishEntry>
 	public var soldFish:Array<Map<String, Array<SoldFishEntry>>> = [];
+	// weedKills: round -> sessionId -> count
+	public var weedKills:Array<Map<String, Int>> = [];
+	// wormKills: round -> sessionId -> count
+	public var wormKills:Array<Map<String, Int>> = [];
 	public var mySessionId = "";
 	public var mySkinIndex:Int = -1; // -1 means no skin selected
 
@@ -59,6 +63,8 @@ class GameManager {
 		net.onPlayerReadyChanged.add(onPlayerReadyChanged);
 		net.onScoreChanged.add(onScoreChanged);
 		net.onFishSold.add(onFishSold);
+		net.onWeedKilled.add(recordWeedKill);
+		net.onWormKilled.add(recordWormKill);
 		net.onHostChanged.add(onHostChange);
 	}
 
@@ -139,6 +145,44 @@ class GameManager {
 			return [];
 		}
 		return roundMap.get(sessionId);
+	}
+
+	/** Record a weed kill for the current round. */
+	public function recordWeedKill(sessionId:String) {
+		while (weedKills.length <= currentRoundNumber) {
+			weedKills.push(new Map<String, Int>());
+		}
+		var roundMap = weedKills[currentRoundNumber];
+		var cur = roundMap.exists(sessionId) ? roundMap.get(sessionId) : 0;
+		roundMap.set(sessionId, cur + 1);
+	}
+
+	/** Record a worm kill for the current round. */
+	public function recordWormKill(sessionId:String) {
+		while (wormKills.length <= currentRoundNumber) {
+			wormKills.push(new Map<String, Int>());
+		}
+		var roundMap = wormKills[currentRoundNumber];
+		var cur = roundMap.exists(sessionId) ? roundMap.get(sessionId) : 0;
+		roundMap.set(sessionId, cur + 1);
+	}
+
+	/** Get weed kills for a specific round and session. */
+	public function getWeedKills(roundNum:Int, sessionId:String):Int {
+		if (roundNum < 0 || roundNum >= weedKills.length) {
+			return 0;
+		}
+		var roundMap = weedKills[roundNum];
+		return roundMap.exists(sessionId) ? roundMap.get(sessionId) : 0;
+	}
+
+	/** Get worm kills for a specific round and session. */
+	public function getWormKills(roundNum:Int, sessionId:String):Int {
+		if (roundNum < 0 || roundNum >= wormKills.length) {
+			return 0;
+		}
+		var roundMap = wormKills[roundNum];
+		return roundMap.exists(sessionId) ? roundMap.get(sessionId) : 0;
 	}
 
 	/** Get the current round number (0-indexed). */

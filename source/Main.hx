@@ -42,7 +42,7 @@ import states.LobbyState;
 #if credits
 import states.CreditsState;
 #end
-#if maingame
+#if local
 import states.PlayState;
 #end
 #if FLX_DEBUG
@@ -76,7 +76,7 @@ class Main extends Sprite {
 			configureLogging();
 			initEvents();
 			Achievements.initAchievements();
-			#if maingame
+			#if local
 			FlxG.switchState(() -> new PlayState(null));
 			#end
 		});

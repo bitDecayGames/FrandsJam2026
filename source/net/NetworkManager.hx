@@ -56,6 +56,8 @@ class NetworkManager {
 	public var onPlayerReadyChanged = new FlxTypedSignal<String->Bool->Void>(); // sessionId, ready
 	public var onScoreChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, score
 	public var onFishSold = new FlxTypedSignal<String->Int->Int->Int->Void>(); // sessionId, fishType, lengthCm, value
+	public var onWeedKilled = new FlxTypedSignal<String->Void>(); // sessionId
+	public var onWormKilled = new FlxTypedSignal<String->Void>(); // sessionId
 
 	public static inline var roomName:String = "game_room";
 
@@ -242,6 +244,16 @@ class NetworkManager {
 			room.onMessage("fish_sold", (message:Dynamic) -> {
 				trace('[NetMan] fish_sold => sessionId:${message.sessionId} fishType:${message.fishType} lengthCm:${message.lengthCm} value:${message.value}');
 				onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
+			});
+
+			room.onMessage("weed_killed", (message:Dynamic) -> {
+				trace('[NetMan] weed_killed => sessionId:${message.sessionId}');
+				onWeedKilled.dispatch(message.sessionId);
+			});
+
+			room.onMessage("worm_killed", (message:Dynamic) -> {
+				trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
+				onWormKilled.dispatch(message.sessionId);
 			});
 		});
 	}

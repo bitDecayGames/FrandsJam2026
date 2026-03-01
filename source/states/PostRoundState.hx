@@ -48,6 +48,9 @@ class PostRoundState extends FlxTransitionableState {
 		// Build the scoreboard
 		buildScoreboard();
 
+		// Build weed/worm kill stats at top-left
+		buildKillStats();
+
 		// Ready button at the bottom center
 		_btnDone = MenuBuilder.createTextButton("Ready", clickReady);
 		_btnDone.setPosition(FlxG.width / 2 - _btnDone.width / 2, FlxG.height - _btnDone.height - 40);
@@ -184,6 +187,68 @@ class PostRoundState extends FlxTransitionableState {
 					currentY += FISH_DETAIL_ROW_HEIGHT;
 				}
 			}
+		}
+	}
+
+	private function buildKillStats():Void {
+		var gm = GameManager.ME;
+		var roundNum = gm.getCurrentRoundNumber();
+
+		// Gather all session IDs
+		var allSessions = [gm.mySessionId];
+		for (sessionId in gm.sessions) {
+			if (sessionId != gm.mySessionId) {
+				allSessions.push(sessionId);
+			}
+		}
+
+		var statY = 10;
+
+		// Most Weeds
+		var bestWeedId:String = null;
+		var bestWeedCount = 0;
+		for (sid in allSessions) {
+			var count = gm.getWeedKills(roundNum, sid);
+			if (count > bestWeedCount) {
+				bestWeedCount = count;
+				bestWeedId = sid;
+			}
+		}
+		if (bestWeedId != null) {
+			var name = gm.names.get(bestWeedId);
+			if (name == null || name == "") {
+				name = bestWeedId == gm.mySessionId ? "You" : "???";
+			}
+			var weedText = new FlxText();
+			weedText.size = 10;
+			weedText.color = FlxColor.fromRGB(180, 180, 180);
+			weedText.text = 'Most Weeds: $name ($bestWeedCount)';
+			weedText.setPosition(10, statY);
+			add(weedText);
+			statY += 14;
+		}
+
+		// Most Worms
+		var bestWormId:String = null;
+		var bestWormCount = 0;
+		for (sid in allSessions) {
+			var count = gm.getWormKills(roundNum, sid);
+			if (count > bestWormCount) {
+				bestWormCount = count;
+				bestWormId = sid;
+			}
+		}
+		if (bestWormId != null) {
+			var name = gm.names.get(bestWormId);
+			if (name == null || name == "") {
+				name = bestWormId == gm.mySessionId ? "You" : "???";
+			}
+			var wormText = new FlxText();
+			wormText.size = 10;
+			wormText.color = FlxColor.fromRGB(180, 180, 180);
+			wormText.text = 'Most Worms: $name ($bestWormCount)';
+			wormText.setPosition(10, statY);
+			add(wormText);
 		}
 	}
 

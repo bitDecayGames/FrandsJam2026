@@ -98,6 +98,18 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
+		// sent when a player kills a weed
+		onMessage("weed_killed", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "weed_killed"');
+			broadcast("weed_killed", {sessionId: client.sessionId}, {except: client});
+		});
+
+		// sent when a player kills a worm
+		onMessage("worm_killed", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "worm_killed"');
+			broadcast("worm_killed", {sessionId: client.sessionId}, {except: client});
+		});
+
 		// sent when a player sells a fish — broadcast to other clients so they can track it
 		onMessage("fish_sold", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_sold" message: fishType=${data.fishType} lengthCm=${data.lengthCm} value=${data.value}');
