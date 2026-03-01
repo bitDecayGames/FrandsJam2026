@@ -67,6 +67,7 @@ class PlayState extends FlxTransitionableState {
 	var scoreHUD:ScoreHUD;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
+	var weedGroup = new FlxTypedGroup<entities.Weed>();
 	var seagullGroup = new FlxTypedGroup<Seagull>();
 	var seagullTimer:Float = 0;
 
@@ -233,6 +234,8 @@ class PlayState extends FlxTransitionableState {
 		}
 		#end
 
+		spawnWeeds();
+
 		player.onBobberLanded = (bx, by) -> {
 			add(new Ripple(bx, by));
 			FlxG.camera.shake(0.002, 0.1);
@@ -290,20 +293,50 @@ class PlayState extends FlxTransitionableState {
 		EventBus.fire(new PlayerSpawn(player.x, player.y));
 	}
 
+	static function classifyGround(color:FlxColor):String {
+		if (color == FlxColor.TRANSPARENT) {
+			return "";
+		}
+		var hue = color.hue;
+		if (color.blue > color.red && color.blue > 80) {
+			return "water";
+		}
+		if ((hue >= 15 && hue <= 55) && color.saturation > 0.15) {
+			return "dirt";
+		}
+		if (hue >= 60 && hue <= 170 && color.saturation > 0.15) {
+			return "grass";
+		}
+		return "";
+	}
+
 	function spawnBushes(water:ldtk.Layer_IntGrid) {
 		var bounds = FlxG.worldBounds;
-		var grid = water.gridSize;
 		for (_ in 0...5) {
-			// Try up to 20 times to find a non-water tile
 			for (_ in 0...20) {
 				var bx = FlxG.random.float(bounds.x, bounds.right - 32);
 				var by = FlxG.random.float(bounds.y, bounds.bottom - 32);
-				var tileX = Std.int(bx / grid);
-				var tileY = Std.int(by / grid);
-				if (water.getInt(tileX, tileY) != 1) {
+				if (classifyGround(terrainLayer.sampleColorAt(bx, by)) == "grass") {
 					var bush = new Bush(bx, by, this);
 					bushGroup.add(bush);
 					ySortGroup.add(bush);
+					break;
+				}
+			}
+		}
+	}
+
+	function spawnWeeds() {
+		var bounds = FlxG.worldBounds;
+		for (_ in 0...20) {
+			for (_ in 0...20) {
+				var wx = FlxG.random.float(bounds.x, bounds.right - 8);
+				var wy = FlxG.random.float(bounds.y, bounds.bottom - 8);
+				var ground = classifyGround(terrainLayer.sampleColorAt(wx, wy));
+				if (ground == "grass" || ground == "dirt") {
+					var weed = new entities.Weed(wx, wy, this);
+					weedGroup.add(weed);
+					midGroundGroup.add(weed);
 					break;
 				}
 			}
@@ -434,6 +467,9 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 		FlxG.collide(bushGroup, player, Bush.onCollide);
+		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
+			weed.burst();
+		});
 		if (shop != null) {
 			FlxG.collide(shop, player, Shop.onCollide);
 		}
