@@ -81,16 +81,17 @@ class GameManager {
 	}
 
 	private function playersReady() {
-		if (round == null) {
+		if (round == null && rounds != null && rounds.length > 0) {
 			setCurrentRound(new RoundManager(rounds[0]));
 		}
 		var nextStatus:String;
+		var nextRoundNumber:Int = currentRoundNumber;
 		switch (roundStatus) {
 			case RoundState.STATUS_LOBBY:
 				if (NetworkManager.IS_HOST) {
 					init([
 						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
-						new Round([new TimedGoal(10), new PersonalFishCountGoal(3)]),
+						new Round([new TimedGoal(3), new PersonalFishCountGoal(3)]),
 						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
 					]);
 				}
@@ -101,9 +102,9 @@ class GameManager {
 				nextStatus = RoundState.STATUS_POST_ROUND;
 			case RoundState.STATUS_POST_ROUND:
 				trace('current round ${currentRoundNumber} -> ${currentRoundNumber + 1} / ${totalRounds}');
-				currentRoundNumber++;
-				if (currentRoundNumber > totalRounds) {
-					setStatus(RoundState.STATUS_END_GAME);
+				nextRoundNumber = currentRoundNumber + 1;
+				if (nextRoundNumber >= totalRounds) {
+					setStatus(RoundState.STATUS_END_GAME, nextRoundNumber);
 					endGame();
 					return;
 				}
@@ -115,7 +116,10 @@ class GameManager {
 			default:
 				throw 'invalid round status: ${roundStatus}';
 		}
-		setStatus(nextStatus);
+		setStatus(nextStatus, nextRoundNumber);
+		if (rounds != null && rounds.length > 0) {
+			setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
+		}
 		switchStateBasedOnStatus();
 	}
 
@@ -144,13 +148,22 @@ class GameManager {
 		}
 	}
 
-	public function setStatus(status:String) {
+	public function setStatus(status:String, ?currentRound:Int = -1) {
 		if (NetworkManager.IS_HOST) {
-			trace('set status: ${roundStatus} -> ${status}');
 			roundStatus = status;
-			GameManager.ME.net.sendMessage("round_update", {
-				status: roundStatus,
-			});
+			if (currentRound >= 0 && currentRound != currentRoundNumber) {
+				trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRoundNumber}');
+				currentRoundNumber = currentRound;
+				GameManager.ME.net.sendMessage("round_update", {
+					status: roundStatus,
+					currentRound: currentRound,
+				});
+			} else {
+				trace('set status: ${roundStatus} -> ${status}');
+				GameManager.ME.net.sendMessage("round_update", {
+					status: roundStatus,
+				});
+			}
 		}
 	}
 
