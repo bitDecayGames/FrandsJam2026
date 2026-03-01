@@ -2,8 +2,9 @@ package entities;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
-import flixel.util.FlxColor;
 import levels.ldtk.Level;
+import com.bitdecay.textpop.style.builtin.FloatAway;
+import com.bitdecay.textpop.TextPop;
 
 class Shop extends FlxSprite {
 	var playerInside:Bool = false;
@@ -14,8 +15,10 @@ class Shop extends FlxSprite {
 		immovable = true;
 	}
 
-	public static function onCollide(shop:Shop, _:Player) {
-		// TODO Shop until you drop
+	public static function onCollide(shop:Shop, player:Player) {
+		shop.sellFish(player);
+
+		// TODO Hook into network call
 	}
 
 	// Re-written by Lumo, Proton’s multi‑model AI assistant
@@ -85,6 +88,7 @@ class Shop extends FlxSprite {
 		}
 	}
 
+	s
 	function sellFish(player:Player) {
 		var count = 0;
 		while (player.inventory.removeAnyFish() != -1) {
@@ -93,6 +97,7 @@ class Shop extends FlxSprite {
 		if (count > 0) {
 			player.score += count * 10;
 			QLog.notice('Sold $count fish for ${count * 10} points. Total score: ${player.score}');
+			TextPop.pop(Std.int(x), Std.int(y), '${count} feeesh', new FloatAway(100, 3));
 		}
 	}
 }

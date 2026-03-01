@@ -23,6 +23,7 @@ ldtk-haxe-api 1.5.3-rc.1
 bitdecaybtree git https://github.com/bitDecayGames/BehaviorTree.git
 bitlytics git https://github.com/bitDecayGames/Bitlytics.git
 flixelutils git https://github.com/bitDecayGames/flixel-utils.git
+textpop git https://github.com/bitDecayGames/text-pop.git
 
 # for our generation scripting
 json2object 3.11.0
@@ -35,4 +36,3 @@ haxefmod git https://github.com/Tanz0rz/haxe-fmod.git 1.1.2-beta
 # networking libs
 colyseus 0.17.6
 hxWebSockets 1.4.0
-
