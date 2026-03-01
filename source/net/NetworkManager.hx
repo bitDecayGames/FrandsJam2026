@@ -31,6 +31,10 @@ class NetworkManager {
 	public var onFishAdded = new FishStateSignal();
 	public var onRockSplash = new FlxTypedSignal<Float->Float->Void>();
 
+	public var onCastLine = new FlxTypedSignal<String->Float->Float->String->Void>(); // sessionId, x, y, dir
+	public var onFishCaught = new FlxTypedSignal<String->String->Void>(); // sessionId (catcher), fishId
+	public var onLinePulled = new FlxTypedSignal<String->Void>(); // sessionId
+
 	public static inline var roomName:String = "game_room";
 
 	public function new() {}
@@ -104,8 +108,26 @@ class NetworkManager {
 				onPlayerRemoved.dispatch(sessionId);
 			});
 
-			room.onMessage("cast_line", (message) -> {
-				trace('[NetMan] cast_line => ${message.x}, ${message.y}');
+			room.onMessage("cast_line", (message:{
+				sessionId:String,
+				x:Float,
+				y:Float,
+				dir:String
+			}) -> {
+				trace('[NetMan] cast_line => ${message.sessionId} ${message.x},${message.y} dir:${message.dir}');
+				// var x:Float = message.x;
+				// var y:Float = message.y;
+				onCastLine.dispatch(message.sessionId, message.x, message.y, message.dir);
+			});
+
+			room.onMessage("fish_caught", (message) -> {
+				trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId}');
+				onFishCaught.dispatch(message.sessionId, message.fishId);
+			});
+
+			room.onMessage("line_pulled", (message) -> {
+				trace('[NetMan] line_pulled => sessionId:${message.sessionId}');
+				onLinePulled.dispatch(message.sessionId);
 			});
 
 			room.onMessage("rock_splash", (message:Dynamic) -> {
@@ -115,6 +137,14 @@ class NetworkManager {
 				onRockSplash.dispatch(sx, sy);
 			});
 		});
+	}
+
+	public function sendFishCaught(fishId:String, catcherSessionId:String) {
+		sendMessage("fish_caught", {fishId: fishId, catcherSessionId: catcherSessionId});
+	}
+
+	public function sendLinePulled() {
+		sendMessage("line_pulled", {});
 	}
 
 	public function sendMove(x:Float, y:Float) {

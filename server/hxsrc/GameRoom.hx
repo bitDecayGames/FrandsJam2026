@@ -39,7 +39,25 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// sent when a player casts their line
 		onMessage("cast_line", (client, data) -> {
 			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');
-			broadcast("cast_line", data, {except: client});
+			broadcast("cast_line", {
+				sessionId: client.sessionId,
+				x: data.x,
+				y: data.y,
+				dir: data.dir
+			}, {except: client});
+		});
+
+		// sent when a player catches a fish; catcherSessionId may differ from client.sessionId
+		// because the host reports catches on behalf of any player whose bobber a fish swam into
+		onMessage("fish_caught", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "fish_caught": fishId=${data.fishId} catcher=${data.catcherSessionId}');
+			broadcast("fish_caught", {sessionId: data.catcherSessionId, fishId: data.fishId});
+		});
+
+		// sent when a player pulls in their line
+		onMessage("line_pulled", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "line_pulled" message');
+			broadcast("line_pulled", {sessionId: client.sessionId});
 		});
 
 		onMessage("round_update", (client:Client, data:Dynamic) -> {
