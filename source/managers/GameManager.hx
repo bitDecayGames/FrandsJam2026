@@ -2,6 +2,7 @@ package managers;
 
 import goals.PersonalFishCountGoal;
 import goals.TimedGoal;
+import goals.KeypressGoal;
 import flixel.util.FlxTimer;
 import schema.RoundState;
 import net.NetworkManager;
@@ -90,9 +91,9 @@ class GameManager {
 			case RoundState.STATUS_LOBBY:
 				if (NetworkManager.IS_HOST) {
 					init([
-						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
-						new Round([new TimedGoal(3), new PersonalFishCountGoal(3)]),
-						new Round([new TimedGoal(5), new PersonalFishCountGoal(3)]),
+						new Round([new TimedGoal(), new PersonalFishCountGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishCountGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishCountGoal(3), new KeypressGoal()]),
 					]);
 					// needs to force this back to 0
 					nextRoundNumber = currentRoundNumber;
