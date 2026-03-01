@@ -16,9 +16,9 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 
 	var net:NetworkManager;
 
-	var catchCallback:(String, String) -> Void;
+	var catchCallback:(String, String, Int) -> Void;
 
-	public function new(onCatch:(String, String) -> Void) {
+	public function new(onCatch:(String, String, Int) -> Void) {
 		super();
 		catchCallback = onCatch;
 	}
@@ -120,12 +120,18 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 				for (_ in 0...numFish) {
 					var fid = '${nextFishID++}';
 					var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
+					var ftype = FlxG.random.int(0, 4);
 					if (net != null) {
-						var data:Dynamic = {id: fid, x: tile.x, y: tile.y};
+						var data:Dynamic = {
+							id: fid,
+							x: tile.x,
+							y: tile.y,
+							fishType: ftype
+						};
 						QLog.notice('sending fish_spawn message: $data');
 						net.sendMessage("fish_spawn", data);
 					}
-					var fish = new WaterFish(fid, tile.x, tile.y, waterTiles);
+					var fish = new WaterFish(fid, tile.x, tile.y, waterTiles, false, ftype);
 					fishMap.set(fid, fish);
 					fish.onCatch = catchCallback;
 					add(fish);

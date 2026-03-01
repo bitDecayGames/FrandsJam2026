@@ -19,6 +19,7 @@ class WaterFish extends FlxSprite {
 	var net:NetworkManager = null;
 
 	public var fishId = "";
+	public var fishType:Int = 0;
 
 	static inline var SPEED:Float = 20;
 	static inline var ATTRACT_SPEED:Float = 40;
@@ -29,15 +30,16 @@ class WaterFish extends FlxSprite {
 	var attracted:Bool = false;
 
 	public var bobbers:Map<String, FlxSprite> = new Map();
-	public var onCatch:(fishId:String, catcherSessionId:String) -> Void;
+	public var onCatch:(fishId:String, catcherSessionId:String, fishType:Int) -> Void;
 
 	var respawnTimer:Float = 0;
 	var fadeInTimer:Float = 0;
 	var scaredTimer:Float = 0;
 
-	public function new(id:String, x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false) {
+	public function new(id:String, x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false, fishType:Int = 0) {
 		super(x, y);
 		fishId = id;
+		this.fishType = fishType;
 		if (waterTiles != null) {
 			this.waterTiles = waterTiles;
 		}
@@ -238,7 +240,7 @@ class WaterFish extends FlxSprite {
 			attracted = false;
 			respawnTimer = 3.0;
 			if (onCatch != null)
-				onCatch(fishId, closestSid);
+				onCatch(fishId, closestSid, fishType);
 			return;
 		}
 

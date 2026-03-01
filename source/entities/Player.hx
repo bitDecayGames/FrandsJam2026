@@ -31,7 +31,7 @@ class Player extends FlxSprite {
 	// 0-indexed frame within the catch animation when the bobber retracts (1 before final)
 	static inline var CATCH_RETRACT_FRAME:Int = 1;
 
-	static var SKINS:Array<String> = [
+	public static var SKINS:Array<String> = [
 		"assets/aseprite/characters/playerA.json",
 		"assets/aseprite/characters/playerB.json",
 		"assets/aseprite/characters/playerC.json",
@@ -40,7 +40,8 @@ class Player extends FlxSprite {
 		"assets/aseprite/characters/playerH.json",
 	];
 
-	var skinIndex:Int = 0;
+	public var skinIndex:Int = 0;
+
 	var speed:Float = 100;
 	var playerNum = 0;
 
@@ -183,6 +184,14 @@ class Player extends FlxSprite {
 		if (throwing && rockSprite == null && frameNumber == 6) {
 			launchRock();
 		}
+
+		// Bug: animName came back as null in a multiplayer test session. This shouldn't happen,
+		// but guard against it here just in case.
+		if (animName == null) {
+			QLog.warn('Player: onAnimFrameChange animName is null');
+			return;
+		}
+
 		// Footstep effects on foot-plant frames of run animations
 		if (StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
 			var fx = x + width / 2;
@@ -377,11 +386,6 @@ class Player extends FlxSprite {
 			var inputDir = InputCalculator.getInputCardinal(playerNum);
 			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
 				lastInputDir = inputDir;
-			}
-
-			if (FlxG.keys.justPressed.T && !hotModeActive) {
-				hotModeActive = true;
-				hotModeTimer = 3.0;
 			}
 
 			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
@@ -745,6 +749,7 @@ class Player extends FlxSprite {
 					if (SimpleController.just_pressed(A)) {
 						castState = CHARGING;
 						frozen = true;
+						sendAnimUpdate("stand_" + getDirSuffix(), true);
 						castPower = 0;
 						castPowerDir = 1;
 						var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
@@ -883,7 +888,7 @@ class Player extends FlxSprite {
 		return castState == LANDED && castBobber != null;
 	}
 
-	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null) {
+	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null, fishType:Int = 0) {
 		if (castState == LANDED || castState == CASTING) {
 			if (!isRemote && !hasFish) {
 				GameManager.ME.net.sendLinePulled();
@@ -905,7 +910,7 @@ class Player extends FlxSprite {
 			if (castBobber != null) {
 				castBobber.velocity.set(0, 0);
 				if (hasFish) {
-					caughtFishSpriteIndex = FlxG.random.int(0, 4);
+					caughtFishSpriteIndex = fishType;
 					castBobber.loadGraphic("assets/aseprite/fish.png", true, 32, 32);
 					castBobber.animation.add("fish", [caughtFishSpriteIndex]);
 					castBobber.animation.play("fish");
@@ -952,13 +957,20 @@ class Player extends FlxSprite {
 		}
 	}
 
-	function swapSkin() {
+	public function swapSkin() {
 		var curAnim = animation.curAnim;
 		var animName = curAnim != null ? curAnim.name : null;
 		var animFrame = curAnim != null ? curAnim.curFrame : 0;
 		loadSkin(SKINS[skinIndex]);
 		if (animName != null) {
 			animation.play(animName, false, false, animFrame);
+		}
+	}
+
+	public function activateHotMode() {
+		if (!hotModeActive) {
+			hotModeActive = true;
+			hotModeTimer = 3.0;
 		}
 	}
 

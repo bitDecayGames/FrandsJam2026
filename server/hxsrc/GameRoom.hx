@@ -80,6 +80,15 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("fish_despawn", {id: data.id, respawnTime: data.respawnTime}, {except: client});
 		});
 
+		// sent when a player changes their skin selection in the lobby
+		onMessage("skin_changed", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "skin_changed" message: skinIndex=${data.skinIndex}');
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player != null) {
+				player.skinIndex = data.skinIndex;
+			}
+		});
+
 		// sent when a player casts their line
 		onMessage("cast_line", (client, data) -> {
 			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');
