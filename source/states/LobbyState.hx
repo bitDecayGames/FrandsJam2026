@@ -72,6 +72,7 @@ class LobbyState extends FlxTransitionableState {
 
 		// Input field centered directly above the Ready button
 		_inputField = new FlxInputText(0, 0, 100, FlxG.save.data.name, 20, FlxColor.WHITE, FlxColor.GRAY);
+		_inputField.maxChars = 20;
 		_inputField.setPosition(FlxG.width / 2 - _inputField.width / 2, _btnDone.y - _inputField.height - 8);
 		_inputField.onTextChange.add(updatePlayerName);
 		add(_inputField);
