@@ -23,6 +23,8 @@ import entities.Rock;
 import entities.GroundFishGroup;
 import entities.Inventory.InventoryItem;
 import entities.RockGroup;
+import levels.ldtk.BDTilemap;
+import levels.ldtk.Ldtk.Enum_TileTags;
 import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
@@ -31,6 +33,7 @@ import entities.CloudShadow;
 import entities.FootDust;
 import entities.Player;
 import entities.Ripple;
+import entities.Seagull;
 import entities.Shop;
 import entities.WaterSparkle;
 import events.gen.Event;
@@ -57,12 +60,16 @@ class PlayState extends FlxTransitionableState {
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
-	var dustGroup = new FlxGroup();
+
 	var shop:Shop;
+	var terrainLayer:BDTilemap;
+	var shallowColliders:FlxTypedGroup<FlxSprite>;
 	var inventoryHUD:InventoryHUD;
 	var scoreHUD:ScoreHUD;
 	var activeCameraTransition:CameraTransition = null;
 	var hotText:FlashingText;
+	var seagullGroup = new FlxTypedGroup<Seagull>();
+	var seagullTimer:Float = 0;
 
 	var transitions = new FlxTypedGroup<CameraTransition>();
 
@@ -101,7 +108,6 @@ class PlayState extends FlxTransitionableState {
 		add(fishSpawner);
 		add(ySortGroup);
 		add(transitions);
-		add(dustGroup);
 
 		#if !local
 		setupNetwork();
@@ -185,8 +191,12 @@ class PlayState extends FlxTransitionableState {
 		if (level.songEvent != "") {
 			// FmodManager.PlaySong(level.songEvent);
 		}
-		midGroundGroup.add(level.terrainLayer);
-		FlxG.worldBounds.copyFrom(level.terrainLayer.getBounds());
+		terrainLayer = level.terrainLayer;
+		midGroundGroup.add(terrainLayer);
+		midGroundGroup.add(level.tileColliders);
+		shallowColliders = level.shallowTileColliders;
+		midGroundGroup.add(shallowColliders);
+		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
 		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
 		camera.follow(player);
@@ -219,12 +229,15 @@ class PlayState extends FlxTransitionableState {
 		};
 		player.onFootstep = (fx, fy) -> {
 			for (_ in 0...4)
-				dustGroup.add(new FootDust(fx + FlxG.random.float(-3, 3), fy + FlxG.random.float(-1, 1)));
+				ySortGroup.add(new FootDust(fx + FlxG.random.float(-3, 3), fy + FlxG.random.float(-1, 1)));
 		};
 
 		CloudShadow.randomizeWind();
-		for (_ in 0...5)
+		for (_ in 0...5) {
 			add(new CloudShadow());
+		}
+
+		add(seagullGroup);
 
 		shop = new Shop();
 		shop.spawnRandom(level);
@@ -232,6 +245,9 @@ class PlayState extends FlxTransitionableState {
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
+
+		player.inventory.onChange.add(onInventoryChanged);
+		onInventoryChanged();
 
 		scoreHUD = new ScoreHUD(player);
 		add(scoreHUD);
@@ -348,6 +364,16 @@ class PlayState extends FlxTransitionableState {
 		add(def.toToast(true));
 	}
 
+	function onInventoryChanged() {
+		var hasWaders = player.inventory.hasWaders();
+		if (terrainLayer != null) {
+			terrainLayer.setShallowCollisions(!hasWaders);
+		}
+		if (shallowColliders != null) {
+			shallowColliders.exists = !hasWaders;
+		}
+	}
+
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
@@ -357,6 +383,12 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 		FlxG.collide(bushGroup, player, Bush.onCollide);
+
+		if (player.inventory.hasWaders() && terrainLayer != null) {
+			player.inShallowWater = terrainLayer.isFullyInTaggedArea(player, [SHALLOW, SOLID]);
+		} else {
+			player.inShallowWater = false;
+		}
 		ySortGroup.sort((order, a, b) -> {
 			var objA:flixel.FlxObject = cast a;
 			var objB:flixel.FlxObject = cast b;
@@ -391,6 +423,16 @@ class PlayState extends FlxTransitionableState {
 		shop.checkInteraction(player);
 
 		updateSparkles(elapsed);
+		updateSeagulls(elapsed);
+	}
+
+	function updateSeagulls(elapsed:Float) {
+		seagullTimer -= elapsed;
+		if (seagullTimer > 0) {
+			return;
+		}
+		seagullTimer = FlxG.random.float(2.0, 6.0);
+		seagullGroup.add(new Seagull(FlxG.random.bool()));
 	}
 
 	function updateSparkles(elapsed:Float) {

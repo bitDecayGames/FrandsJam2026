@@ -14,6 +14,9 @@ class Inventory {
 			items.push(Rock);
 		}
 		#end
+		#if waders
+		items.push(Waders);
+		#end
 	}
 
 	public function add(item:InventoryItem):Bool {
@@ -65,10 +68,15 @@ class Inventory {
 		return items.length;
 	}
 
+	public function hasWaders():Bool {
+		return has(Waders);
+	}
+
 	static function matchesItem(a:InventoryItem, b:InventoryItem):Bool {
 		return switch [a, b] {
 			case [Rock, Rock]: true;
 			case [Fish(_), Fish(_)]: true;
+			case [Waders, Waders]: true;
 			default: false;
 		};
 	}
@@ -77,4 +85,5 @@ class Inventory {
 enum InventoryItem {
 	Rock;
 	Fish(fishSpriteIndex:Int);
+	Waders;
 }
