@@ -114,13 +114,13 @@ class PlayState extends FlxTransitionableState {
 		player.setNetwork(sessionId);
 	}
 
-	function onPlayerAdded(sessionId:String, playerState:PlayerState) {
+	function onPlayerAdded(sessionId:String, data:{state:PlayerState}) {
 		if (sessionId == player.sessionId) {
 			return;
 		}
 		// TODO: Have server give us the player color, too
 		trace('PlayState: remote player $sessionId appeared');
-		var remote = new Player(playerState.x, playerState.y, this);
+		var remote = new Player(data.state.x, data.state.y, this);
 		remote.isRemote = true;
 		remote.setNetwork(sessionId);
 		remotePlayers.set(sessionId, remote);

@@ -211,12 +211,27 @@ class Player extends FlxSprite {
 		GameManager.ME.net.onPlayerChanged.add(handleChange);
 	}
 
-	private function handleChange(sesId:String, state:PlayerState):Void {
+	private function handleChange(sesId:String, data:{state:PlayerState, ?prevX:Float, ?prevY:Float}):Void {
 		if (sesId != sessionId) {
 			return;
 		}
 
-		setPosition(state.x, state.y);
+		var deltaPos = new FlxPoint();
+		if (data.prevX != null) {
+			deltaPos.x = data.state.x - data.prevX;
+		}
+		if (data.prevY != null) {
+			deltaPos.y = data.state.y - data.prevY;
+		}
+		lastInputDir = Cardinal.closest(deltaPos);
+
+		// QLog.notice('!!!!!!!!!!!!!!!! x: ${data.state.x}, y: ${data.state.y}, prevX: ${data.prevX}, prevY: ${data.prevY}, deltaX: ${deltaPos.x}, deltaY: ${deltaPos.y}, lastInputDir: ${lastInputDir}');
+
+		setPosition(data.state.x, data.state.y);
+
+		if (isRemote) {
+			playMovementAnim();
+		}
 	}
 
 	override public function update(delta:Float) {

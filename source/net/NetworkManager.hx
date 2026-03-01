@@ -11,7 +11,8 @@ import schema.FishState;
 import schema.RoundState;
 
 typedef SessionIdSignal = FlxTypedSignal<String->Void>;
-typedef PlayerStateSignal = FlxTypedSignal<String->PlayerState->Void>;
+typedef PlayerUpdateData = {state:PlayerState, ?prevX:Float, ?prevY:Float};
+typedef PlayerStateSignal = FlxTypedSignal<(String, PlayerUpdateData) -> Void>;
 typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>;
 
 class NetworkManager {
@@ -39,6 +40,7 @@ class NetworkManager {
 		var addr = '${Configure.getServerProtocol()}$host:$port';
 		trace('attempting to connect to: ${addr}');
 		client = new Client(addr);
+
 		client.joinOrCreate(roomName, new Map<String, Dynamic>(), GameState, (err, joinedRoom) -> {
 			if (err != null) {
 				trace('NetworkManager: failed to join room — $err');
@@ -82,15 +84,15 @@ class NetworkManager {
 				if (sessionId == mySessionId) {
 					return;
 				}
-				onPlayerAdded.dispatch(sessionId, player);
+				onPlayerAdded.dispatch(sessionId, {state: player});
 
-				cb.listen(player, "x", (_, _) -> {
-					trace('NetMan: (sesh: ${sessionId} x update');
-					onPlayerChanged.dispatch(sessionId, player);
+				cb.listen(player, "x", (_, prevX:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');
+					onPlayerChanged.dispatch(sessionId, {state: player, prevX: prevX});
 				});
-				cb.listen(player, "y", (_, _) -> {
-					trace('NetMan: (sesh: ${sessionId} y update');
-					onPlayerChanged.dispatch(sessionId, player);
+				cb.listen(player, "y", (_, prevY:Float) -> {
+					trace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+					onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
 				});
 			});
 
