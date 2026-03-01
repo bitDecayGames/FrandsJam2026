@@ -2,6 +2,7 @@ package entities;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
+import levels.ldtk.BDTilemap;
 import levels.ldtk.Level;
 
 class PepperPickup extends FlxSprite {
@@ -11,7 +12,7 @@ class PepperPickup extends FlxSprite {
 		visible = false;
 	}
 
-	public function spawn(level:Level) {
+	public function spawn(level:Level, ?terrain:BDTilemap) {
 		var layer = level.fishSpawnerLayer;
 		var w = layer.cWid;
 		var h = layer.cHei;
@@ -21,7 +22,11 @@ class PepperPickup extends FlxSprite {
 		for (cy in 0...h) {
 			for (cx in 0...w) {
 				if (layer.getInt(cx, cy) != 1) {
-					landTiles.push({cx: cx, cy: cy});
+					var px = cx * grid + grid / 2;
+					var py = cy * grid + grid / 2;
+					if (terrain == null || !terrain.isShallowAt(px, py)) {
+						landTiles.push({cx: cx, cy: cy});
+					}
 				}
 			}
 		}

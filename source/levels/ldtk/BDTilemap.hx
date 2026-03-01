@@ -148,6 +148,18 @@ class BDTilemap extends LdtkTilemap<Enum_TileTags> {
 		return true;
 	}
 
+	public function isShallowAt(worldX:Float, worldY:Float):Bool {
+		var col = Std.int((worldX - x) / scaledTileWidth);
+		var row = Std.int((worldY - y) / scaledTileHeight);
+		if (col < 0 || col >= widthInTiles || row < 0 || row >= heightInTiles) {
+			return false;
+		}
+
+		@:privateAccess
+		var tileIndex = _data[row * widthInTiles + col];
+		return isShallowTile(tileIndex);
+	}
+
 	public function sampleColorAt(worldX:Float, worldY:Float):FlxColor {
 		var col = Std.int((worldX - x) / scaledTileWidth);
 		var row = Std.int((worldY - y) / scaledTileHeight);

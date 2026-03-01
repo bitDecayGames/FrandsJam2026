@@ -2,6 +2,7 @@ package entities;
 
 import flixel.FlxG;
 import flixel.FlxSprite;
+import levels.ldtk.BDTilemap;
 import levels.ldtk.Level;
 import com.bitdecay.textpop.style.builtin.FloatAway;
 import com.bitdecay.textpop.TextPop;
@@ -23,7 +24,7 @@ class Shop extends FlxSprite {
 
 	// Re-written by Lumo, Proton’s multi‑model AI assistant
 	// with some slight hooman modifications.
-	public function spawnRandom(level:Level) {
+	public function spawnRandom(level:Level, ?terrain:BDTilemap) {
 		// Level grid information
 		var layer = level.fishSpawnerLayer;
 		var cols = layer.cWid; // number of cells horizontally
@@ -46,9 +47,13 @@ class Shop extends FlxSprite {
 		var candidates = new Array<Int>();
 		for (cy in 0...rows) {
 			for (cx in 0...cols) {
-				// 1️⃣  Cell must be walkable
-				// TODO Handle water layer, shop will sometimes spawn partially in water
+				// 1️⃣  Cell must be walkable (not water, not shallow)
 				if (layer.getInt(cx, cy) != 1) {
+					var tileX = cx * gridSize + gridSize / 2;
+					var tileY = cy * gridSize + gridSize / 2;
+					if (terrain != null && terrain.isShallowAt(tileX, tileY)) {
+						continue;
+					}
 					// 2️⃣  Compute the pixel position where the shop’s top‑left corner would land
 					var posX = cx * gridSize;
 					var posY = cy * gridSize;
