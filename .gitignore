@@ -18,6 +18,8 @@ metrics/.env
 # FMOD
 fmod/.cache/
 fmod/.unsaved/
+fmod/.user/
+
 # haxefmod integration
 fmod/Cached*
 
