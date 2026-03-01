@@ -74,10 +74,20 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			trace('${client.sessionId}: sent "round_update" message: ${Json.stringify(data)}');
 			if (data != null) {
 				if (data.status != null) {
-					state.round.status = data.status;
+					trace('update round status: ${state.round.status} -> ${data.status}');
+					var newStatus:String = data.status;
+					state.round.status = newStatus;
+
 					for (sId => pp in state.players) {
 						pp.ready = false;
 					}
+
+					broadcast("round_has_changed", {
+						sessionId: client.sessionId,
+						x: data.x,
+						y: data.y,
+						dir: data.dir
+					}, {except: client});
 				}
 				if (data.currentRound != null) {
 					state.round.currentRound = data.currentRound;
