@@ -1,5 +1,6 @@
 package states;
 
+import entities.FishTypes;
 import schema.RoundState;
 import managers.GameManager;
 import net.NetworkManager;
@@ -31,6 +32,7 @@ class PostRoundState extends FlxTransitionableState {
 	static inline var SCORE_ROW_HEIGHT:Int = 36;
 	static inline var FIRST_PLACE_SIZE:Int = 20;
 	static inline var OTHER_PLACE_SIZE:Int = 16;
+	static inline var FISH_DETAIL_ROW_HEIGHT:Int = 16;
 
 	override public function create():Void {
 		super.create();
@@ -72,9 +74,10 @@ class PostRoundState extends FlxTransitionableState {
 
 	private function buildScoreboard():Void {
 		var gm = GameManager.ME;
+		var roundNum = gm.getCurrentRoundNumber();
 
 		// Gather all player scores (local + remote)
-		var entries:Array<{name:String, score:Int}> = [];
+		var entries:Array<{sessionId:String, name:String, score:Int}> = [];
 
 		// Local player
 		var localName = gm.names.get(gm.mySessionId);
@@ -82,7 +85,7 @@ class PostRoundState extends FlxTransitionableState {
 			localName = "You";
 		}
 		var localScore = gm.scores.exists(gm.mySessionId) ? gm.scores.get(gm.mySessionId) : 0;
-		entries.push({name: localName, score: localScore});
+		entries.push({sessionId: gm.mySessionId, name: localName, score: localScore});
 
 		// Remote players
 		for (sessionId in gm.sessions) {
@@ -94,7 +97,7 @@ class PostRoundState extends FlxTransitionableState {
 				name = "???";
 			}
 			var score = gm.scores.exists(sessionId) ? gm.scores.get(sessionId) : 0;
-			entries.push({name: name, score: score});
+			entries.push({sessionId: sessionId, name: name, score: score});
 		}
 
 		// Sort descending by score (highest first)
@@ -103,8 +106,9 @@ class PostRoundState extends FlxTransitionableState {
 		// Determine the top score for first-place sizing
 		var topScore = if (entries.length > 0) entries[0].score else 0;
 
-		// Assign place labels (handling ties)
+		// Assign place labels (handling ties) and render rows + fish details
 		var currentPlace = 1;
+		var currentY = SCORE_START_Y;
 		for (i in 0...entries.length) {
 			if (i > 0 && entries[i].score < entries[i - 1].score) {
 				currentPlace = i + 1;
@@ -112,14 +116,13 @@ class PostRoundState extends FlxTransitionableState {
 
 			var isFirst = entries[i].score == topScore;
 			var fontSize = isFirst ? FIRST_PLACE_SIZE : OTHER_PLACE_SIZE;
-			var rowY = SCORE_START_Y + i * SCORE_ROW_HEIGHT;
 
 			// Place label (1st, 2nd, 3rd, etc.) — left side
 			var placeText = new FlxText();
 			placeText.size = fontSize;
 			placeText.alignment = FlxTextAlign.LEFT;
 			placeText.text = ordinal(currentPlace);
-			placeText.setPosition(SCORE_LEFT_MARGIN, rowY);
+			placeText.setPosition(SCORE_LEFT_MARGIN, currentY);
 			if (isFirst) {
 				placeText.color = FlxColor.YELLOW;
 			}
@@ -131,7 +134,7 @@ class PostRoundState extends FlxTransitionableState {
 			nameText.size = fontSize;
 			nameText.alignment = FlxTextAlign.LEFT;
 			nameText.text = entries[i].name;
-			nameText.setPosition(SCORE_LEFT_MARGIN + 50, rowY);
+			nameText.setPosition(SCORE_LEFT_MARGIN + 50, currentY);
 			if (isFirst) {
 				nameText.color = FlxColor.YELLOW;
 			}
@@ -143,13 +146,44 @@ class PostRoundState extends FlxTransitionableState {
 			scoreText.size = fontSize;
 			scoreText.alignment = FlxTextAlign.RIGHT;
 			scoreText.text = formatMoney(entries[i].score);
-			// Position right-aligned: set x so the right edge hits the margin
-			scoreText.setPosition(FlxG.width - SCORE_RIGHT_MARGIN - scoreText.width, rowY);
+			scoreText.setPosition(FlxG.width - SCORE_RIGHT_MARGIN - scoreText.width, currentY);
 			if (isFirst) {
 				scoreText.color = FlxColor.YELLOW;
 			}
 			add(scoreText);
 			_scoreValueTexts.push(scoreText);
+
+			currentY += SCORE_ROW_HEIGHT;
+
+			// Fish details for this player
+			var fishEntries = gm.getSoldFish(roundNum, entries[i].sessionId);
+			if (fishEntries.length > 0) {
+				for (fish in fishEntries) {
+					var typeName = if (fish.fishType >= 0 && fish.fishType < FishTypes.TYPES.length) {
+						FishTypes.TYPES[fish.fishType].name;
+					} else {
+						"???";
+					};
+
+					var detailText = new FlxText();
+					detailText.size = 10;
+					detailText.alignment = FlxTextAlign.LEFT;
+					detailText.color = FlxColor.fromRGB(180, 180, 180);
+					detailText.text = typeName + " - " + Std.string(fish.lengthCm) + "cm";
+					detailText.setPosition(SCORE_LEFT_MARGIN + 70, currentY);
+					add(detailText);
+
+					var detailValue = new FlxText();
+					detailValue.size = 10;
+					detailValue.alignment = FlxTextAlign.RIGHT;
+					detailValue.color = FlxColor.fromRGB(180, 180, 180);
+					detailValue.text = formatMoney(fish.value);
+					detailValue.setPosition(FlxG.width - SCORE_RIGHT_MARGIN - detailValue.width, currentY);
+					add(detailValue);
+
+					currentY += FISH_DETAIL_ROW_HEIGHT;
+				}
+			}
 		}
 	}
 

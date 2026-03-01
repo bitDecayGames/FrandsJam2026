@@ -99,6 +99,18 @@ class Player extends FlxSprite {
 	var retractHasFish:Bool = false;
 	var remoteWasStationary:Bool = false;
 
+	// Interpolation targets for smooth remote player movement
+	var remoteTargetX:Float = 0;
+	var remoteTargetY:Float = 0;
+	var remoteServerVelX:Float = 0;
+	var remoteServerVelY:Float = 0;
+
+	static inline var REMOTE_TELEPORT_DIST_SQ:Float = 128 * 128;
+	static inline var REMOTE_SNAP_DIST_SQ:Float = 4 * 4;
+	static inline var REMOTE_BLEND_RANGE:Float = 24.0;
+	static inline var REMOTE_SPRING_K:Float = 8.0;
+	static inline var REMOTE_MAX_CORRECTION:Float = 250.0;
+
 	public var caughtFishSpriteIndex:Int = 0;
 	public var caughtFishLengthCm:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
@@ -316,6 +328,8 @@ class Player extends FlxSprite {
 		cleanupNetwork();
 
 		sessionId = session;
+		remoteTargetX = x;
+		remoteTargetY = y;
 		GameManager.ME.net.onPlayerChanged.add(handleChange);
 	}
 
@@ -324,14 +338,27 @@ class Player extends FlxSprite {
 			return;
 		}
 
-		var deltaPos = new FlxPoint();
-		if (data.prevX != null) {
-			deltaPos.x = data.state.x - data.prevX;
+		remoteTargetX = data.state.x;
+		remoteTargetY = data.state.y;
+		remoteServerVelX = data.state.velocityX;
+		remoteServerVelY = data.state.velocityY;
+
+		// Update facing direction: server velocity is most accurate; fall back to position delta
+		if (remoteServerVelX != 0 || remoteServerVelY != 0) {
+			var velPt = new FlxPoint(remoteServerVelX, remoteServerVelY);
+			lastInputDir = Cardinal.closest(velPt);
+		} else {
+			var deltaPos = new FlxPoint();
+			if (data.prevX != null) {
+				deltaPos.x = data.state.x - data.prevX;
+			}
+			if (data.prevY != null) {
+				deltaPos.y = data.state.y - data.prevY;
+			}
+			if (deltaPos.x != 0 || deltaPos.y != 0) {
+				lastInputDir = Cardinal.closest(deltaPos);
+			}
 		}
-		if (data.prevY != null) {
-			deltaPos.y = data.state.y - data.prevY;
-		}
-		lastInputDir = Cardinal.closest(deltaPos);
 
 		// Once the remote player stops (frozen during catch anim) then starts moving
 		// again, their retract is done — clean up any lingering bobber
@@ -347,16 +374,50 @@ class Player extends FlxSprite {
 				playMovementAnim(true);
 			}
 		}
+	}
 
-		setPosition(data.state.x, data.state.y);
-		velocity.set(data.state.velocityX, data.state.velocityY);
-
-		// Zero velocity during frozen cast states — mirrors the local player's `frozen` flag behavior
+	function updateRemoteInterpolation() {
+		// Freeze during cast/catch animations, same as local player
 		if (castState == CAST_ANIM || castState == CASTING || castState == CATCH_ANIM || castState == RETURNING) {
 			velocity.set(0, 0);
+			return;
 		}
 
-		if (isRemote && castState != CAST_ANIM && castState != CATCH_ANIM && castState != RETURNING && !throwing) {
+		var dx = remoteTargetX - x;
+		var dy = remoteTargetY - y;
+		var distSq = dx * dx + dy * dy;
+		var serverStopped = remoteServerVelX == 0 && remoteServerVelY == 0;
+
+		if (distSq > REMOTE_TELEPORT_DIST_SQ) {
+			// Way off — snap and sync velocity
+			setPosition(remoteTargetX, remoteTargetY);
+			velocity.set(remoteServerVelX, remoteServerVelY);
+		} else if (serverStopped && distSq <= REMOTE_SNAP_DIST_SQ) {
+			// Server stopped and we're close — snap exactly so position aligns and idle anim plays
+			setPosition(remoteTargetX, remoteTargetY);
+			velocity.set(0, 0);
+		} else {
+			var dist = Math.sqrt(distSq);
+			var corrVx = 0.0;
+			var corrVy = 0.0;
+			if (distSq > 0.25) {
+				var corrSpeed = Math.min(dist * REMOTE_SPRING_K, REMOTE_MAX_CORRECTION);
+				corrVx = (dx / dist) * corrSpeed;
+				corrVy = (dy / dist) * corrSpeed;
+			}
+
+			if (serverStopped) {
+				// Stopped but not yet close — spring directly without blend dampening the correction
+				velocity.set(corrVx, corrVy);
+			} else {
+				// Moving — blend server velocity (correct direction/anim) with correction (position fix)
+				var errorWeight = Math.min(dist / REMOTE_BLEND_RANGE, 1.0);
+				velocity.x = remoteServerVelX + (corrVx - remoteServerVelX) * errorWeight;
+				velocity.y = remoteServerVelY + (corrVy - remoteServerVelY) * errorWeight;
+			}
+		}
+
+		if (!throwing) {
 			playMovementAnim();
 		}
 	}
@@ -370,7 +431,7 @@ class Player extends FlxSprite {
 		updateRock(delta);
 
 		if (isRemote) {
-			// events drive this one
+			updateRemoteInterpolation();
 			return;
 		}
 
