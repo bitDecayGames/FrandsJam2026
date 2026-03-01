@@ -13,11 +13,18 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		setState(new GameState());
 
 		// sent when a player moves
-		onMessage("move", (client:Client, data:Dynamic) -> {
+		onMessage("move", (client:Client, data:{
+			x:Float,
+			y:Float,
+			velocityX:Float,
+			velocityY:Float
+		}) -> {
 			var player:PlayerState = state.players.get(client.sessionId);
 			if (player != null) {
 				player.x = data.x;
 				player.y = data.y;
+				player.velocityX = data.velocityX;
+				player.velocityY = data.velocityY;
 			}
 		});
 
