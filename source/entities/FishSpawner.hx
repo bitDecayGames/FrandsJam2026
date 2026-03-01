@@ -16,9 +16,9 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 
 	var net:NetworkManager;
 
-	var catchCallback:() -> Void;
+	var catchCallback:(String, String) -> Void;
 
-	public function new(onCatch:() -> Void) {
+	public function new(onCatch:(String, String) -> Void) {
 		super();
 		catchCallback = onCatch;
 	}
@@ -134,11 +134,11 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 		}
 	}
 
-	public function setBobber(bobber:FlxSprite) {
+	public function setBobbers(bobbers:Map<String, FlxSprite>) {
 		for (fish in members) {
 			if (fish == null || !fish.alive)
 				continue;
-			fish.bobber = bobber;
+			fish.bobbers = bobbers;
 		}
 	}
 

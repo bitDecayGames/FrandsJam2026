@@ -28,8 +28,8 @@ class WaterFish extends FlxSprite {
 
 	var attracted:Bool = false;
 
-	public var bobber:FlxSprite;
-	public var onCatch:() -> Void;
+	public var bobbers:Map<String, FlxSprite> = new Map();
+	public var onCatch:(fishId:String, catcherSessionId:String) -> Void;
 
 	var respawnTimer:Float = 0;
 	var fadeInTimer:Float = 0;
@@ -139,7 +139,7 @@ class WaterFish extends FlxSprite {
 
 		super.update(elapsed);
 
-		if (bobber != null || attracted) {
+		if (!Lambda.empty(bobbers) || attracted) {
 			checkBobber();
 		}
 
@@ -173,7 +173,24 @@ class WaterFish extends FlxSprite {
 	}
 
 	function checkBobber() {
-		if (bobber == null) {
+		var closestDist = Math.POSITIVE_INFINITY;
+		var closestBobber:FlxSprite = null;
+		var closestSid:String = null;
+
+		for (sid => bobb in bobbers) {
+			if (bobb == null)
+				continue;
+			var dx = (bobb.x + bobb.width / 2) - (x + width / 2);
+			var dy = (bobb.y + bobb.height / 2) - (y + height / 2);
+			var dist = Math.sqrt(dx * dx + dy * dy);
+			if (dist < closestDist) {
+				closestDist = dist;
+				closestBobber = bobb;
+				closestSid = sid;
+			}
+		}
+
+		if (closestBobber == null || closestDist > ATTRACT_DIST) {
 			if (attracted) {
 				attracted = false;
 				fleeFrom(x + velocity.x, y + velocity.y);
@@ -181,38 +198,24 @@ class WaterFish extends FlxSprite {
 			return;
 		}
 
-		var bx = bobber.x + bobber.width / 2;
-		var by = bobber.y + bobber.height / 2;
-		var fx = x + width / 2;
-		var fy = y + height / 2;
-		var dx = bx - fx;
-		var dy = by - fy;
-		var dist = Math.sqrt(dx * dx + dy * dy);
-
-		if (dist < CATCH_DIST) {
+		if (closestDist < CATCH_DIST) {
 			alive = false;
 			visible = false;
 			velocity.set(0, 0);
 			attracted = false;
 			respawnTimer = 3.0;
-			if (onCatch != null) {
-				onCatch();
-			}
+			if (onCatch != null)
+				onCatch(fishId, closestSid);
 			return;
-		} else if (dist < ATTRACT_DIST) {
-			attracted = true;
-			pauseTimer = 0;
-			if (dist > 0.1) {
-				velocity.set((dx / dist) * ATTRACT_SPEED, (dy / dist) * ATTRACT_SPEED);
-			}
-		} else if (attracted) {
-			stopAttract();
 		}
-	}
 
-	function stopAttract() {
-		attracted = false;
-		pickTarget();
+		// attract toward closest bobber
+		attracted = true;
+		pauseTimer = 0;
+		var dx = (closestBobber.x + closestBobber.width / 2) - (x + width / 2);
+		var dy = (closestBobber.y + closestBobber.height / 2) - (y + height / 2);
+		if (closestDist > 0.1)
+			velocity.set((dx / closestDist) * ATTRACT_SPEED, (dy / closestDist) * ATTRACT_SPEED);
 	}
 
 	function respawn() {
@@ -233,7 +236,7 @@ class WaterFish extends FlxSprite {
 		}
 		// Don't put waterTiles points — they're shared across fish in the same body
 		waterTiles = null;
-		bobber = null;
+		bobbers = null;
 		onCatch = null;
 		super.destroy();
 	}
