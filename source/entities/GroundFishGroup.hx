@@ -5,13 +5,13 @@ import flixel.FlxG;
 import flixel.group.FlxGroup.FlxTypedGroup;
 
 class GroundFishGroup extends FlxTypedGroup<GroundFish> {
-	var waterLayer:ldtk.Layer_IntGrid;
+	var waterLayer:levels.ldtk.WaterGrid;
 
 	public function new() {
 		super();
 	}
 
-	public function setWaterLayer(layer:ldtk.Layer_IntGrid) {
+	public function setWaterLayer(layer:levels.ldtk.WaterGrid) {
 		waterLayer = layer;
 	}
 

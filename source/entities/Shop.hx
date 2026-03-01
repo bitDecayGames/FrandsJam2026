@@ -28,7 +28,7 @@ class Shop extends FlxSprite {
 	// with some slight hooman modifications.
 	public function spawnRandom(level:Level, ?terrain:BDTilemap) {
 		// Level grid information
-		var layer = level.fishSpawnerLayer;
+		var layer = level.waterGrid;
 		var cols = layer.cWid; // number of cells horizontally
 		var rows = layer.cHei; // number of cells vertically
 		var gridSize = layer.gridSize; // size of one cell in pixels

@@ -14,7 +14,7 @@ class WadersPickup extends FlxSprite {
 	}
 
 	public function spawn(level:Level, ?terrain:BDTilemap) {
-		var layer = level.fishSpawnerLayer;
+		var layer = level.waterGrid;
 		var w = layer.cWid;
 		var h = layer.cHei;
 		var grid = layer.gridSize;

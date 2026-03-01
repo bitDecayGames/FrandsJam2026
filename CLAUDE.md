@@ -10,7 +10,6 @@ FrandsJam is a HaxeFlixel game built with Haxe, OpenFL/Lime, and FMOD audio. It 
 
 ```bash
 ./bin/init_deps.sh          # Install dependencies from haxelib.deps
-haxelib set flixel 6.0.0    # Required once per terminal session before building (fixes "GraphicArrowLeft/GraphicArrowRight not found" errors)
 lime build html5             # Production build
 lime build html5 -debug      # Debug build
 lime build hl -debug         # HashLink debug build (preferred for local testing)
@@ -19,6 +18,8 @@ lime build hl -debug         # HashLink debug build (preferred for local testing
 ./bin/generate_events.sh     # Regenerate Event.hx from types.json
 ./bin/setup_hooks.sh         # Install git hooks
 ```
+
+**Never run `haxelib set flixel` as part of build commands.** The user manages their flixel version manually.
 
 **Do not run `./bin/run_debug.sh`** — it starts a long-running HTTP server. The user will run this themselves. Use `lime build hl -debug` to compile only.
 

@@ -27,7 +27,7 @@ class Level {
 	public var songEvent:String = "";
 
 	public var terrainLayer:BDTilemap;
-	public var fishSpawnerLayer:ldtk.Layer_IntGrid;
+	public var waterGrid:WaterGrid;
 	public var spawnPoint:FlxPoint = FlxPoint.get();
 	public var tileColliders:FlxTypedGroup<FlxSprite>;
 	public var shallowTileColliders:FlxTypedGroup<FlxSprite>;
@@ -48,7 +48,7 @@ class Level {
 		shallowTileColliders = new FlxTypedGroup<FlxSprite>();
 		tileColliders = loadTileHitboxes(raw.l_Terrain);
 
-		fishSpawnerLayer = raw.l_FishSpawner;
+		waterGrid = buildWaterGrid(raw.l_Terrain);
 
 		if (raw.l_Objects.all_Spawn.length == 0) {
 			throw('no spawn found in level ${nameOrIID}');
@@ -61,6 +61,20 @@ class Level {
 
 		parseCameraZones(raw.l_Objects.all_CameraZone);
 		parseCameraTransitions(raw.l_Objects.all_CameraTransition);
+	}
+
+	function buildWaterGrid(terrainLdtk:ldtk.Layer_Tiles):WaterGrid {
+		var w = terrainLdtk.cWid;
+		var h = terrainLdtk.cHei;
+		var grid = new WaterGrid(w, h, terrainLdtk.gridSize);
+		for (row in 0...h) {
+			for (col in 0...w) {
+				if (terrainLayer.isSwimmableAt(col, row)) {
+					grid.setWater(col, row);
+				}
+			}
+		}
+		return grid;
 	}
 
 	function loadTileHitboxes(terrainLdtk:ldtk.Layer_Tiles):FlxTypedGroup<FlxSprite> {
