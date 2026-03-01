@@ -28,6 +28,7 @@ class NetworkManager {
 	public var onPlayerRemoved:SessionIdSignal = new SessionIdSignal();
 	public var onFishMove:FishStateSignal = new FishStateSignal();
 	public var onFishAdded = new FishStateSignal();
+	public var onRockSplash = new FlxTypedSignal<Float->Float->Void>();
 
 	public static inline var roomName:String = "game_room";
 
@@ -103,6 +104,13 @@ class NetworkManager {
 
 			room.onMessage("cast_line", (message) -> {
 				trace('[NetMan] cast_line => ${message.x}, ${message.y}');
+			});
+
+			room.onMessage("rock_splash", (message:Dynamic) -> {
+				var sx:Float = message.x;
+				var sy:Float = message.y;
+				trace('[NetMan] rock_splash => $sx, $sy');
+				onRockSplash.dispatch(sx, sy);
 			});
 		});
 	}

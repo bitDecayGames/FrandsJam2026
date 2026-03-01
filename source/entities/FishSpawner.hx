@@ -134,6 +134,18 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 		}
 	}
 
+	public function scareFish(splashX:Float, splashY:Float, radius:Float = 80) {
+		for (fish in members) {
+			if (fish == null || !fish.alive)
+				continue;
+			var dx = fish.x - splashX;
+			var dy = fish.y - splashY;
+			if (dx * dx + dy * dy < radius * radius) {
+				fish.scare(splashX, splashY);
+			}
+		}
+	}
+
 	public function setBobber(bobber:FlxSprite) {
 		for (fish in members) {
 			if (fish == null || !fish.alive)
