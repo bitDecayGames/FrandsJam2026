@@ -48,6 +48,10 @@ class InventoryHUD extends FlxSpriteGroup {
 						slots[i].animation.play("fish");
 						slots[i].scale.set(1, 1);
 						slots[i].offset.set(0, 0);
+					case Waders:
+						slots[i].makeGraphic(SLOT_SIZE, SLOT_SIZE, FlxColor.BLUE);
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
 				}
 			} else {
 				// slots[i].loadGraphic(null);

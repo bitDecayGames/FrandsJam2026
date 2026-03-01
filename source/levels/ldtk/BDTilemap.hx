@@ -56,8 +56,23 @@ class BDTile extends LdtkTile<Enum_TileTags> {
 			allowCollisions = ANY;
 		}
 
+		if (tags.contains(SHALLOW)) {
+			allowCollisions = ANY;
+		}
+
 		if (tags.contains(ONEWAY)) {
 			allowCollisions = UP;
+		}
+	}
+
+	public function hasCustomHitbox():Bool {
+		var tm:BDTilemap = cast tilemap;
+		return tm.customHitboxTileIds.exists(index);
+	}
+
+	public function applyCustomHitbox():Void {
+		if (hasCustomHitbox()) {
+			allowCollisions = NONE;
 		}
 	}
 }
@@ -67,6 +82,72 @@ class BDTile extends LdtkTile<Enum_TileTags> {
  * game specific parsing of tile tags and metadata
 **/
 class BDTilemap extends LdtkTilemap<Enum_TileTags> {
+	public var customHitboxTileIds:Map<Int, Bool> = new Map();
+
+	public function setCustomHitboxTileIds(ids:Map<Int, Bool>):Void {
+		customHitboxTileIds = ids;
+		@:privateAccess
+		for (tile in _tileObjects) {
+			var bdTile:BDTile = cast tile;
+			bdTile.applyCustomHitbox();
+		}
+	}
+
+	public function setShallowCollisions(enabled:Bool):Void {
+		@:privateAccess
+		for (tile in _tileObjects) {
+			var bdTile:BDTile = cast tile;
+			if (bdTile.tags != null && bdTile.tags.contains(SHALLOW) && !bdTile.hasCustomHitbox()) {
+				bdTile.allowCollisions = enabled ? ANY : NONE;
+			}
+		}
+	}
+
+	public function isShallowTile(tileId:Int):Bool {
+		@:privateAccess
+		if (tileId >= 0 && tileId < _tileObjects.length) {
+			var bdTile:BDTile = cast _tileObjects[tileId];
+			return bdTile.tags != null && bdTile.tags.contains(SHALLOW);
+		}
+		return false;
+	}
+
+	public function isFullyInTaggedArea(object:flixel.FlxObject, tags:Array<Enum_TileTags>):Bool {
+		var minCol = Std.int((object.x - x) / scaledTileWidth);
+		var maxCol = Std.int((object.x + object.width - 1 - x) / scaledTileWidth);
+		var minRow = Std.int((object.y - y) / scaledTileHeight);
+		var maxRow = Std.int((object.y + object.height - 1 - y) / scaledTileHeight);
+
+		if (minCol < 0 || minRow < 0 || maxCol >= widthInTiles || maxRow >= heightInTiles) {
+			return false;
+		}
+
+		@:privateAccess
+		for (row in minRow...maxRow + 1) {
+			for (col in minCol...maxCol + 1) {
+				var tileId = _data[row * widthInTiles + col];
+				if (tileId < 0 || tileId >= _tileObjects.length) {
+					return false;
+				}
+				var bdTile:BDTile = cast _tileObjects[tileId];
+				if (bdTile.tags == null) {
+					return false;
+				}
+				var hasAny = false;
+				for (tag in tags) {
+					if (bdTile.tags.contains(tag)) {
+						hasAny = true;
+						break;
+					}
+				}
+				if (!hasAny) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
 	override function createTile(index:Int, width:Float, height:Float):BDTile {
 		return new BDTile(this, index, width, height);
 	}

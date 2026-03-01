@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tile Hitbox Polygon Editor</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1a1a2e; color: #e0e0e0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* Top bar */
+.top-bar { background: #16213e; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f3460; flex-shrink: 0; }
+.top-bar h1 { font-size: 16px; color: #e94560; margin-right: 16px; }
+.top-bar button, .top-bar label { font-size: 13px; }
+button { background: #0f3460; color: #e0e0e0; border: 1px solid #e94560; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+button:hover { background: #e94560; }
+button:disabled { opacity: 0.4; cursor: default; }
+button.active { background: #e94560; }
+input[type="file"] { display: none; }
+.file-label { background: #0f3460; color: #e0e0e0; border: 1px solid #e94560; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.file-label:hover { background: #e94560; }
+select { background: #0f3460; color: #e0e0e0; border: 1px solid #0f3460; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+
+/* Main layout */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* Left panel - tileset grid */
+.left-panel { width: 360px; min-width: 360px; border-right: 1px solid #0f3460; display: flex; flex-direction: column; }
+.left-header { padding: 8px; background: #16213e; border-bottom: 1px solid #0f3460; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.grid-container { flex: 1; overflow: auto; padding: 8px; }
+#tilesetCanvas { cursor: pointer; image-rendering: pixelated; }
+
+/* Right panel - polygon editor */
+.right-panel { flex: 1; display: flex; flex-direction: column; }
+.right-header { padding: 8px; background: #16213e; border-bottom: 1px solid #0f3460; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.editor-container { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+#editorCanvas { cursor: crosshair; image-rendering: pixelated; }
+
+/* Preset buttons */
+.presets { display: flex; gap: 4px; flex-wrap: wrap; }
+.presets button { padding: 2px 8px; font-size: 11px; }
+
+/* Bottom bar */
+.bottom-bar { background: #16213e; padding: 6px 16px; border-top: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; font-size: 12px; }
+.status { color: #aaa; }
+.progress { color: #e94560; }
+
+/* Legend */
+.legend { display: flex; gap: 12px; font-size: 11px; align-items: center; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 12px; height: 12px; border: 2px solid; }
+
+/* Tooltip */
+.tooltip { position: absolute; background: #16213e; color: #e0e0e0; padding: 4px 8px; border: 1px solid #e94560; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 100; white-space: nowrap; }
+
+/* Help overlay */
+.help-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+.help-overlay.visible { display: flex; }
+.help-box { background: #16213e; border: 1px solid #e94560; border-radius: 8px; padding: 24px; max-width: 500px; max-height: 80vh; overflow-y: auto; }
+.help-box h2 { color: #e94560; margin-bottom: 12px; }
+.help-box dt { color: #e94560; font-weight: bold; margin-top: 8px; }
+.help-box dd { margin-left: 16px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+    <h1>Tile Hitbox Editor</h1>
+    <label class="file-label" id="ldtkLabel">
+        Load .ldtk
+        <input type="file" id="ldtkInput" accept=".ldtk,.json">
+    </label>
+    <label class="file-label" id="imageLabel" style="display:none">
+        Load Tileset Image
+        <input type="file" id="imageInput" accept="image/*">
+    </label>
+    <select id="tilesetSelect" style="display:none"></select>
+    <span id="imageHint" style="display:none; font-size:12px; color:#aaa;"></span>
+    <div style="flex:1"></div>
+    <button id="importBtn" disabled>Import JSON</button>
+    <input type="file" id="importInput" accept=".json" style="display:none">
+    <button id="exportBtn" disabled>Export JSON</button>
+    <button id="helpBtn">Help (?)</button>
+</div>
+
+<div class="main">
+    <div class="left-panel">
+        <div class="left-header">
+            <div class="legend">
+                <span class="legend-item"><span class="legend-swatch" style="border-color:#e94560"></span>SOLID</span>
+                <span class="legend-item"><span class="legend-swatch" style="border-color:#4a9eff"></span>SHALLOW</span>
+                <span class="legend-item"><span class="legend-swatch" style="border-color:#4eff4e"></span>Polygon</span>
+                <span class="legend-item"><span class="legend-swatch" style="border-color:#ffd700"></span>Selected</span>
+            </div>
+            <label style="font-size:12px"><input type="checkbox" id="filterTagged"> Tagged only</label>
+        </div>
+        <div class="grid-container" id="gridContainer">
+            <canvas id="tilesetCanvas"></canvas>
+        </div>
+    </div>
+    <div class="right-panel">
+        <div class="right-header">
+            <button id="prevBtn" disabled>&lt; Prev</button>
+            <button id="nextBtn" disabled>Next &gt;</button>
+            <span id="tileInfo" style="font-size:13px;">No tile selected</span>
+            <div style="flex:1"></div>
+            <div class="presets">
+                <button class="preset-btn" data-preset="full">Full</button>
+                <button class="preset-btn" data-preset="top">Top ½</button>
+                <button class="preset-btn" data-preset="bottom">Bot ½</button>
+                <button class="preset-btn" data-preset="left">Left ½</button>
+                <button class="preset-btn" data-preset="right">Right ½</button>
+                <button class="preset-btn" data-preset="tri-tl">◸ TL</button>
+                <button class="preset-btn" data-preset="tri-tr">◹ TR</button>
+                <button class="preset-btn" data-preset="tri-bl">◺ BL</button>
+                <button class="preset-btn" data-preset="tri-br">◿ BR</button>
+            </div>
+            <button id="clearBtn">Clear</button>
+            <button id="copyBtn" disabled>Copy</button>
+            <button id="pasteBtn" disabled>Paste</button>
+            <button id="mirrorHBtn" disabled>Mirror H</button>
+            <button id="mirrorVBtn" disabled>Mirror V</button>
+            <button id="undoBtn" disabled>Undo</button>
+        </div>
+        <div class="editor-container">
+            <canvas id="editorCanvas" width="256" height="256"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-bar">
+    <span class="status" id="statusText">Load an .ldtk file to begin</span>
+    <span class="progress" id="progressText"></span>
+</div>
+
+<div class="tooltip" id="tooltip" style="display:none"></div>
+
+<div class="help-overlay" id="helpOverlay">
+    <div class="help-box">
+        <h2>Tile Hitbox Editor - Help</h2>
+        <dl>
+            <dt>Loading</dt>
+            <dd>1. Click "Load .ldtk" and select your LDTK project file</dd>
+            <dd>2. Click "Load Tileset Image" and select the tileset PNG</dd>
+            <dt>Drawing Polygons</dt>
+            <dd>Click on the editor to place vertices (snapped to pixel coords)</dd>
+            <dd>Double-click or right-click near the first vertex to close the polygon</dd>
+            <dd>Drag vertices to reposition them</dd>
+            <dd>Shift+click a vertex to delete it</dd>
+            <dt>Presets</dt>
+            <dd>Use preset buttons for common shapes (full, halves, corner triangles)</dd>
+            <dt>Navigation</dt>
+            <dd>Click tiles in the grid, or use Prev/Next buttons</dd>
+            <dd>Arrow keys also navigate (Left/Right, Up/Down)</dd>
+            <dd>"Tagged only" filter shows only SOLID/SHALLOW tiles</dd>
+            <dt>Copy/Paste</dt>
+            <dd>Copy polygon from current tile, select another tile, then Paste</dd>
+            <dd>Mirror H/V flips the current polygon horizontally/vertically</dd>
+            <dt>Undo</dt>
+            <dd>Removes the last placed vertex (Ctrl+Z)</dd>
+            <dt>Export/Import</dt>
+            <dd>Export saves tile-hitboxes.json with all polygon data</dd>
+            <dd>Import loads a previously exported JSON to resume editing</dd>
+            <dt>Autosave</dt>
+            <dd>Data is saved to localStorage automatically</dd>
+        </dl>
+        <br>
+        <button onclick="document.getElementById('helpOverlay').classList.remove('visible')">Close</button>
+    </div>
+</div>
+
+<script>
+(function() {
+    // State
+    let ldtkData = null;
+    let tilesetInfo = null; // { identifier, tileGridSize, pxWid, pxHei, relPath, enumTags }
+    let tilesetImage = null;
+    let selectedTileId = -1;
+    let polygons = {}; // { tileId: [[x,y], ...] }
+    let clipboard = null;
+    let undoStack = []; // per-tile undo: snapshots of current tile's polygon
+    let draggingVertex = -1;
+    let isDrawing = false; // true when polygon is open (not yet closed)
+    let filteredTileIds = null; // null = show all, array = filtered set
+    let taggedTileIds = new Set();
+    let solidTileIds = new Set();
+    let shallowTileIds = new Set();
+
+    // DOM refs
+    const ldtkInput = document.getElementById('ldtkInput');
+    const imageInput = document.getElementById('imageInput');
+    const imageLabel = document.getElementById('imageLabel');
+    const imageHint = document.getElementById('imageHint');
+    const tilesetSelect = document.getElementById('tilesetSelect');
+    const tilesetCanvas = document.getElementById('tilesetCanvas');
+    const editorCanvas = document.getElementById('editorCanvas');
+    const tilesetCtx = tilesetCanvas.getContext('2d');
+    const editorCtx = editorCanvas.getContext('2d');
+    const filterTagged = document.getElementById('filterTagged');
+    const statusText = document.getElementById('statusText');
+    const progressText = document.getElementById('progressText');
+    const tileInfo = document.getElementById('tileInfo');
+    const tooltip = document.getElementById('tooltip');
+
+    const GRID_SCALE = 2;
+    const EDITOR_SCALE = 16;
+    const CLOSE_THRESHOLD = 12; // pixels in editor space
+
+    // --- LDTK Loading ---
+    ldtkInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) { return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                ldtkData = JSON.parse(ev.target.result);
+                parseLdtk();
+            } catch (err) {
+                setStatus('Error parsing LDTK file: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    function parseLdtk() {
+        const tilesets = (ldtkData.defs?.tilesets || []).filter(ts => ts.relPath && ts.relPath !== 'None' && ts.pxWid > 0);
+        if (tilesets.length === 0) {
+            setStatus('No tilesets with images found in LDTK file');
+            return;
+        }
+
+        if (tilesets.length === 1) {
+            selectTileset(tilesets[0]);
+        } else {
+            tilesetSelect.innerHTML = '';
+            tilesets.forEach((ts, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = ts.identifier;
+                tilesetSelect.appendChild(opt);
+            });
+            tilesetSelect.style.display = '';
+            tilesetSelect.addEventListener('change', () => {
+                selectTileset(tilesets[parseInt(tilesetSelect.value)]);
+            });
+            selectTileset(tilesets[0]);
+        }
+    }
+
+    function selectTileset(ts) {
+        tilesetInfo = {
+            identifier: ts.identifier,
+            tileGridSize: ts.tileGridSize,
+            pxWid: ts.pxWid,
+            pxHei: ts.pxHei,
+            relPath: ts.relPath,
+            enumTags: ts.enumTags || []
+        };
+
+        // Parse tags
+        solidTileIds.clear();
+        shallowTileIds.clear();
+        taggedTileIds.clear();
+        for (const tag of tilesetInfo.enumTags) {
+            const ids = tag.tileIds || [];
+            if (tag.enumValueId === 'SOLID') {
+                ids.forEach(id => { solidTileIds.add(id); taggedTileIds.add(id); });
+            } else if (tag.enumValueId === 'SHALLOW') {
+                ids.forEach(id => { shallowTileIds.add(id); taggedTileIds.add(id); });
+            }
+        }
+
+        // Show image loader
+        imageLabel.style.display = '';
+        imageHint.style.display = '';
+        imageHint.textContent = 'Expected: ' + tilesetInfo.relPath;
+        setStatus('Tileset "' + tilesetInfo.identifier + '" selected. Load the tileset image.');
+
+        // Try to restore from localStorage
+        restoreFromStorage();
+    }
+
+    // --- Image Loading ---
+    imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) { return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                tilesetImage = img;
+                onReady();
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function onReady() {
+        setStatus('Ready. Click a tile to begin editing.');
+        document.getElementById('exportBtn').disabled = false;
+        document.getElementById('importBtn').disabled = false;
+        renderTilesetGrid();
+        updateProgress();
+
+        // Select first tagged tile if any
+        if (taggedTileIds.size > 0) {
+            selectTile([...taggedTileIds].sort((a,b) => a-b)[0]);
+        }
+    }
+
+    // --- Tileset Grid Rendering ---
+    function getTileCols() { return Math.floor(tilesetInfo.pxWid / tilesetInfo.tileGridSize); }
+    function getTileRows() { return Math.floor(tilesetInfo.pxHei / tilesetInfo.tileGridSize); }
+    function getTileCount() { return getTileCols() * getTileRows(); }
+
+    function getVisibleTileIds() {
+        if (filterTagged.checked) {
+            return [...taggedTileIds].sort((a,b) => a-b);
+        }
+        const count = getTileCount();
+        const ids = [];
+        for (let i = 0; i < count; i++) { ids.push(i); }
+        return ids;
+    }
+
+    function renderTilesetGrid() {
+        if (!tilesetImage || !tilesetInfo) { return; }
+
+        const gs = tilesetInfo.tileGridSize;
+        const cols = getTileCols();
+        const visibleIds = getVisibleTileIds();
+
+        // When filtered, lay out in a fixed-width grid
+        const displayCols = filterTagged.checked ? Math.min(cols, 10) : cols;
+        const displayRows = Math.ceil(visibleIds.length / displayCols);
+
+        const cellSize = gs * GRID_SCALE;
+        const gap = 2;
+        const totalW = displayCols * (cellSize + gap) + gap;
+        const totalH = displayRows * (cellSize + gap) + gap;
+
+        tilesetCanvas.width = totalW;
+        tilesetCanvas.height = totalH;
+        tilesetCtx.imageSmoothingEnabled = false;
+        tilesetCtx.fillStyle = '#111';
+        tilesetCtx.fillRect(0, 0, totalW, totalH);
+
+        visibleIds.forEach((tileId, idx) => {
+            const srcCol = tileId % cols;
+            const srcRow = Math.floor(tileId / cols);
+            const dstCol = idx % displayCols;
+            const dstRow = Math.floor(idx / displayCols);
+            const dx = gap + dstCol * (cellSize + gap);
+            const dy = gap + dstRow * (cellSize + gap);
+
+            // Draw tile image
+            tilesetCtx.drawImage(tilesetImage, srcCol * gs, srcRow * gs, gs, gs, dx, dy, cellSize, cellSize);
+
+            // Border colors
+            let borderColor = null;
+            if (tileId === selectedTileId) {
+                borderColor = '#ffd700';
+            } else if (polygons[tileId]) {
+                borderColor = '#4eff4e';
+            } else if (solidTileIds.has(tileId)) {
+                borderColor = '#e94560';
+            } else if (shallowTileIds.has(tileId)) {
+                borderColor = '#4a9eff';
+            }
+
+            if (borderColor) {
+                tilesetCtx.strokeStyle = borderColor;
+                tilesetCtx.lineWidth = 2;
+                tilesetCtx.strokeRect(dx + 1, dy + 1, cellSize - 2, cellSize - 2);
+            }
+        });
+
+        // Store layout info for click handling
+        tilesetCanvas._visibleIds = visibleIds;
+        tilesetCanvas._displayCols = displayCols;
+        tilesetCanvas._cellSize = cellSize;
+        tilesetCanvas._gap = gap;
+    }
+
+    tilesetCanvas.addEventListener('click', (e) => {
+        if (!tilesetImage || !tilesetInfo) { return; }
+        const rect = tilesetCanvas.getBoundingClientRect();
+        const scaleX = tilesetCanvas.width / rect.width;
+        const scaleY = tilesetCanvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+
+        const cellSize = tilesetCanvas._cellSize;
+        const gap = tilesetCanvas._gap;
+        const displayCols = tilesetCanvas._displayCols;
+        const visibleIds = tilesetCanvas._visibleIds;
+
+        const col = Math.floor((mx - gap) / (cellSize + gap));
+        const row = Math.floor((my - gap) / (cellSize + gap));
+        const idx = row * displayCols + col;
+
+        if (idx >= 0 && idx < visibleIds.length) {
+            selectTile(visibleIds[idx]);
+        }
+    });
+
+    tilesetCanvas.addEventListener('mousemove', (e) => {
+        if (!tilesetImage || !tilesetInfo) { return; }
+        const rect = tilesetCanvas.getBoundingClientRect();
+        const scaleX = tilesetCanvas.width / rect.width;
+        const scaleY = tilesetCanvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+
+        const cellSize = tilesetCanvas._cellSize;
+        const gap = tilesetCanvas._gap;
+        const displayCols = tilesetCanvas._displayCols;
+        const visibleIds = tilesetCanvas._visibleIds;
+
+        const col = Math.floor((mx - gap) / (cellSize + gap));
+        const row = Math.floor((my - gap) / (cellSize + gap));
+        const idx = row * displayCols + col;
+
+        if (idx >= 0 && idx < visibleIds.length) {
+            const tileId = visibleIds[idx];
+            let tags = [];
+            if (solidTileIds.has(tileId)) { tags.push('SOLID'); }
+            if (shallowTileIds.has(tileId)) { tags.push('SHALLOW'); }
+            const tagStr = tags.length > 0 ? ' [' + tags.join(', ') + ']' : '';
+            tooltip.textContent = 'Tile #' + tileId + tagStr;
+            tooltip.style.display = '';
+            tooltip.style.left = (e.clientX + 12) + 'px';
+            tooltip.style.top = (e.clientY + 12) + 'px';
+        } else {
+            tooltip.style.display = 'none';
+        }
+    });
+
+    tilesetCanvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    filterTagged.addEventListener('change', () => { renderTilesetGrid(); });
+
+    // --- Tile Selection ---
+    function selectTile(tileId) {
+        selectedTileId = tileId;
+        undoStack = [];
+        isDrawing = false;
+        draggingVertex = -1;
+        renderTilesetGrid();
+        renderEditor();
+        updateTileInfo();
+        updateButtons();
+    }
+
+    function updateTileInfo() {
+        if (selectedTileId < 0) {
+            tileInfo.textContent = 'No tile selected';
+            return;
+        }
+        let tags = [];
+        if (solidTileIds.has(selectedTileId)) { tags.push('SOLID'); }
+        if (shallowTileIds.has(selectedTileId)) { tags.push('SHALLOW'); }
+        const tagStr = tags.length > 0 ? ' [' + tags.join(', ') + ']' : '';
+        const polyStr = polygons[selectedTileId] ? ' - ' + polygons[selectedTileId].length + ' vertices' : ' - no polygon';
+        tileInfo.textContent = 'Tile #' + selectedTileId + tagStr + polyStr;
+    }
+
+    function updateButtons() {
+        const hasTile = selectedTileId >= 0;
+        const hasPoly = hasTile && polygons[selectedTileId] && polygons[selectedTileId].length > 0;
+        document.getElementById('prevBtn').disabled = !tilesetImage;
+        document.getElementById('nextBtn').disabled = !tilesetImage;
+        document.getElementById('copyBtn').disabled = !hasPoly;
+        document.getElementById('pasteBtn').disabled = !clipboard || !hasTile;
+        document.getElementById('mirrorHBtn').disabled = !hasPoly;
+        document.getElementById('mirrorVBtn').disabled = !hasPoly;
+        document.getElementById('undoBtn').disabled = undoStack.length === 0;
+        document.querySelectorAll('.preset-btn').forEach(b => b.disabled = !hasTile);
+        document.getElementById('clearBtn').disabled = !hasPoly;
+    }
+
+    // --- Editor Rendering ---
+    function renderEditor() {
+        const ctx = editorCtx;
+        const gs = tilesetInfo ? tilesetInfo.tileGridSize : 16;
+        const size = gs * EDITOR_SCALE;
+        editorCanvas.width = size;
+        editorCanvas.height = size;
+        ctx.imageSmoothingEnabled = false;
+
+        // Background
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, size, size);
+
+        if (selectedTileId < 0 || !tilesetImage || !tilesetInfo) { return; }
+
+        // Draw tile image scaled up
+        const cols = getTileCols();
+        const srcCol = selectedTileId % cols;
+        const srcRow = Math.floor(selectedTileId / cols);
+        ctx.drawImage(tilesetImage, srcCol * gs, srcRow * gs, gs, gs, 0, 0, size, size);
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < gs; i++) {
+            const p = i * EDITOR_SCALE;
+            ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke();
+        }
+
+        // Draw polygon
+        const poly = polygons[selectedTileId];
+        if (poly && poly.length > 0) {
+            // Fill
+            ctx.fillStyle = 'rgba(233, 69, 96, 0.25)';
+            ctx.beginPath();
+            ctx.moveTo(poly[0][0] * EDITOR_SCALE, poly[0][1] * EDITOR_SCALE);
+            for (let i = 1; i < poly.length; i++) {
+                ctx.lineTo(poly[i][0] * EDITOR_SCALE, poly[i][1] * EDITOR_SCALE);
+            }
+            if (!isDrawing) {
+                ctx.closePath();
+            }
+            ctx.fill();
+
+            // Stroke
+            ctx.strokeStyle = '#e94560';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(poly[0][0] * EDITOR_SCALE, poly[0][1] * EDITOR_SCALE);
+            for (let i = 1; i < poly.length; i++) {
+                ctx.lineTo(poly[i][0] * EDITOR_SCALE, poly[i][1] * EDITOR_SCALE);
+            }
+            if (!isDrawing) {
+                ctx.closePath();
+            }
+            ctx.stroke();
+
+            // Vertices
+            for (let i = 0; i < poly.length; i++) {
+                const vx = poly[i][0] * EDITOR_SCALE;
+                const vy = poly[i][1] * EDITOR_SCALE;
+                ctx.fillStyle = i === 0 && isDrawing ? '#ffd700' : '#fff';
+                ctx.beginPath();
+                ctx.arc(vx, vy, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#e94560';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+    }
+
+    // --- Editor Interaction ---
+    function editorToTile(e) {
+        const rect = editorCanvas.getBoundingClientRect();
+        const scaleX = editorCanvas.width / rect.width;
+        const scaleY = editorCanvas.height / rect.height;
+        const ex = (e.clientX - rect.left) * scaleX;
+        const ey = (e.clientY - rect.top) * scaleY;
+        // Snap to integer pixel coords
+        const gs = tilesetInfo.tileGridSize;
+        let tx = Math.round(ex / EDITOR_SCALE);
+        let ty = Math.round(ey / EDITOR_SCALE);
+        tx = Math.max(0, Math.min(gs, tx));
+        ty = Math.max(0, Math.min(gs, ty));
+        return { tx, ty, ex, ey };
+    }
+
+    function findNearVertex(poly, ex, ey) {
+        if (!poly) { return -1; }
+        for (let i = 0; i < poly.length; i++) {
+            const vx = poly[i][0] * EDITOR_SCALE;
+            const vy = poly[i][1] * EDITOR_SCALE;
+            const dist = Math.sqrt((ex - vx) ** 2 + (ey - vy) ** 2);
+            if (dist < CLOSE_THRESHOLD) { return i; }
+        }
+        return -1;
+    }
+
+    function pushUndo() {
+        const poly = polygons[selectedTileId];
+        undoStack.push(poly ? poly.map(v => [...v]) : null);
+        if (undoStack.length > 50) { undoStack.shift(); }
+        updateButtons();
+    }
+
+    editorCanvas.addEventListener('mousedown', (e) => {
+        if (selectedTileId < 0 || !tilesetInfo) { return; }
+        e.preventDefault();
+
+        const { tx, ty, ex, ey } = editorToTile(e);
+        const poly = polygons[selectedTileId];
+
+        // Right click closes polygon
+        if (e.button === 2) {
+            if (isDrawing && poly && poly.length >= 3) {
+                isDrawing = false;
+                renderEditor();
+                autoSave();
+                updateButtons();
+                updateTileInfo();
+            }
+            return;
+        }
+
+        // Shift+click deletes vertex
+        if (e.shiftKey && poly) {
+            const vi = findNearVertex(poly, ex, ey);
+            if (vi >= 0) {
+                pushUndo();
+                poly.splice(vi, 1);
+                if (poly.length === 0) {
+                    delete polygons[selectedTileId];
+                    isDrawing = false;
+                }
+                renderEditor();
+                renderTilesetGrid();
+                autoSave();
+                updateButtons();
+                updateTileInfo();
+                return;
+            }
+        }
+
+        // Check for vertex drag
+        if (poly && !isDrawing) {
+            const vi = findNearVertex(poly, ex, ey);
+            if (vi >= 0) {
+                pushUndo();
+                draggingVertex = vi;
+                return;
+            }
+        }
+
+        // Close polygon by clicking near first vertex
+        if (isDrawing && poly && poly.length >= 3) {
+            const v0x = poly[0][0] * EDITOR_SCALE;
+            const v0y = poly[0][1] * EDITOR_SCALE;
+            if (Math.sqrt((ex - v0x) ** 2 + (ey - v0y) ** 2) < CLOSE_THRESHOLD) {
+                isDrawing = false;
+                renderEditor();
+                autoSave();
+                updateButtons();
+                updateTileInfo();
+                return;
+            }
+        }
+
+        // Add vertex
+        if (isDrawing) {
+            pushUndo();
+            poly.push([tx, ty]);
+        } else {
+            // Start new polygon (replace existing closed one)
+            pushUndo();
+            polygons[selectedTileId] = [[tx, ty]];
+            isDrawing = true;
+        }
+        renderEditor();
+        renderTilesetGrid();
+        autoSave();
+        updateButtons();
+        updateTileInfo();
+    });
+
+    editorCanvas.addEventListener('mousemove', (e) => {
+        if (draggingVertex >= 0 && selectedTileId >= 0 && tilesetInfo) {
+            const { tx, ty } = editorToTile(e);
+            const poly = polygons[selectedTileId];
+            if (poly && draggingVertex < poly.length) {
+                poly[draggingVertex] = [tx, ty];
+                renderEditor();
+            }
+        }
+    });
+
+    editorCanvas.addEventListener('mouseup', () => {
+        if (draggingVertex >= 0) {
+            draggingVertex = -1;
+            renderEditor();
+            renderTilesetGrid();
+            autoSave();
+            updateTileInfo();
+        }
+    });
+
+    editorCanvas.addEventListener('dblclick', (e) => {
+        if (isDrawing && polygons[selectedTileId] && polygons[selectedTileId].length >= 3) {
+            e.preventDefault();
+            isDrawing = false;
+            renderEditor();
+            autoSave();
+            updateButtons();
+            updateTileInfo();
+        }
+    });
+
+    editorCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // --- Navigation ---
+    document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
+    document.getElementById('nextBtn').addEventListener('click', () => navigate(1));
+
+    function navigate(dir) {
+        const visibleIds = getVisibleTileIds();
+        if (visibleIds.length === 0) { return; }
+        const curIdx = visibleIds.indexOf(selectedTileId);
+        let newIdx;
+        if (curIdx < 0) {
+            newIdx = dir > 0 ? 0 : visibleIds.length - 1;
+        } else {
+            newIdx = curIdx + dir;
+            if (newIdx < 0) { newIdx = visibleIds.length - 1; }
+            if (newIdx >= visibleIds.length) { newIdx = 0; }
+        }
+        selectTile(visibleIds[newIdx]);
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (!tilesetImage) { return; }
+        if (e.key === 'ArrowLeft') { navigate(-1); e.preventDefault(); }
+        if (e.key === 'ArrowRight') { navigate(1); e.preventDefault(); }
+        if (e.key === 'ArrowUp') {
+            const cols = filterTagged.checked ? Math.min(getTileCols(), 10) : getTileCols();
+            navigate(-cols);
+            e.preventDefault();
+        }
+        if (e.key === 'ArrowDown') {
+            const cols = filterTagged.checked ? Math.min(getTileCols(), 10) : getTileCols();
+            navigate(cols);
+            e.preventDefault();
+        }
+        if (e.ctrlKey && e.key === 'z') { doUndo(); e.preventDefault(); }
+    });
+
+    // --- Presets ---
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (selectedTileId < 0 || !tilesetInfo) { return; }
+            const gs = tilesetInfo.tileGridSize;
+            pushUndo();
+            const presets = {
+                'full': [[0,0],[gs,0],[gs,gs],[0,gs]],
+                'top': [[0,0],[gs,0],[gs,Math.floor(gs/2)],[0,Math.floor(gs/2)]],
+                'bottom': [[0,Math.floor(gs/2)],[gs,Math.floor(gs/2)],[gs,gs],[0,gs]],
+                'left': [[0,0],[Math.floor(gs/2),0],[Math.floor(gs/2),gs],[0,gs]],
+                'right': [[Math.floor(gs/2),0],[gs,0],[gs,gs],[Math.floor(gs/2),gs]],
+                'tri-tl': [[0,0],[gs,0],[0,gs]],
+                'tri-tr': [[0,0],[gs,0],[gs,gs]],
+                'tri-bl': [[0,0],[gs,gs],[0,gs]],
+                'tri-br': [[gs,0],[gs,gs],[0,gs]],
+            };
+            polygons[selectedTileId] = presets[btn.dataset.preset];
+            isDrawing = false;
+            renderEditor();
+            renderTilesetGrid();
+            autoSave();
+            updateButtons();
+            updateTileInfo();
+        });
+    });
+
+    // --- Clear ---
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        if (selectedTileId < 0) { return; }
+        pushUndo();
+        delete polygons[selectedTileId];
+        isDrawing = false;
+        renderEditor();
+        renderTilesetGrid();
+        autoSave();
+        updateButtons();
+        updateTileInfo();
+    });
+
+    // --- Copy/Paste ---
+    document.getElementById('copyBtn').addEventListener('click', () => {
+        if (selectedTileId >= 0 && polygons[selectedTileId]) {
+            clipboard = polygons[selectedTileId].map(v => [...v]);
+            setStatus('Polygon copied from tile #' + selectedTileId);
+            updateButtons();
+        }
+    });
+
+    document.getElementById('pasteBtn').addEventListener('click', () => {
+        if (selectedTileId >= 0 && clipboard) {
+            pushUndo();
+            polygons[selectedTileId] = clipboard.map(v => [...v]);
+            isDrawing = false;
+            renderEditor();
+            renderTilesetGrid();
+            autoSave();
+            updateButtons();
+            updateTileInfo();
+            setStatus('Polygon pasted to tile #' + selectedTileId);
+        }
+    });
+
+    // --- Mirror ---
+    document.getElementById('mirrorHBtn').addEventListener('click', () => {
+        if (selectedTileId < 0 || !polygons[selectedTileId] || !tilesetInfo) { return; }
+        const gs = tilesetInfo.tileGridSize;
+        pushUndo();
+        polygons[selectedTileId] = polygons[selectedTileId].map(v => [gs - v[0], v[1]]).reverse();
+        renderEditor();
+        autoSave();
+        updateTileInfo();
+    });
+
+    document.getElementById('mirrorVBtn').addEventListener('click', () => {
+        if (selectedTileId < 0 || !polygons[selectedTileId] || !tilesetInfo) { return; }
+        const gs = tilesetInfo.tileGridSize;
+        pushUndo();
+        polygons[selectedTileId] = polygons[selectedTileId].map(v => [v[0], gs - v[1]]).reverse();
+        renderEditor();
+        autoSave();
+        updateTileInfo();
+    });
+
+    // --- Undo ---
+    document.getElementById('undoBtn').addEventListener('click', doUndo);
+    function doUndo() {
+        if (undoStack.length === 0) { return; }
+        const prev = undoStack.pop();
+        if (prev) {
+            polygons[selectedTileId] = prev;
+        } else {
+            delete polygons[selectedTileId];
+        }
+        isDrawing = false;
+        renderEditor();
+        renderTilesetGrid();
+        autoSave();
+        updateButtons();
+        updateTileInfo();
+    }
+
+    // --- Export ---
+    document.getElementById('exportBtn').addEventListener('click', () => {
+        if (!tilesetInfo) { return; }
+        const output = {
+            tilesetName: tilesetInfo.identifier,
+            tileSize: tilesetInfo.tileGridSize,
+            tiles: {}
+        };
+        for (const [id, poly] of Object.entries(polygons)) {
+            if (poly && poly.length >= 3) {
+                output.tiles[id] = { polygon: poly };
+            }
+        }
+        const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'tile-hitboxes.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        setStatus('Exported ' + Object.keys(output.tiles).length + ' tile polygons');
+    });
+
+    // --- Import ---
+    document.getElementById('importBtn').addEventListener('click', () => {
+        document.getElementById('importInput').click();
+    });
+    document.getElementById('importInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) { return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                if (tilesetInfo && data.tilesetName !== tilesetInfo.identifier) {
+                    if (!confirm('Tileset name mismatch: expected "' + tilesetInfo.identifier + '", got "' + data.tilesetName + '". Import anyway?')) {
+                        return;
+                    }
+                }
+                // Merge polygons
+                for (const [id, tileData] of Object.entries(data.tiles || {})) {
+                    if (tileData.polygon && tileData.polygon.length >= 3) {
+                        polygons[id] = tileData.polygon.map(v => [...v]);
+                    }
+                }
+                renderTilesetGrid();
+                renderEditor();
+                autoSave();
+                updateProgress();
+                updateButtons();
+                updateTileInfo();
+                setStatus('Imported ' + Object.keys(data.tiles || {}).length + ' tile polygons');
+            } catch (err) {
+                setStatus('Error importing JSON: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+        // Reset to allow re-importing same file
+        e.target.value = '';
+    });
+
+    // --- Help ---
+    document.getElementById('helpBtn').addEventListener('click', () => {
+        document.getElementById('helpOverlay').classList.toggle('visible');
+    });
+
+    // --- Autosave ---
+    function autoSave() {
+        if (!tilesetInfo) { return; }
+        const key = 'tile-hitbox-' + tilesetInfo.identifier;
+        localStorage.setItem(key, JSON.stringify(polygons));
+        updateProgress();
+    }
+
+    function restoreFromStorage() {
+        if (!tilesetInfo) { return; }
+        const key = 'tile-hitbox-' + tilesetInfo.identifier;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                Object.assign(polygons, data);
+                setStatus('Restored ' + Object.keys(data).length + ' polygons from autosave');
+            } catch(e) {}
+        }
+    }
+
+    // --- Progress ---
+    function updateProgress() {
+        const defined = Object.keys(polygons).filter(id => polygons[id] && polygons[id].length >= 3).length;
+        const total = taggedTileIds.size;
+        progressText.textContent = defined + ' of ' + total + ' tagged tiles defined';
+    }
+
+    function setStatus(msg) {
+        statusText.textContent = msg;
+    }
+})();
+</script>
+</body>
+</html>

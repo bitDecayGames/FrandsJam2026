@@ -48,6 +48,27 @@ class Player extends FlxSprite {
 
 	public var lastInputDir:Cardinal = E;
 
+	static inline var SHALLOW_WATER_OFFSET:Float = 8;
+	public var inShallowWater(default, set):Bool = false;
+
+	function set_inShallowWater(value:Bool):Bool {
+		if (value == inShallowWater) {
+			return value;
+		}
+		inShallowWater = value;
+		if (value) {
+			offset.y -= SHALLOW_WATER_OFFSET;
+			clipRect = flixel.math.FlxRect.get(0, 0, 48, 28);
+		} else {
+			offset.y += SHALLOW_WATER_OFFSET;
+			clipRect = null;
+			if (animation != null && animation.curAnim != null) {
+				playMovementAnim(true);
+			}
+		}
+		return value;
+	}
+
 	var frozen:Bool = false;
 
 	public var sessionId:String = "";
@@ -205,14 +226,15 @@ class Player extends FlxSprite {
 
 	function playMovementAnim(force:Bool = false) {
 		var moving = velocity.x != 0 || velocity.y != 0;
-		if (!force && moving == lastMoving && lastInputDir == lastAnimDir)
+		if (!force && moving == lastMoving && lastInputDir == lastAnimDir && !inShallowWater)
 			return;
 
 		lastMoving = moving;
 		lastAnimDir = lastInputDir;
 
 		var dirSuffix = getDirSuffix();
-		sendAnimUpdate((moving ? "run_" : "stand_") + dirSuffix);
+		var prefix = (inShallowWater || !moving) ? "stand_" : "run_";
+		sendAnimUpdate(prefix + dirSuffix);
 	}
 
 	function sendAnimUpdate(animName:String, forceRestart:Bool = false) {
@@ -239,8 +261,6 @@ class Player extends FlxSprite {
 			deltaPos.y = data.state.y - data.prevY;
 		}
 		lastInputDir = Cardinal.closest(deltaPos);
-
-		// QLog.notice('!!!!!!!!!!!!!!!! x: ${data.state.x}, y: ${data.state.y}, prevX: ${data.prevX}, prevY: ${data.prevY}, deltaX: ${deltaPos.x}, deltaY: ${deltaPos.y}, lastInputDir: ${lastInputDir}');
 
 		// Once the remote player stops (frozen during catch anim) then starts moving
 		// again, their retract is done — clean up any lingering bobber
@@ -298,6 +318,7 @@ class Player extends FlxSprite {
 				hotModeTimer = 3.0;
 			}
 
+			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
 			if (hotModeActive) {
 				hotModeTimer -= delta;
 				if (hotModeTimer <= 0) {
@@ -308,20 +329,20 @@ class Player extends FlxSprite {
 				} else {
 					var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
 					if (moveDir != NONE) {
-						moveDir.asVector(velocity).normalize().scale(speed * 1.5);
+						moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
 					}
 				}
 			} else {
 				if (inputDir != NONE) {
-					inputDir.asVector(velocity).normalize().scale(speed);
+					inputDir.asVector(velocity).normalize().scale(moveSpeed);
 				} else {
 					velocity.set();
 				}
 			}
 		}
 
-		// Only update movement animations when not in a scripted animation
-		if (castState != CAST_ANIM && castState != CATCH_ANIM && castState != RETURNING && !throwing) {
+		// Only update movement animations when fully idle (not casting, catching, or throwing)
+		if (castState == IDLE && !throwing) {
 			playMovementAnim();
 		}
 
@@ -365,44 +386,49 @@ class Player extends FlxSprite {
 	}
 
 	function getRodTipPos():FlxPoint {
+		var wy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
 		if (castState == CAST_ANIM || castState == CASTING) {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			if (castState == CAST_ANIM && frame == CAST_LAUNCH_FRAME) {
 				return switch (castDirSuffix) {
-					case "right": FlxPoint.get(x + 12, y - 12);
-					case "left": FlxPoint.get(x + 2, y - 12);
-					case "down": FlxPoint.get(x, y - 8);
-					case "up": FlxPoint.get(x + 12, y - 8);
+					case "right": FlxPoint.get(x + 12, y - 12 + wy);
+					case "left": FlxPoint.get(x + 2, y - 12 + wy);
+					case "down": FlxPoint.get(x, y - 8 + wy);
+					case "up": FlxPoint.get(x + 12, y - 8 + wy);
 					default: null;
 				};
 			}
 			return switch (castDirSuffix) {
-				case "down": FlxPoint.get(x + 10, y + 12);
-				case "right": FlxPoint.get(x + 30, y - 10);
-				case "up": FlxPoint.get(x + 3, y - 16);
-				case "left": FlxPoint.get(x - 15, y - 10);
-				default: FlxPoint.get(x + 8, y - 4);
+				case "down": FlxPoint.get(x + 10, y + 12 + wy);
+				case "right": FlxPoint.get(x + 30, y - 10 + wy);
+				case "up": FlxPoint.get(x + 3, y - 16 + wy);
+				case "left": FlxPoint.get(x - 15, y - 10 + wy);
+				default: FlxPoint.get(x + 8, y - 4 + wy);
 			};
 		} else if (castState == CATCH_ANIM || castState == RETURNING) {
 			var frame = animation.curAnim != null ? animation.curAnim.curFrame : 0;
 			return switch (castDirSuffix) {
 				case "down":
-					if (frame == 0) FlxPoint.get(x + 10, y + 12) else if (frame == 1) FlxPoint.get(x + 8, y - 9) else FlxPoint.get(x - 1, y - 20);
+					if (frame == 0) FlxPoint.get(x + 10, y + 12 + wy) else if (frame == 1) FlxPoint.get(x + 8, y - 9 + wy) else FlxPoint.get(x - 1,
+						y - 20 + wy);
 				case "right":
-					if (frame == 0) FlxPoint.get(x + 30, y - 10) else if (frame == 1) FlxPoint.get(x + 14, y - 16) else FlxPoint.get(x - 6, y - 18);
+					if (frame == 0) FlxPoint.get(x + 30, y - 10 + wy) else if (frame == 1) FlxPoint.get(x + 14, y - 16 + wy) else FlxPoint.get(x - 6,
+						y - 18 + wy);
 				case "up":
-					if (frame == 0) FlxPoint.get(x + 3, y - 18) else if (frame == 1) FlxPoint.get(x + 13, y - 20) else FlxPoint.get(x + 19, y - 20);
+					if (frame == 0) FlxPoint.get(x + 3, y - 18 + wy) else if (frame == 1) FlxPoint.get(x + 13, y - 20 + wy) else FlxPoint.get(x + 19,
+						y - 20 + wy);
 				case "left":
-					if (frame == 0) FlxPoint.get(x - 15, y - 10) else if (frame == 1) FlxPoint.get(x + 1, y - 16) else FlxPoint.get(x + 21, y - 18);
-				default: FlxPoint.get(x + 8, y - 4);
+					if (frame == 0) FlxPoint.get(x - 15, y - 10 + wy) else if (frame == 1) FlxPoint.get(x + 1, y - 16 + wy) else FlxPoint.get(x + 21,
+						y - 18 + wy);
+				default: FlxPoint.get(x + 8, y - 4 + wy);
 			};
 		} else {
 			return switch (castDirSuffix) {
-				case "down": FlxPoint.get(x + 1, y - 13);
-				case "right": FlxPoint.get(x + 15, y - 17);
-				case "up": FlxPoint.get(x + 11, y - 18);
-				case "left": FlxPoint.get(x + 0, y - 17);
-				default: FlxPoint.get(x + 8, y - 4);
+				case "down": FlxPoint.get(x + 1, y - 13 + wy);
+				case "right": FlxPoint.get(x + 15, y - 17 + wy);
+				case "up": FlxPoint.get(x + 11, y - 18 + wy);
+				case "left": FlxPoint.get(x + 0, y - 17 + wy);
+				default: FlxPoint.get(x + 8, y - 4 + wy);
 			};
 		}
 	}
@@ -495,7 +521,8 @@ class Player extends FlxSprite {
 	}
 
 	function launchRock() {
-		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8) else new Rock(x + 4, y - 8);
+		var rockWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
+		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8 + rockWy) else new Rock(x + 4, y - 8 + rockWy);
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;
@@ -624,8 +651,9 @@ class Player extends FlxSprite {
 						frozen = true;
 						castPower = 0;
 						castPowerDir = 1;
-						powerBarBg.setPosition(x - 8, y + 20);
-						powerBarFill.setPosition(x - 8, y + 20);
+						var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
+						powerBarBg.setPosition(x - 8, y + 20 + barWy);
+						powerBarFill.setPosition(x - 8, y + 20 + barWy);
 						powerBarBg.visible = true;
 						powerBarFill.visible = true;
 						powerBarFill.scale.x = 0;
@@ -640,8 +668,9 @@ class Player extends FlxSprite {
 						castPowerDir = 1;
 					}
 					powerBarFill.scale.x = castPower;
-					powerBarBg.setPosition(x - 8, y + 8);
-					powerBarFill.setPosition(x - 8, y + 8);
+					var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
+					powerBarBg.setPosition(x - 8, y + 8 + barWy);
+					powerBarFill.setPosition(x - 8, y + 8 + barWy);
 
 					if (SimpleController.just_released(A)) {
 						powerBarBg.visible = false;
@@ -852,12 +881,13 @@ class Player extends FlxSprite {
 	}
 
 	function getRetractTarget():FlxPoint {
+		var wy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
 		return switch (castDirSuffix) {
-			case "right": FlxPoint.get(x + 8, y - 14);
-			case "left": FlxPoint.get(x + 8, y - 14);
-			case "down": FlxPoint.get(x, y - 8);
-			case "up": FlxPoint.get(x + 12, y - 8);
-			default: FlxPoint.get(x + 4, y - 8);
+			case "right": FlxPoint.get(x + 8, y - 14 + wy);
+			case "left": FlxPoint.get(x + 8, y - 14 + wy);
+			case "down": FlxPoint.get(x, y - 8 + wy);
+			case "up": FlxPoint.get(x + 12, y - 8 + wy);
+			default: FlxPoint.get(x + 4, y - 8 + wy);
 		};
 	}
 
