@@ -1,5 +1,7 @@
 package entities;
 
+import bitdecay.flixel.graphics.Aseprite;
+import flixel.graphics.FlxAsepriteUtil;
 import managers.GameManager;
 import schema.PlayerState;
 import net.NetworkManager;
@@ -27,6 +29,7 @@ import levels.ldtk.BDTilemap;
 
 class Player extends FlxSprite {
 	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/playerA.json");
+	public static var bobberAnims = AsepriteMacros.tagNames("assets/aseprite/bobber.json");
 
 	// 0-indexed frame within the cast animation when the bobber launches
 	static inline var CAST_LAUNCH_FRAME:Int = 3;
@@ -43,6 +46,8 @@ class Player extends FlxSprite {
 		"assets/aseprite/characters/playerG.json",
 		"assets/aseprite/characters/playerH.json",
 	];
+
+	public static var BOBBERS:Array<String> = ["a", "b", "c", "d", "e", "f", "g", "h",];
 
 	public var skinIndex:Int = 0;
 
@@ -777,7 +782,8 @@ class Player extends FlxSprite {
 
 	function spawnBobberArc() {
 		castBobber = new FlxSprite();
-		castBobber.loadGraphic(AssetPaths.bobber__png);
+		Aseprite.loadAllAnimations(castBobber, AssetPaths.bobber__json);
+		castBobber.animation.play(BOBBERS[skinIndex]);
 		var tip = getRodTipPos();
 		castBobber.setPosition(tip.x, tip.y);
 		tip.put();
