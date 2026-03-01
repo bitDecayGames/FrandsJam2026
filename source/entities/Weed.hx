@@ -7,9 +7,14 @@ import flixel.FlxState;
 class Weed extends FlxSprite {
 	var parentState:FlxState;
 
+	public var spawnCX:Float;
+	public var spawnCY:Float;
+
 	public function new(cx:Float, cy:Float, state:FlxState) {
 		super(cx, cy);
 		parentState = state;
+		spawnCX = cx;
+		spawnCY = cy;
 		loadGraphic(AssetPaths.weed__png);
 		x -= width / 2;
 		y -= height / 2;

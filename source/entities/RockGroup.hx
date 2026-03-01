@@ -14,6 +14,8 @@ class RockGroup extends FlxTypedGroup<Rock> {
 	var fishSpawner:FishSpawner;
 	var parentState:FlxState;
 
+	public var onPickup:(String, Int) -> Void;
+
 	public function new(fishSpawner:FishSpawner, state:FlxState) {
 		super();
 		this.fishSpawner = fishSpawner;
@@ -67,8 +69,12 @@ class RockGroup extends FlxTypedGroup<Rock> {
 
 	function handleOverlap(player:Player, rock:Rock) {
 		if (!player.inventory.isFull()) {
+			var index = members.indexOf(rock);
 			player.pickupItem(rock.big ? BigRock : Rock);
 			rock.kill();
+			if (onPickup != null) {
+				onPickup("rock", index);
+			}
 		}
 	}
 
@@ -93,6 +99,21 @@ class RockGroup extends FlxTypedGroup<Rock> {
 		// x, y is the rock's top-left; offset to rock center (8x8 sprite)
 		parentState.add(new Splash(x + 4, y + 4, big));
 		FlxG.camera.shake(big ? 0.008 : 0.005, big ? 0.2 : 0.15);
+	}
+
+	public function spawnFromPositions(positions:Array<{x:Float, y:Float, big:Bool}>) {
+		for (pos in positions) {
+			add(new Rock(pos.x, pos.y, pos.big));
+		}
+	}
+
+	public function removeByIndex(index:Int) {
+		if (index >= 0 && index < members.length) {
+			var rock = members[index];
+			if (rock != null && rock.alive) {
+				rock.kill();
+			}
+		}
 	}
 
 	public function clearAll() {

@@ -7,6 +7,8 @@ import levels.ldtk.BDTilemap;
 import levels.ldtk.Level;
 
 class WadersPickup extends FlxSprite {
+	public var onPickup:() -> Void;
+
 	public function new() {
 		super();
 		loadGraphic(AssetPaths.waders__png);
@@ -53,6 +55,20 @@ class WadersPickup extends FlxSprite {
 		if (!player.inventory.isFull()) {
 			player.pickupItem(Waders);
 			kill();
+			if (onPickup != null) {
+				onPickup();
+			}
 		}
+	}
+
+	public function spawnAt(px:Float, py:Float) {
+		setPosition(px, py);
+		centerOffsets();
+		revive();
+		visible = true;
+	}
+
+	public function remotePickup() {
+		kill();
 	}
 }

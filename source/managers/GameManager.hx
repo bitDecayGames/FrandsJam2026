@@ -63,7 +63,6 @@ class GameManager {
 		net.onPlayerReadyChanged.add(onPlayerReadyChanged);
 		net.onScoreChanged.add(onScoreChanged);
 		net.onFishSold.add(onFishSold);
-		net.onWeedKilled.add(recordWeedKill);
 		net.onWormKilled.add(recordWormKill);
 		net.onHostChanged.add(onHostChange);
 	}

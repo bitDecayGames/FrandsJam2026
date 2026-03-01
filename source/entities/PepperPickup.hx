@@ -6,6 +6,8 @@ import levels.ldtk.BDTilemap;
 import levels.ldtk.Level;
 
 class PepperPickup extends FlxSprite {
+	public var onPickup:() -> Void;
+
 	public function new() {
 		super();
 		loadGraphic(AssetPaths.pepper__png);
@@ -50,6 +52,20 @@ class PepperPickup extends FlxSprite {
 
 	function handleOverlap(player:Player, pepper:PepperPickup) {
 		player.activateHotMode();
+		kill();
+		if (onPickup != null) {
+			onPickup();
+		}
+	}
+
+	public function spawnAt(px:Float, py:Float) {
+		setPosition(px, py);
+		centerOffsets();
+		revive();
+		visible = true;
+	}
+
+	public function remotePickup() {
 		kill();
 	}
 }

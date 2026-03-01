@@ -156,6 +156,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onThrowRock.remove(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
+		GameManager.ME.net.onWorldItems.remove(onRemoteWorldItems);
+		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
+		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
 	}
 
 	function setupNetwork() {
@@ -168,6 +171,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onThrowRock.add(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
+		GameManager.ME.net.onWorldItems.add(onRemoteWorldItems);
+		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
+		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -237,11 +243,14 @@ class PlayState extends FlxTransitionableState {
 		}
 
 		#if local
+		spawnWeeds();
 		spawnWorldItems(level);
 		#else
 		FlxTimer.wait(10, () -> {
 			if (NetworkManager.IS_HOST) {
+				spawnWeeds();
 				spawnWorldItems(level);
+				broadcastWorldItems();
 			} else {
 				QLog.notice('skipping spawn');
 			}
@@ -259,7 +268,16 @@ class PlayState extends FlxTransitionableState {
 		}
 		#end
 
-		spawnWeeds();
+		// wire up pickup callbacks for network broadcast
+		rockGroup.onPickup = (type, idx) -> {
+			GameManager.ME.net.sendItemPickup(type, idx);
+		};
+		wadersPickup.onPickup = () -> {
+			GameManager.ME.net.sendItemPickup("waders", 0);
+		};
+		pepperPickup.onPickup = () -> {
+			GameManager.ME.net.sendItemPickup("pepper", 0);
+		};
 
 		player.onBobberLanded = (bx, by) -> {
 			add(new Ripple(bx, by));
@@ -373,6 +391,94 @@ class PlayState extends FlxTransitionableState {
 				}
 			}
 		}
+	}
+
+	function broadcastWorldItems() {
+		var rocks:Array<{x:Float, y:Float, big:Bool}> = [];
+		for (rock in rockGroup) {
+			if (rock != null && rock.alive) {
+				rocks.push({x: rock.x, y: rock.y, big: rock.big});
+			}
+		}
+
+		var weeds:Array<{x:Float, y:Float}> = [];
+		for (weed in weedGroup) {
+			if (weed != null && weed.alive) {
+				weeds.push({x: weed.spawnCX, y: weed.spawnCY});
+			}
+		}
+
+		var data:Dynamic = {
+			rocks: rocks,
+			weeds: weeds,
+		};
+		if (wadersPickup.visible && wadersPickup.alive) {
+			data.wadersX = wadersPickup.x;
+			data.wadersY = wadersPickup.y;
+		}
+		if (pepperPickup.visible && pepperPickup.alive) {
+			data.pepperX = pepperPickup.x;
+			data.pepperY = pepperPickup.y;
+		}
+
+		GameManager.ME.net.sendWorldItems(data);
+	}
+
+	function onRemoteWorldItems(data:Dynamic) {
+		if (NetworkManager.IS_HOST) {
+			return;
+		}
+
+		// spawn rocks from host positions
+		var rockPositions:Array<Dynamic> = data.rocks;
+		if (rockPositions != null) {
+			var typed:Array<{x:Float, y:Float, big:Bool}> = [];
+			for (r in rockPositions) {
+				typed.push({x: r.x, y: r.y, big: r.big});
+			}
+			rockGroup.spawnFromPositions(typed);
+		}
+
+		// spawn weeds from host positions
+		var weedPositions:Array<Dynamic> = data.weeds;
+		if (weedPositions != null) {
+			for (w in weedPositions) {
+				var weed = new entities.Weed(w.x, w.y, this);
+				weedGroup.add(weed);
+				midGroundGroup.add(weed);
+			}
+		}
+
+		// spawn waders if host sent position
+		if (data.wadersX != null && data.wadersY != null) {
+			wadersPickup.spawnAt(data.wadersX, data.wadersY);
+		}
+
+		// spawn pepper if host sent position
+		if (data.pepperX != null && data.pepperY != null) {
+			pepperPickup.spawnAt(data.pepperX, data.pepperY);
+		}
+	}
+
+	function onRemoteItemPickup(sessionId:String, itemType:String, index:Int) {
+		switch (itemType) {
+			case "rock":
+				rockGroup.removeByIndex(index);
+			case "waders":
+				wadersPickup.remotePickup();
+			case "pepper":
+				pepperPickup.remotePickup();
+		}
+	}
+
+	function onRemoteWeedBurst(sessionId:String, index:Int) {
+		if (index >= 0 && index < weedGroup.members.length) {
+			var weed = weedGroup.members[index];
+			if (weed != null && weed.alive) {
+				weed.burst();
+			}
+		}
+		GameManager.ME.recordWeedKill(sessionId);
 	}
 
 	function unload() {
@@ -508,8 +614,9 @@ class PlayState extends FlxTransitionableState {
 		FlxG.collide(midGroundGroup, player);
 		FlxG.collide(bushGroup, player, Bush.onCollide);
 		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
+			var index = weedGroup.members.indexOf(weed);
 			weed.burst();
-			GameManager.ME.net.sendMessage("weed_killed", {});
+			GameManager.ME.net.sendWeedBurst(index);
 			GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
 		});
 		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {

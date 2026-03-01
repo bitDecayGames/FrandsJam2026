@@ -98,10 +98,25 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
-		// sent when a player kills a weed
-		onMessage("weed_killed", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "weed_killed"');
-			broadcast("weed_killed", {sessionId: client.sessionId}, {except: client});
+		// sent by the host to broadcast all world item positions
+		onMessage("world_items", (client:Client, data:Dynamic) -> {
+			if (client.sessionId != state.hostSessionId) {
+				return;
+			}
+			trace('${client.sessionId}: sent "world_items"');
+			broadcast("world_items", data, {except: client});
+		});
+
+		// sent when a player picks up a world item (rock, waders, pepper)
+		onMessage("item_pickup", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "item_pickup": itemType=${data.itemType} index=${data.index}');
+			broadcast("item_pickup", {sessionId: client.sessionId, itemType: data.itemType, index: data.index}, {except: client});
+		});
+
+		// sent when a player bursts a weed
+		onMessage("weed_burst", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "weed_burst": index=${data.index}');
+			broadcast("weed_burst", {sessionId: client.sessionId, index: data.index}, {except: client});
 		});
 
 		// sent when a player kills a worm

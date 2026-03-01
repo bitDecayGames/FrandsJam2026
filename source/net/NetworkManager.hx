@@ -56,8 +56,10 @@ class NetworkManager {
 	public var onPlayerReadyChanged = new FlxTypedSignal<String->Bool->Void>(); // sessionId, ready
 	public var onScoreChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, score
 	public var onFishSold = new FlxTypedSignal<String->Int->Int->Int->Void>(); // sessionId, fishType, lengthCm, value
-	public var onWeedKilled = new FlxTypedSignal<String->Void>(); // sessionId
+	public var onWeedBurst = new FlxTypedSignal<String->Int->Void>(); // sessionId, index
 	public var onWormKilled = new FlxTypedSignal<String->Void>(); // sessionId
+	public var onWorldItems = new FlxTypedSignal<Dynamic->Void>();
+	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
 
 	public static inline var roomName:String = "game_room";
 
@@ -246,9 +248,19 @@ class NetworkManager {
 				onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
 			});
 
-			room.onMessage("weed_killed", (message:Dynamic) -> {
-				trace('[NetMan] weed_killed => sessionId:${message.sessionId}');
-				onWeedKilled.dispatch(message.sessionId);
+			room.onMessage("weed_burst", (message:Dynamic) -> {
+				trace('[NetMan] weed_burst => sessionId:${message.sessionId} index:${message.index}');
+				onWeedBurst.dispatch(message.sessionId, Std.int(message.index));
+			});
+
+			room.onMessage("world_items", (message:Dynamic) -> {
+				trace('[NetMan] world_items received');
+				onWorldItems.dispatch(message);
+			});
+
+			room.onMessage("item_pickup", (message:Dynamic) -> {
+				trace('[NetMan] item_pickup => sessionId:${message.sessionId} itemType:${message.itemType} index:${message.index}');
+				onItemPickup.dispatch(message.sessionId, message.itemType, Std.int(message.index));
 			});
 
 			room.onMessage("worm_killed", (message:Dynamic) -> {
@@ -284,6 +296,18 @@ class NetworkManager {
 
 	public function sendLinePulled() {
 		sendMessage("line_pulled", {});
+	}
+
+	public function sendWorldItems(data:Dynamic) {
+		sendMessage("world_items", data);
+	}
+
+	public function sendItemPickup(itemType:String, index:Int) {
+		sendMessage("item_pickup", {itemType: itemType, index: index});
+	}
+
+	public function sendWeedBurst(index:Int) {
+		sendMessage("weed_burst", {index: index});
 	}
 
 	public function sendMove(x:Float, y:Float, velocityX:Float, velocityY:Float) {
