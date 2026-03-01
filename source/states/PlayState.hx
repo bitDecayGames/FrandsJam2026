@@ -106,6 +106,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.add(onFishAdded);
+		GameManager.ME.net.onRockSplash.add(onRemoteRockSplash);
 	}
 
 	function onPlayerJoined(sessionId:String) {
@@ -150,6 +151,15 @@ class PlayState extends FlxTransitionableState {
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
 
+	function onRemoteRockSplash(x:Float, y:Float) {
+		fishSpawner.scareFish(x, y);
+	}
+
+	function onLocalRockSplash(x:Float, y:Float) {
+		fishSpawner.scareFish(x, y);
+		GameManager.ME.net.sendMessage("rock_splash", {x: x, y: y});
+	}
+
 	function loadLevel(level:String) {
 		unload();
 
@@ -179,7 +189,7 @@ class PlayState extends FlxTransitionableState {
 		#end
 
 		var spawnerLayer = level.fishSpawnerLayer;
-		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock);
+		player.makeRock = (rx, ry) -> new Rock(rx, ry, spawnerLayer, rockGroup.addRock, onLocalRockSplash);
 		groundFishGroup.setWaterLayer(spawnerLayer);
 
 		shop = new Shop();

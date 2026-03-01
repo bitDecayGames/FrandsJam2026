@@ -541,7 +541,7 @@ class Player extends FlxSprite {
 	function updateCast(elapsed:Float) {
 		switch (castState) {
 			case IDLE:
-				if (SimpleController.just_pressed(A)) {
+				if (!throwing && SimpleController.just_pressed(A)) {
 					castState = CHARGING;
 					frozen = true;
 					castPower = 0;
