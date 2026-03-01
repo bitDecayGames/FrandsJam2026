@@ -159,6 +159,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onWorldItems.remove(onRemoteWorldItems);
 		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
+		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 	}
 
 	function setupNetwork() {
@@ -214,7 +215,29 @@ class PlayState extends FlxTransitionableState {
 		midGroundGroup.add(shallowColliders);
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
-		player = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
+		// pick random spawn points for all players
+		var allSessionIds = [GameManager.ME.net.mySessionId];
+		for (_ => seshID in GameManager.ME.sessions) {
+			allSessionIds.push(seshID);
+		}
+		var spawnPoints = level.getRandomSpawnPoints(allSessionIds.length);
+
+		// build a map of sessionId -> {x, y} before we consume the points
+		var spawnMap = new Map<String, {x:Float, y:Float}>();
+		for (i in 0...allSessionIds.length) {
+			if (i < spawnPoints.length) {
+				spawnMap.set(allSessionIds[i], {x: spawnPoints[i].x, y: spawnPoints[i].y});
+			}
+		}
+		// return pooled points
+		for (pt in spawnPoints) {
+			pt.put();
+		}
+
+		var localPos = spawnMap.get(GameManager.ME.net.mySessionId);
+		var lx = localPos != null ? localPos.x : level.spawnPoint.x;
+		var ly = localPos != null ? localPos.y : level.spawnPoint.y;
+		player = new Player(lx, ly, this);
 		if (GameManager.ME.mySkinIndex >= 0) {
 			player.skinIndex = GameManager.ME.mySkinIndex;
 			player.swapSkin();
@@ -225,8 +248,11 @@ class PlayState extends FlxTransitionableState {
 		camera.follow(player);
 		ySortGroup.add(player);
 
-		for (index => seshID in GameManager.ME.sessions) {
-			var remote = new Player(level.spawnPoint.x, level.spawnPoint.y, this);
+		for (_ => seshID in GameManager.ME.sessions) {
+			var remotePos = spawnMap.get(seshID);
+			var rx = remotePos != null ? remotePos.x : level.spawnPoint.x;
+			var ry = remotePos != null ? remotePos.y : level.spawnPoint.y;
+			var remote = new Player(rx, ry, this);
 			remote.isRemote = true;
 			remote.terrainLayer = terrainLayer;
 			remote.groundEffectsGroup = midGroundGroup;
@@ -241,6 +267,20 @@ class PlayState extends FlxTransitionableState {
 			remotePlayers.set(seshID, remote);
 			ySortGroup.add(remote);
 		}
+
+		// host sends spawn locations to clients
+		#if !local
+		if (NetworkManager.IS_HOST) {
+			var spawnData:Dynamic = {};
+			for (sid => pos in spawnMap) {
+				Reflect.setField(spawnData, sid, {x: pos.x, y: pos.y});
+			}
+			GameManager.ME.net.sendSpawnLocations(spawnData);
+		}
+
+		// clients listen for host-assigned spawn locations
+		GameManager.ME.net.onSpawnLocations.add(onSpawnLocations);
+		#end
 
 		#if local
 		spawnWeeds();
@@ -327,11 +367,13 @@ class PlayState extends FlxTransitionableState {
 			transitions.add(t);
 		}
 
+		var playerPos = FlxPoint.get(player.x, player.y);
 		for (_ => zone in level.camZones) {
-			if (zone.containsPoint(level.spawnPoint)) {
+			if (zone.containsPoint(playerPos)) {
 				setCameraBounds(zone);
 			}
 		}
+		playerPos.put();
 
 		EventBus.fire(new PlayerSpawn(player.x, player.y));
 	}
@@ -544,6 +586,25 @@ class PlayState extends FlxTransitionableState {
 		placeShopAt(x, y);
 	}
 
+	function onSpawnLocations(message:Dynamic) {
+		// host already placed everyone, so skip
+		if (NetworkManager.IS_HOST) {
+			return;
+		}
+		// reposition local player and remotes based on host-assigned locations
+		var myId = GameManager.ME.net.mySessionId;
+		var myPos:Dynamic = Reflect.field(message, myId);
+		if (myPos != null) {
+			player.setPosition(myPos.x, myPos.y);
+		}
+		for (seshID => remote in remotePlayers) {
+			var pos:Dynamic = Reflect.field(message, seshID);
+			if (pos != null) {
+				remote.setPosition(pos.x, pos.y);
+			}
+		}
+	}
+
 	function onRemoteCastLine(sessionId:String, x:Float, y:Float, dir:String) {
 		var remote = remotePlayers.get(sessionId);
 		if (remote != null) {
@@ -709,10 +770,7 @@ class PlayState extends FlxTransitionableState {
 				continue;
 			}
 
-			var dirs = [
-				{dx: 1, dy: 0},
-				{dx: -1, dy: 0}
-			];
+			var dirs = [{dx: 1, dy: 0}, {dx: -1, dy: 0}];
 			FlxG.random.shuffle(dirs);
 
 			var spawned = false;

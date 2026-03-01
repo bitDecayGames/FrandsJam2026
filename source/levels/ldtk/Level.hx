@@ -1,6 +1,7 @@
 package levels.ldtk;
 
 import entities.CameraTransition;
+import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.math.FlxRect;
@@ -160,9 +161,19 @@ class Level {
 		return group;
 	}
 
-	static function scanlinePolygon(verts:Array<{x:Float, y:Float}>, gs:Int):Array<{x:Int, y:Int, w:Int, h:Int}> {
+	static function scanlinePolygon(verts:Array<{x:Float, y:Float}>, gs:Int):Array<{
+		x:Int,
+		y:Int,
+		w:Int,
+		h:Int
+	}> {
 		var n = verts.length;
-		var strips = new Array<{x:Int, y:Int, w:Int, h:Int}>();
+		var strips = new Array<{
+			x:Int,
+			y:Int,
+			w:Int,
+			h:Int
+		}>();
 
 		// For each pixel row, find the min/max x intersection with the polygon
 		var curX0 = -1;
@@ -190,15 +201,24 @@ class Level {
 				var t = (scanY - y0) / (y1 - y0);
 				var ix = verts[i].x + t * (verts[j].x - verts[i].x);
 
-				if (ix < rowMinX) { rowMinX = ix; }
-				if (ix > rowMaxX) { rowMaxX = ix; }
+				if (ix < rowMinX) {
+					rowMinX = ix;
+				}
+				if (ix > rowMaxX) {
+					rowMaxX = ix;
+				}
 				hit = true;
 			}
 
 			if (!hit) {
 				// Flush current strip
 				if (curX0 >= 0) {
-					strips.push({x: curX0, y: curY0, w: curX1 - curX0, h: row - curY0});
+					strips.push({
+						x: curX0,
+						y: curY0,
+						w: curX1 - curX0,
+						h: row - curY0
+					});
 					curX0 = -1;
 				}
 				continue;
@@ -208,7 +228,12 @@ class Level {
 			var x1 = Std.int(Math.min(gs, Math.ceil(rowMaxX)));
 			if (x1 <= x0) {
 				if (curX0 >= 0) {
-					strips.push({x: curX0, y: curY0, w: curX1 - curX0, h: row - curY0});
+					strips.push({
+						x: curX0,
+						y: curY0,
+						w: curX1 - curX0,
+						h: row - curY0
+					});
 					curX0 = -1;
 				}
 				continue;
@@ -221,7 +246,12 @@ class Level {
 
 			// Flush previous strip and start new one
 			if (curX0 >= 0) {
-				strips.push({x: curX0, y: curY0, w: curX1 - curX0, h: row - curY0});
+				strips.push({
+					x: curX0,
+					y: curY0,
+					w: curX1 - curX0,
+					h: row - curY0
+				});
 			}
 			curX0 = x0;
 			curX1 = x1;
@@ -230,10 +260,70 @@ class Level {
 
 		// Flush final strip
 		if (curX0 >= 0) {
-			strips.push({x: curX0, y: curY0, w: curX1 - curX0, h: gs - curY0});
+			strips.push({
+				x: curX0,
+				y: curY0,
+				w: curX1 - curX0,
+				h: gs - curY0
+			});
 		}
 
 		return strips;
+	}
+
+	/**
+	 * Picks `count` random walkable tile positions (not water, not shallow, not solid).
+	 * Returns pixel positions at tile centers.
+	 */
+	public function getRandomSpawnPoints(count:Int):Array<FlxPoint> {
+		var layer = waterGrid;
+		var cols = layer.cWid;
+		var rows = layer.cHei;
+		var gridSize = layer.gridSize;
+
+		// build candidate list of walkable tiles
+		var candidates = new Array<Int>();
+		for (cy in 0...rows) {
+			for (cx in 0...cols) {
+				// skip water tiles
+				if (layer.getInt(cx, cy) == 1) {
+					continue;
+				}
+				var tileX = cx * gridSize + gridSize / 2;
+				var tileY = cy * gridSize + gridSize / 2;
+				// skip shallow and solid tiles
+				if (terrainLayer.isShallowAt(tileX, tileY)) {
+					continue;
+				}
+				if (terrainLayer.isSolidAt(tileX, tileY)) {
+					continue;
+				}
+				candidates.push(cx + cy * cols);
+			}
+		}
+
+		if (candidates.length == 0) {
+			QLog.error("Level: no walkable tiles found for spawn points, falling back to LDTK spawn");
+			return [FlxPoint.get(spawnPoint.x, spawnPoint.y)];
+		}
+
+		var results = new Array<FlxPoint>();
+		for (_ in 0...count) {
+			if (candidates.length == 0) {
+				break;
+			}
+			var idx = FlxG.random.int(0, candidates.length - 1);
+			var linearIdx = candidates[idx];
+			// remove to avoid duplicates
+			candidates[idx] = candidates[candidates.length - 1];
+			candidates.pop();
+
+			var cx = linearIdx % cols;
+			var cy = Std.int(linearIdx / cols);
+			results.push(FlxPoint.get(cx * gridSize + gridSize / 2, cy * gridSize + gridSize / 2));
+		}
+
+		return results;
 	}
 
 	function parseCameraZones(zoneDefs:Array<Ldtk.Entity_CameraZone>) {
