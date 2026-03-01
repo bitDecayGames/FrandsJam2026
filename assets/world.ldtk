@@ -415,7 +415,7 @@
 			"padding": 0,
 			"tags": [],
 			"tagsSourceEnumUid": 199,
-			"enumTags": [ { "enumValueId": "SOLID", "tileIds": [] }, { "enumValueId": "ONEWAY", "tileIds": [] }, { "enumValueId": "NONE", "tileIds": [] }, { "enumValueId": "INVISIBLE", "tileIds": [] } ],
+			"enumTags": [ { "enumValueId": "SOLID", "tileIds": [1,20,21,23,40,41,42,43,44,63] }, { "enumValueId": "ONEWAY", "tileIds": [] }, { "enumValueId": "NONE", "tileIds": [] }, { "enumValueId": "INVISIBLE", "tileIds": [] } ],
 			"customData": [],
 			"savedSelections": [],
 			"cachedPixelData": {

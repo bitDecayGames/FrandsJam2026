@@ -37,7 +37,7 @@ import openfl.utils.Assets;
 import states.MainMenuState;
 import states.SplashScreenState;
 #if play
-import states.AutoPlayState;
+import states.LobbyState;
 #end
 #if credits
 import states.CreditsState;
@@ -47,25 +47,16 @@ import plugins.GlobalDebugPlugin;
 #end
 
 class Main extends Sprite {
-	public static function reset() {
-		new GameManager([
-			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
-			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
-			new Round([new TimedGoal(), new PersonalFishCountGoal()]),
-		]);
-	}
-
 	public function new() {
 		super();
 		Configure.initAnalytics(false);
 		Storage.load();
 
-		// must be here so it exists before any possible starting state
-		Main.reset();
+		new GameManager();
 
 		var startingState:Class<FlxState> = SplashScreenState;
 		#if play
-		startingState = AutoPlayState;
+		startingState = LobbyState;
 		#elseif credits
 		startingState = CreditsState;
 		#else
