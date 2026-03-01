@@ -26,19 +26,19 @@ class GroupFishCountGoal extends Goal {
 		state.add(text);
 
 		// TODO: MW need to change this to FishCollected probably
-		EventBus.subscribe(FishCaught, (event) -> {
-			var count = scores.get(event.ownerId);
-			if (count == null) {
-				count = 0;
-			}
-			count++;
-			scores.set(event.ownerId, count);
+		GameManager.ME.net.onFishCaught.add(onFishCaught);
+	}
 
-			sum++;
-			if (sum >= targetCount) {
-				onComplete();
-			}
-		});
+	private function onFishCaught(playerId:String, fishId:String) {
+		var count = scores.get(playerId);
+		if (count == null) {
+			count = 0;
+		}
+		count++;
+		scores.set(playerId, count);
+		if (count >= targetCount) {
+			onComplete();
+		}
 	}
 
 	public function manuallySetFishCount(playerId:String, count:Int) {
