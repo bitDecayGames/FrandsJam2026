@@ -30,7 +30,7 @@ class PersonalFishCountGoal extends Goal {
 		GameManager.ME.net.onFishCaught.add(onFishCaught);
 	}
 
-	private function onFishCaught(playerId:String, fishId:String) {
+	private function onFishCaught(playerId:String, fishId:String, fishType:Int) {
 		var count = scores.get(playerId);
 		if (count == null) {
 			count = 0;
