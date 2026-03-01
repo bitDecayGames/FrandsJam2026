@@ -162,6 +162,22 @@ class BDTilemap extends LdtkTilemap<Enum_TileTags> {
 		return bdTile.tags != null && bdTile.tags.contains(SWIMMABLE);
 	}
 
+	public function isSolidAt(worldX:Float, worldY:Float):Bool {
+		var col = Std.int((worldX - x) / scaledTileWidth);
+		var row = Std.int((worldY - y) / scaledTileHeight);
+		if (col < 0 || col >= widthInTiles || row < 0 || row >= heightInTiles) {
+			return false;
+		}
+
+		@:privateAccess
+		var tileIndex = _data[row * widthInTiles + col];
+		if (tileIndex < 0 || tileIndex >= _tileObjects.length) {
+			return false;
+		}
+		var bdTile:BDTile = cast _tileObjects[tileIndex];
+		return bdTile.tags != null && bdTile.tags.contains(SOLID);
+	}
+
 	public function isShallowAt(worldX:Float, worldY:Float):Bool {
 		var col = Std.int((worldX - x) / scaledTileWidth);
 		var row = Std.int((worldY - y) / scaledTileHeight);

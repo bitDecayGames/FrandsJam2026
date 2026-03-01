@@ -26,6 +26,8 @@ import entities.Inventory.InventoryItem;
 import entities.RockGroup;
 import entities.PepperPickup;
 import entities.WadersPickup;
+import entities.Worm;
+import entities.WormSplat;
 import levels.ldtk.BDTilemap;
 import levels.ldtk.Ldtk.Enum_TileTags;
 import levels.ldtk.Level;
@@ -75,6 +77,8 @@ class PlayState extends FlxTransitionableState {
 	var weedGroup = new FlxTypedGroup<entities.Weed>();
 	var seagullGroup = new FlxTypedGroup<Seagull>();
 	var seagullTimer:Float = 0;
+	var wormGroup = new FlxTypedGroup<Worm>();
+	var wormTimer:Float = 0;
 
 	var transitions = new FlxTypedGroup<CameraTransition>();
 
@@ -115,6 +119,7 @@ class PlayState extends FlxTransitionableState {
 		add(wadersPickup);
 		add(pepperPickup);
 		add(fishSpawner);
+		add(wormGroup);
 		add(ySortGroup);
 		add(transitions);
 
@@ -505,6 +510,10 @@ class PlayState extends FlxTransitionableState {
 		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
 			weed.burst();
 		});
+		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
+			midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
+			worm.kill();
+		});
 		if (shop != null) {
 			FlxG.collide(shop, player, Shop.onCollide);
 		}
@@ -553,6 +562,7 @@ class PlayState extends FlxTransitionableState {
 
 		updateSparkles(elapsed);
 		updateSeagulls(elapsed);
+		updateWorms(elapsed);
 	}
 
 	function updateSeagulls(elapsed:Float) {
@@ -562,6 +572,80 @@ class PlayState extends FlxTransitionableState {
 		}
 		seagullTimer = FlxG.random.float(2.0, 6.0);
 		seagullGroup.add(new Seagull(FlxG.random.bool(), this, midGroundGroup, terrainLayer, fishSpawner));
+	}
+
+	function updateWorms(elapsed:Float) {
+		if (terrainLayer == null) {
+			return;
+		}
+		wormTimer -= elapsed;
+		if (wormTimer > 0) {
+			return;
+		}
+		wormTimer = FlxG.random.float(5.0, 9.0);
+
+		var bounds = FlxG.worldBounds;
+		var grid = 16;
+
+		for (_ in 0...10) {
+			var srcX = FlxG.random.float(bounds.x + grid, bounds.right - grid);
+			var srcY = FlxG.random.float(bounds.y + grid, bounds.bottom - grid);
+
+			if (classifyGround(terrainLayer.sampleColorAt(srcX, srcY)) != "dirt") {
+				continue;
+			}
+			if (terrainLayer.isShallowAt(srcX, srcY) || terrainLayer.isSolidAt(srcX, srcY)) {
+				continue;
+			}
+
+			var dirs = [
+				{dx: 1, dy: 0},
+				{dx: -1, dy: 0}
+			];
+			FlxG.random.shuffle(dirs);
+
+			var spawned = false;
+			for (dir in dirs) {
+				var dist = FlxG.random.int(2, 4);
+				var destX = srcX + dir.dx * dist * grid;
+				var destY = srcY + dir.dy * dist * grid;
+
+				if (destX < bounds.x || destX >= bounds.right || destY < bounds.y || destY >= bounds.bottom) {
+					continue;
+				}
+
+				if (classifyGround(terrainLayer.sampleColorAt(destX, destY)) != "dirt") {
+					continue;
+				}
+				if (terrainLayer.isShallowAt(destX, destY) || terrainLayer.isSolidAt(destX, destY)) {
+					continue;
+				}
+
+				var pathClear = true;
+				for (step in 1...dist) {
+					var checkX = srcX + dir.dx * step * grid;
+					var checkY = srcY + dir.dy * step * grid;
+					if (classifyGround(terrainLayer.sampleColorAt(checkX, checkY)) != "dirt") {
+						pathClear = false;
+						break;
+					}
+					if (terrainLayer.isShallowAt(checkX, checkY) || terrainLayer.isSolidAt(checkX, checkY)) {
+						pathClear = false;
+						break;
+					}
+				}
+
+				if (pathClear) {
+					wormGroup.add(new Worm(srcX, srcY, destX, destY));
+					spawned = true;
+					break;
+				}
+			}
+
+			if (spawned) {
+				break;
+			}
+		}
 	}
 
 	function updateSparkles(elapsed:Float) {
