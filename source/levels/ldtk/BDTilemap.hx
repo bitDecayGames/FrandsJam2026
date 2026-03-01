@@ -148,6 +148,33 @@ class BDTilemap extends LdtkTilemap<Enum_TileTags> {
 		return true;
 	}
 
+	public function sampleColorAt(worldX:Float, worldY:Float):FlxColor {
+		var col = Std.int((worldX - x) / scaledTileWidth);
+		var row = Std.int((worldY - y) / scaledTileHeight);
+		if (col < 0 || col >= widthInTiles || row < 0 || row >= heightInTiles) {
+			return FlxColor.TRANSPARENT;
+		}
+
+		@:privateAccess
+		var tileIndex = _data[row * widthInTiles + col];
+		if (tileIndex < 0) {
+			return FlxColor.TRANSPARENT;
+		}
+
+		@:privateAccess
+		var tileFrame = _tileObjects[tileIndex].frame;
+		if (tileFrame == null || tileFrame.parent == null || tileFrame.parent.bitmap == null) {
+			return FlxColor.TRANSPARENT;
+		}
+
+		var subX = Std.int((worldX - x) % scaledTileWidth);
+		var subY = Std.int((worldY - y) % scaledTileHeight);
+		var srcX = Std.int(tileFrame.frame.x) + subX;
+		var srcY = Std.int(tileFrame.frame.y) + subY;
+
+		return FlxColor.fromInt(tileFrame.parent.bitmap.getPixel32(srcX, srcY));
+	}
+
 	override function createTile(index:Int, width:Float, height:Float):BDTile {
 		return new BDTile(this, index, width, height);
 	}

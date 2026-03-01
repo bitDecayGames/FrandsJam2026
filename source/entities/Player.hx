@@ -14,9 +14,14 @@ import input.SimpleController;
 import bitdecay.flixel.spacial.Cardinal;
 import bitdecay.flixel.graphics.AsepriteMacros;
 import flixel.FlxG;
+import flixel.group.FlxGroup;
+import flixel.text.FlxText;
 import haxe.io.Path;
+import entities.FootDust;
+import entities.Footprint;
 import entities.Inventory;
 import entities.Inventory.InventoryItem;
+import levels.ldtk.BDTilemap;
 
 class Player extends FlxSprite {
 	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/playerA.json");
@@ -101,12 +106,17 @@ class Player extends FlxSprite {
 	var powerBarBg:FlxSprite;
 	var powerBarFill:FlxSprite;
 
+	// Terrain layer for sampling ground colors — set by PlayState
+	public var terrainLayer:BDTilemap;
+
+	// Group for ground-level effects (dust, footprints) — set by PlayState
+	public var groundEffectsGroup:FlxGroup;
+
 	// Factory for creating thrown rocks — set by PlayState
 	public var makeRock:(Float, Float, Bool) -> Rock;
 
 	// Effect callbacks — set by PlayState
 	public var onBobberLanded:Null<(Float, Float) -> Void> = null;
-	public var onFootstep:Null<(Float, Float) -> Void> = null;
 
 	// Throw state
 	var throwing:Bool = false;
@@ -173,10 +183,58 @@ class Player extends FlxSprite {
 		if (throwing && rockSprite == null && frameNumber == 6) {
 			launchRock();
 		}
-		// Footstep dust on foot-plant frames of run animations
-		if (onFootstep != null && StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
-			// Spawn dust at player's feet (center-bottom of hitbox)
-			onFootstep(x + width / 2, y + 4);
+		// Footstep effects on foot-plant frames of run animations
+		if (StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
+			var fx = x + width / 2;
+			var fy = y + 4;
+			var groundColor:Null<FlxColor> = null;
+			if (terrainLayer != null) {
+				var sampled = terrainLayer.sampleColorAt(fx, fy);
+				if (sampled != FlxColor.TRANSPARENT) {
+					groundColor = sampled;
+				}
+			}
+			var effectsTarget:FlxGroup = groundEffectsGroup != null ? groundEffectsGroup : null;
+			var groundType:String = null;
+			var isBrown = false;
+			var isBlue = false;
+			if (groundColor != null) {
+				var hue = groundColor.hue;
+				isBrown = (hue >= 15 && hue <= 55) && groundColor.saturation > 0.15;
+				isBlue = groundColor.blue > groundColor.red && groundColor.blue > 80;
+				if (isBrown) {
+					groundType = "dirt";
+				} else if (isBlue) {
+					groundType = "water";
+				}
+			}
+			if (isBrown || isBlue) {
+				var print = new Footprint(fx, fy, lastInputDir, groundColor, isBlue);
+				if (effectsTarget != null) {
+					effectsTarget.add(print);
+				} else {
+					state.add(print);
+				}
+			}
+			if (isBrown) {
+				for (_ in 0...12) {
+					var dust = new FootDust(fx + FlxG.random.float(-3, 3), fy + FlxG.random.float(-1, 1), groundColor, false);
+					if (effectsTarget != null) {
+						effectsTarget.add(dust);
+					} else {
+						state.add(dust);
+					}
+				}
+			} else if (isBlue) {
+				for (_ in 0...10) {
+					var dust = new FootDust(fx + FlxG.random.float(-3, 3), fy + FlxG.random.float(-1, 1), groundColor, true);
+					if (effectsTarget != null) {
+						effectsTarget.add(dust);
+					} else {
+						state.add(dust);
+					}
+				}
+			}
 		}
 
 		if (castState == CATCH_ANIM && frameNumber == CATCH_RETRACT_FRAME && castBobber != null) {
@@ -931,4 +989,29 @@ enum CastState {
 	LANDED;
 	CATCH_ANIM;
 	RETURNING;
+}
+
+class FloatingLabel extends flixel.text.FlxText {
+	static inline var DURATION:Float = 1.0;
+
+	var elapsed:Float = 0;
+
+	public function new(cx:Float, cy:Float, text:String, textColor:flixel.util.FlxColor) {
+		super(0, 0, 0, text, 8);
+		color = textColor;
+		setPosition(cx - width / 2, cy);
+		velocity.y = -20;
+		allowCollisions = NONE;
+	}
+
+	override public function update(dt:Float) {
+		super.update(dt);
+		elapsed += dt;
+		var t = elapsed / DURATION;
+		if (t >= 1) {
+			kill();
+			return;
+		}
+		alpha = 1 - t;
+	}
 }
