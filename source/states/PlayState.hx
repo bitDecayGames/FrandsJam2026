@@ -106,6 +106,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.add(onFishAdded);
+		GameManager.ME.net.onCastLine.add(onRemoteCastLine);
+		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
+		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
 		GameManager.ME.net.onRockSplash.add(onRemoteRockSplash);
 	}
 
@@ -232,14 +235,63 @@ class PlayState extends FlxTransitionableState {
 		midGroundGroup.clear();
 	}
 
-	function onFishCaught() {
-		player.onFishDelivered = () -> {
-			if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
-				groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
-			}
-			player.onFishDelivered = null;
-		};
-		player.catchFish(true);
+	function onFishCaught(fishId:String, catcherSessionId:String) {
+		#if !local
+		GameManager.ME.net.sendFishCaught(fishId, catcherSessionId);
+		#end
+
+		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
+		if (catcherSessionId == player.sessionId) {
+			player.onFishDelivered = () -> {
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
+				}
+				player.onFishDelivered = null;
+			};
+			player.catchFish(true);
+		} else {
+			var remote = remotePlayers.get(catcherSessionId);
+			if (remote != null)
+				remote.catchFish(true);
+		}
+	}
+
+	function onRemoteCastLine(sessionId:String, x:Float, y:Float, dir:String) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null)
+			remote.remoteStartCast(x, y, dir);
+	}
+
+	function onRemoteFishCaught(sessionId:String, fishId:String) {
+		// Hide the remote fish sprite — it will fade back in when the host starts moving it again
+		var fish = remoteFish.get(fishId);
+		if (fish != null)
+			fish.visible = false;
+
+		// Non-host clients receive this to trigger the catch animation
+		if (sessionId == player.sessionId) {
+			player.onFishDelivered = () -> {
+				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex))) {
+					groundFishGroup.addFish(player.x + 8, player.y - 2, player.caughtFishSpriteIndex);
+				}
+				player.onFishDelivered = null;
+			};
+			player.catchFish(true);
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null)
+				remote.catchFish(true);
+		}
+	}
+
+	function onRemoteLinePulled(sessionId:String) {
+		if (sessionId == player.sessionId) {
+			player.catchFish(false);
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null)
+				remote.catchFish(false);
+		}
 	}
 
 	function handleAchieve(def:AchievementDef) {
@@ -266,7 +318,18 @@ class PlayState extends FlxTransitionableState {
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
-		fishSpawner.setBobber(player.isBobberLanded() ? player.castBobber : null);
+		var bobbers:Map<String, FlxSprite> = new Map();
+		if (player.isBobberLanded())
+			bobbers.set(player.sessionId, player.castBobber);
+		#if !local
+		if (NetworkManager.IS_HOST) {
+			for (sid => remote in remotePlayers) {
+				if (remote.isBobberLanded())
+					bobbers.set(sid, remote.castBobber);
+			}
+		}
+		#end
+		fishSpawner.setBobbers(bobbers);
 		rockGroup.checkPickup(player);
 		groundFishGroup.checkPickup(player);
 		shop.checkInteraction(player);

@@ -136,7 +136,11 @@ class Player extends FlxSprite {
 
 	function onAnimFrameChange(animName:String, frameNumber:Int, frameIndex:Int) {
 		if (castState == CAST_ANIM && castBobber == null && frameNumber == CAST_LAUNCH_FRAME) {
-			launchBobber();
+			if (isRemote) {
+				spawnBobberArc(); // castTarget already set by remoteStartCast()
+			} else {
+				launchBobber();
+			}
 		}
 		if (throwing && rockSprite == null && frameNumber == 6) {
 			launchRock();
@@ -238,6 +242,10 @@ class Player extends FlxSprite {
 	override public function update(delta:Float) {
 		super.update(delta);
 
+		// Run for both local and remote players
+		updateCast(delta);
+		updateFishingLine();
+
 		if (isRemote) {
 			// events drive this one
 			return;
@@ -307,8 +315,6 @@ class Player extends FlxSprite {
 		}
 
 		updateReticle();
-		updateCast(delta);
-		updateFishingLine();
 		updateRock(delta);
 
 		clampToWorldBounds();
@@ -505,31 +511,30 @@ class Player extends FlxSprite {
 		}
 	}
 
-	function launchBobber() {
-		var reticleDir = lastInputDir.asVector();
-		var castDist = castPower * 96;
-		var targetX = x + reticleDir.x * castDist + 4;
-		var targetY = y + reticleDir.y * castDist + 4;
-		reticleDir.put();
-
-		castTarget = FlxPoint.get(targetX, targetY);
-
-		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y});
-
+	function spawnBobberArc() {
 		castBobber = new FlxSprite();
 		castBobber.loadGraphic(AssetPaths.bobber__png);
 		var tip = getRodTipPos();
 		castBobber.setPosition(tip.x, tip.y);
 		tip.put();
-
 		castStartPos = FlxPoint.get(castBobber.x, castBobber.y);
 		var dx = castTarget.x - castStartPos.x;
 		var dy = castTarget.y - castStartPos.y;
 		var dist = Math.sqrt(dx * dx + dy * dy);
 		castFlightTime = if (dist > 0) dist / 150 else 0.01;
 		castElapsed = 0;
-
 		state.add(castBobber);
+	}
+
+	function launchBobber() {
+		var reticleDir = lastInputDir.asVector();
+		var castDist = castPower * 96;
+		var targetX = x + reticleDir.x * castDist + 4;
+		var targetY = y + reticleDir.y * castDist + 4;
+		reticleDir.put();
+		castTarget = FlxPoint.get(targetX, targetY);
+		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
+		spawnBobberArc();
 	}
 
 	/** Updates the bobber position along an arc. Returns true when it has arrived. */
@@ -554,47 +559,98 @@ class Player extends FlxSprite {
 		return t >= 1.0;
 	}
 
+	function startCast() {
+		castState = CAST_ANIM;
+		castDirSuffix = getDirSuffix();
+		sendAnimUpdate("cast_" + castDirSuffix, true);
+	}
+
+	public function remoteStartCast(targetX:Float, targetY:Float, dir:String) {
+		castDirSuffix = dir;
+		lastInputDir = switch (dir) {
+			case "up": N;
+			case "down": S;
+			case "left": W;
+			case "right": E;
+			default: S;
+		};
+		if (castTarget != null) {
+			castTarget.put();
+		}
+		castTarget = FlxPoint.get(targetX, targetY);
+		castState = CAST_ANIM;
+		sendAnimUpdate("cast_" + castDirSuffix, true);
+	}
+
 	function updateCast(elapsed:Float) {
-		switch (castState) {
-			case IDLE:
-				if (!throwing && SimpleController.just_pressed(A)) {
-					castState = CHARGING;
-					frozen = true;
-					castPower = 0;
-					castPowerDir = 1;
+		if (!isRemote) {
+			switch (castState) {
+				// --- START: Local player handling
+				case IDLE:
+					if (SimpleController.just_pressed(A)) {
+						castState = CHARGING;
+						frozen = true;
+						castPower = 0;
+						castPowerDir = 1;
+						powerBarBg.setPosition(x - 8, y + 20);
+						powerBarFill.setPosition(x - 8, y + 20);
+						powerBarBg.visible = true;
+						powerBarFill.visible = true;
+						powerBarFill.scale.x = 0;
+					}
+				case CHARGING:
+					castPower += castPowerDir * elapsed * 2.0;
+					if (castPower >= 1) {
+						castPower = 1;
+						castPowerDir = -1;
+					} else if (castPower <= 0) {
+						castPower = 0;
+						castPowerDir = 1;
+					}
+					powerBarFill.scale.x = castPower;
 					powerBarBg.setPosition(x - 8, y + 20);
 					powerBarFill.setPosition(x - 8, y + 20);
-					powerBarBg.visible = true;
-					powerBarFill.visible = true;
-					powerBarFill.scale.x = 0;
-				}
-			case CHARGING:
-				castPower += castPowerDir * elapsed * 2.0;
-				if (castPower >= 1) {
-					castPower = 1;
-					castPowerDir = -1;
-				} else if (castPower <= 0) {
-					castPower = 0;
-					castPowerDir = 1;
-				}
-				powerBarFill.scale.x = castPower;
-				powerBarBg.setPosition(x - 8, y + 20);
-				powerBarFill.setPosition(x - 8, y + 20);
 
-				if (SimpleController.just_released(A)) {
-					powerBarBg.visible = false;
-					powerBarFill.visible = false;
+					if (SimpleController.just_released(A)) {
+						powerBarBg.visible = false;
+						powerBarFill.visible = false;
 
-					if (castPower < 0.05) {
-						castState = IDLE;
-						frozen = false;
-					} else {
-						castState = CAST_ANIM;
-						castDirSuffix = getDirSuffix();
-						sendAnimUpdate("cast_" + castDirSuffix, true);
+						if (castPower < 0.05) {
+							castState = IDLE;
+							frozen = false;
+						} else {
+							startCast();
+						}
 					}
+				case CASTING:
+					if (SimpleController.just_pressed(A)) {
+						catchFish();
+					}
+				case LANDED:
+					if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
+						catchFish();
+					}
+				default:
+					// nothing to do
+			}
+		}
+
+		// --- START: Used for both local and remote players
+		switch (castState) {
+			case CASTING:
+				// Arc advances and lands for both local and remote players
+				if (updateCastArc(elapsed)) {
+					castBobber.setPosition(castTarget.x, castTarget.y);
+					if (castStartPos != null) {
+						castStartPos.put();
+						castStartPos = null;
+					}
+					castState = LANDED;
+					frozen = false;
+					playMovementAnim(true);
 				}
 			case CAST_ANIM:
+				// TODO: We can
 				// Arc the bobber toward the target; clamp if it arrives during the animation.
 				if (updateCastArc(elapsed)) {
 					castBobber.setPosition(castTarget.x, castTarget.y);
@@ -624,23 +680,6 @@ class Player extends FlxSprite {
 							castBobber = null;
 						}
 					}
-				}
-			case CASTING:
-				if (SimpleController.just_pressed(A)) {
-					catchFish();
-				} else if (updateCastArc(elapsed)) {
-					castBobber.setPosition(castTarget.x, castTarget.y);
-					if (castStartPos != null) {
-						castStartPos.put();
-						castStartPos = null;
-					}
-					frozen = false;
-					playMovementAnim(true);
-					castState = LANDED;
-				}
-			case LANDED:
-				if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
-					catchFish();
 				}
 			case RETURNING:
 				if (castBobber != null) {
@@ -676,6 +715,8 @@ class Player extends FlxSprite {
 						}
 					}
 				}
+			default:
+				// nothing to do
 		}
 	}
 
@@ -685,6 +726,9 @@ class Player extends FlxSprite {
 
 	public function catchFish(hasFish:Bool = false) {
 		if (castState == LANDED || castState == CASTING) {
+			if (!isRemote && !hasFish) {
+				GameManager.ME.net.sendLinePulled();
+			}
 			castState = CATCH_ANIM;
 			frozen = true;
 			retractHasFish = hasFish;
