@@ -52,7 +52,7 @@ class MainMenuState extends FlxTransitionableState {
 		creditsButton.setPosition(10, FlxG.height - creditsButton.height - 10);
 		add(creditsButton);
 
-		FmodManager.PlaySong(FmodSongs.LetsGo);
+		// FmodManager.PlaySong(FmodSongs.LetsGo);
 
 		// we will handle transitions manually
 		transOut = null;
