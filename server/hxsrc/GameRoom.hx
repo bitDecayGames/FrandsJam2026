@@ -44,7 +44,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// sent when a client spawns a fish
 		onMessage("fish_spawn", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_spawn" message: ${Json.stringify(data)}');
-			state.fish.set(data.id, new FishState(data.x, data.y));
+			state.fish.set(data.id, new FishState(data.x, data.y, data.fishType != null ? Std.int(data.fishType) : 0));
 		});
 
 		// sent when a player throws a rock
@@ -131,6 +131,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("worm_killed", {sessionId: client.sessionId}, {except: client});
 		});
 
+		// sent when a player activates or deactivates hot pepper mode
+		onMessage("hot_pepper", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "hot_pepper": isStart=${data.isStart}');
+			broadcast("hot_pepper", {sessionId: client.sessionId, isStart: data.isStart}, {except: client});
+		});
+
 		// sent when a player sells a fish — broadcast to other clients so they can track it
 		onMessage("fish_sold", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_sold" message: fishType=${data.fishType} lengthCm=${data.lengthCm} value=${data.value}');
@@ -156,8 +162,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// sent when a player catches a fish; catcherSessionId may differ from client.sessionId
 		// because the host reports catches on behalf of any player whose bobber a fish swam into
 		onMessage("fish_caught", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_caught": fishId=${data.fishId} catcher=${data.catcherSessionId}');
-			broadcast("fish_caught", {sessionId: data.catcherSessionId, fishId: data.fishId});
+			trace('${client.sessionId}: sent "fish_caught": fishId=${data.fishId} catcher=${data.catcherSessionId} fishType=${data.fishType}');
+			broadcast("fish_caught", {sessionId: data.catcherSessionId, fishId: data.fishId, fishType: data.fishType});
 		});
 
 		// sent when a player pulls in their line
@@ -213,6 +219,41 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				}
 				state.round = newData;
 			}
+		});
+
+		onMessage("kick", (client:Client, data:{targetSessionId:String}) -> {
+			trace('${client.sessionId}: wants to kick ${data.targetSessionId}');
+			var target = clients.getById(data.targetSessionId);
+			if (target == null) {
+				return;
+			}
+
+			// Remove the player from state immediately so other clients see it right away.
+			// onLeave will also fire after the WebSocket closes but will safely no-op.
+			state.players.delete(data.targetSessionId);
+
+			// Rotate host if the kicked player was the host
+			if (data.targetSessionId == state.hostSessionId) {
+				var remaining = [];
+				for (sId => _ in state.players) {
+					remaining.push(sId);
+				}
+				if (remaining.length > 0) {
+					state.hostSessionId = remaining[Std.random(remaining.length)];
+					trace('host changed ${data.targetSessionId} -> ${state.hostSessionId}');
+				} else {
+					disconnect();
+					return;
+				}
+			}
+
+			// Tell all remaining clients explicitly so they can update their player lists
+			// without relying on the schema patch cycle or background-thread schema callbacks
+			broadcast("player_kicked", {sessionId: data.targetSessionId}, {except: target});
+
+			// Notify the kicked client and disconnect them via standard Colyseus method
+			target.send("kicked", {});
+			target.leave(CloseCode.CONSENTED);
 		});
 
 		onMessage("player_ready", (client:Client, _) -> {

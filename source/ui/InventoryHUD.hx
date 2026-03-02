@@ -39,7 +39,7 @@ class InventoryHUD extends FlxSpriteGroup {
 				switch (inventory.items[i]) {
 					case Rock:
 						slots[i].loadGraphic(AssetPaths.inventoryItems__png, true, 16, 16);
-						slots[i].animation.add("rock", [0]);
+						slots[i].animation.add("rock", [1]);
 						slots[i].animation.play("rock");
 						slots[i].scale.set(1, 1);
 						slots[i].offset.set(0, 0);
@@ -55,14 +55,16 @@ class InventoryHUD extends FlxSpriteGroup {
 						slots[i].offset.set(0, 0);
 					case Waders:
 						slots[i].loadGraphic(AssetPaths.inventoryItems__png, true, 16, 16);
-						slots[i].animation.add("waders", [1]);
+						slots[i].animation.add("waders", [2]);
 						slots[i].animation.play("waders");
 						slots[i].scale.set(1, 1);
 						slots[i].offset.set(0, 0);
 				}
 			} else {
 				// slots[i].loadGraphic(null);
-				slots[i].makeGraphic(SLOT_SIZE, SLOT_SIZE, FlxColor.fromRGB(30, 30, 30));
+				slots[i].loadGraphic(AssetPaths.inventoryItems__png, true, 16, 16);
+				slots[i].animation.add("empty", [0]);
+				slots[i].animation.play("empty");
 				slots[i].scale.set(1, 1);
 				slots[i].offset.set(0, 0);
 			}

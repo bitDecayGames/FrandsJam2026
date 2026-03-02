@@ -160,6 +160,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
 		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
+		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 	}
 
@@ -177,6 +178,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
 		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
+		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -289,7 +291,7 @@ class PlayState extends FlxTransitionableState {
 		spawnWeeds();
 		spawnWorldItems(level);
 		#else
-		FlxTimer.wait(10, () -> {
+		FlxTimer.wait(1, () -> {
 			if (NetworkManager.IS_HOST) {
 				spawnWeeds();
 				spawnWorldItems(level);
@@ -302,6 +304,9 @@ class PlayState extends FlxTransitionableState {
 
 		waterLayer = level.waterGrid;
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		for (_ => remote in remotePlayers) {
+			remote.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onRemoteSplash);
+		}
 		groundFishGroup.setWaterLayer(waterLayer);
 		#if local
 		spawnBushes();
@@ -532,6 +537,18 @@ class PlayState extends FlxTransitionableState {
 			if (bush != null && bush.alive) {
 				bush.rustleFrom(dirX, dirY);
 			}
+		}
+	}
+
+	function onRemoteHotPepper(sessionId:String, isStart:Bool) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote == null) {
+			return;
+		}
+		if (isStart) {
+			remote.activateHotMode();
+		} else {
+			remote.deactivateHotMode();
 		}
 	}
 

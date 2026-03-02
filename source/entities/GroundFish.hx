@@ -9,13 +9,21 @@ import todo.TODO;
 class GroundFish extends FlxSprite {
 	var flopTimer:Float = 0;
 
-	// Actual pixel sizes of each fish frame within the 32x32 cell (top-left aligned)
+	// Actual pixel sizes of each fish frame within the 32x32 cell (top-left aligned).
+	// Frames 0-4 are manually calibrated; 5-11 use the full cell since trim data isn't available.
 	static var FISH_SIZES:Array<Array<Int>> = [
-		[8, 8], // fish 0
-		[9, 9], // fish 1
-		[12, 12], // fish 2
-		[13, 14], // fish 3
-		[15, 16], // fish 4
+		[8, 8], // fish 0 - Minnow
+		[9, 9], // fish 1 - Goldfish
+		[12, 12], // fish 2 - Anchovy
+		[13, 14], // fish 3 - Bones
+		[15, 16], // fish 4 - Trout
+		[32, 32], // fish 5 - Stone Fish
+		[32, 32], // fish 6 - Zebra Fish
+		[32, 32], // fish 7 - Sword Fish
+		[32, 32], // fish 8 - Bass
+		[32, 32], // fish 9 - Golden Bass
+		[32, 32], // fish 10 - Eel
+		[32, 32], // fish 11 - Boot
 	];
 
 	// Arc flight
