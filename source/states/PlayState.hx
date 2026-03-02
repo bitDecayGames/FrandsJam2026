@@ -290,7 +290,7 @@ class PlayState extends FlxTransitionableState {
 		spawnWeeds();
 		spawnWorldItems(level);
 		#else
-		FlxTimer.wait(10, () -> {
+		FlxTimer.wait(1, () -> {
 			if (NetworkManager.IS_HOST) {
 				spawnWeeds();
 				spawnWorldItems(level);
