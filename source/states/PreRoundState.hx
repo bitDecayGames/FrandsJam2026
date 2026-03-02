@@ -24,12 +24,11 @@ class PreRoundState extends FlxTransitionableState {
 	override public function create():Void {
 		super.create();
 		trace('yaaaa boii');
-		bgColor = FlxColor.TRANSPARENT;
+		bgColor = 0xff73efe8; // turquoise from title screen
 
 		_txtTitle = new FlxText();
 		_txtTitle.setPosition(FlxG.width / 2, FlxG.height / 4);
-		_txtTitle.size = 40;
-		_txtTitle.alignment = FlxTextAlign.CENTER;
+		_txtTitle.setFormat(Main.menuFont, 40, 0xff2b4e95, FlxTextAlign.CENTER);
 		_txtTitle.text = "Pre Round";
 
 		add(_txtTitle);
@@ -40,17 +39,14 @@ class PreRoundState extends FlxTransitionableState {
 		add(_btnDone);
 
 		_txtReady = new FlxText();
-		_txtReady.size = 24;
-		_txtReady.alignment = FlxTextAlign.CENTER;
-		_txtReady.color = FlxColor.LIME;
+		_txtReady.setFormat(Main.menuFont, 24, 0xff2b4e95, FlxTextAlign.CENTER);
 		_txtReady.text = "READY";
 		_txtReady.setPosition(FlxG.width / 2 - _txtReady.width / 2, _btnDone.y);
 		_txtReady.visible = false;
 		add(_txtReady);
 
 		_txtOtherPlayers = new FlxText();
-		_txtOtherPlayers.size = 10;
-		_txtOtherPlayers.alignment = FlxTextAlign.RIGHT;
+		_txtOtherPlayers.setFormat(Main.menuFont, 16, 0xff2b4e95, FlxTextAlign.RIGHT);
 		_txtOtherPlayers.text = "";
 		add(_txtOtherPlayers);
 

@@ -37,7 +37,7 @@ class PostRoundState extends FlxTransitionableState {
 	static inline var FISH_ICON_NATIVE:Int = 32;
 	static inline var FISH_ICON_SIZE:Int = 64; // displayed size (2x native)
 	static inline var FISH_ICON_STEP:Int = 44; // horizontal step between fish (overlapping but with breathing room)
-	static inline var FISH_LABEL_SIZE:Int = 10;
+	static inline var FISH_LABEL_SIZE:Int = 12;
 	static inline var FISH_LABEL_LINE_HEIGHT:Int = 12;
 	// total vertical space for two text lines + icon
 	static inline var FISH_BLOCK_HEIGHT:Int = 12 + 12 + 64 + 6; // length + value + icon + gap
@@ -45,12 +45,11 @@ class PostRoundState extends FlxTransitionableState {
 	override public function create():Void {
 		super.create();
 		TODO.sfx("post_round_music");
-		bgColor = FlxColor.TRANSPARENT;
+		bgColor = 0xff73efe8; // turquoise from title screen
 
 		_txtTitle = new FlxText();
 		_txtTitle.setPosition(FlxG.width / 2, 20);
-		_txtTitle.size = 40;
-		_txtTitle.alignment = FlxTextAlign.CENTER;
+		_txtTitle.setFormat(Main.menuFont, 40, 0xff2b4e95, FlxTextAlign.CENTER);
 		_txtTitle.text = "Round Winner!";
 		add(_txtTitle);
 
@@ -67,17 +66,14 @@ class PostRoundState extends FlxTransitionableState {
 		add(_btnDone);
 
 		_txtReady = new FlxText();
-		_txtReady.size = 24;
-		_txtReady.alignment = FlxTextAlign.CENTER;
-		_txtReady.color = FlxColor.LIME;
+		_txtReady.setFormat(Main.menuFont, 24, 0xff2b4e95, FlxTextAlign.CENTER);
 		_txtReady.text = "READY";
 		_txtReady.setPosition(FlxG.width / 2 - _txtReady.width / 2, _btnDone.y);
 		_txtReady.visible = false;
 		add(_txtReady);
 
 		_txtOtherPlayers = new FlxText();
-		_txtOtherPlayers.size = 10;
-		_txtOtherPlayers.alignment = FlxTextAlign.RIGHT;
+		_txtOtherPlayers.setFormat(Main.menuFont, 16, 0xff2b4e95, FlxTextAlign.RIGHT);
 		_txtOtherPlayers.text = "";
 		add(_txtOtherPlayers);
 
@@ -129,39 +125,29 @@ class PostRoundState extends FlxTransitionableState {
 			var isFirst = entries[i].score == topScore;
 			var fontSize = isFirst ? FIRST_PLACE_SIZE : OTHER_PLACE_SIZE;
 
+			var textColor = isFirst ? FlxColor.RED : 0xff2b4e95;
+
 			// Place label (1st, 2nd, 3rd, etc.) — left side
 			var placeText = new FlxText();
-			placeText.size = fontSize;
-			placeText.alignment = FlxTextAlign.LEFT;
+			placeText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.LEFT);
 			placeText.text = ordinal(currentPlace);
 			placeText.setPosition(SCORE_LEFT_MARGIN, currentY);
-			if (isFirst) {
-				placeText.color = FlxColor.YELLOW;
-			}
 			add(placeText);
 			_scorePlaceTexts.push(placeText);
 
 			// Name — next to the place label
 			var nameText = new FlxText();
-			nameText.size = fontSize;
-			nameText.alignment = FlxTextAlign.LEFT;
+			nameText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.LEFT);
 			nameText.text = entries[i].name;
 			nameText.setPosition(SCORE_LEFT_MARGIN + 50, currentY);
-			if (isFirst) {
-				nameText.color = FlxColor.YELLOW;
-			}
 			add(nameText);
 			_scoreNameTexts.push(nameText);
 
 			// Score — right side
 			var scoreText = new FlxText();
-			scoreText.size = fontSize;
-			scoreText.alignment = FlxTextAlign.RIGHT;
+			scoreText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.RIGHT);
 			scoreText.text = formatMoney(entries[i].score);
 			scoreText.setPosition(FlxG.width - SCORE_RIGHT_MARGIN - scoreText.width, currentY);
-			if (isFirst) {
-				scoreText.color = FlxColor.YELLOW;
-			}
 			add(scoreText);
 			_scoreValueTexts.push(scoreText);
 
@@ -175,16 +161,14 @@ class PostRoundState extends FlxTransitionableState {
 				for (fish in fishEntries) {
 					// Length label above icon
 					var lenText = new FlxText();
-					lenText.size = FISH_LABEL_SIZE;
-					lenText.color = FlxColor.fromRGB(180, 180, 180);
+					lenText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
 					lenText.text = Std.string(fish.lengthCm) + "cm";
 					lenText.setPosition(fishX + FISH_ICON_SIZE / 2 - lenText.width / 2, currentY);
 					add(lenText);
 
 					// Value label between length and icon
 					var valText = new FlxText();
-					valText.size = FISH_LABEL_SIZE;
-					valText.color = FlxColor.fromRGB(180, 180, 180);
+					valText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
 					valText.text = formatMoney(fish.value);
 					valText.setPosition(fishX + FISH_ICON_SIZE / 2 - valText.width / 2, currentY + FISH_LABEL_LINE_HEIGHT);
 					add(valText);
@@ -236,8 +220,7 @@ class PostRoundState extends FlxTransitionableState {
 				name = bestWeedId == gm.mySessionId ? "You" : "???";
 			}
 			var weedText = new FlxText();
-			weedText.size = 10;
-			weedText.color = FlxColor.fromRGB(180, 180, 180);
+			weedText.setFormat(Main.menuFont, 12, 0xff2b4e95);
 			weedText.text = 'Weed crusher: $name ($bestWeedCount)';
 			weedText.setPosition(10, statY);
 			add(weedText);
@@ -260,8 +243,7 @@ class PostRoundState extends FlxTransitionableState {
 				name = bestWormId == gm.mySessionId ? "You" : "???";
 			}
 			var wormText = new FlxText();
-			wormText.size = 10;
-			wormText.color = FlxColor.fromRGB(180, 180, 180);
+			wormText.setFormat(Main.menuFont, 12, 0xff2b4e95);
 			wormText.text = 'Worm murderer: $name ($bestWormCount)';
 			wormText.setPosition(10, statY);
 			add(wormText);

@@ -50,6 +50,8 @@ import plugins.GlobalDebugPlugin;
 #end
 
 class Main extends Sprite {
+	public static var menuFont:String;
+
 	public function new() {
 		super();
 		Configure.initAnalytics(false);
@@ -107,6 +109,11 @@ class Main extends Sprite {
 		var exampleFont = FlxBitmapFont.fromAngelCode(AssetPaths.safety_0__png, AssetPaths.safety__fnt);
 		FlxTextFactory.defaultFont = exampleFont;
 		FlxTextFactory.defaultSize = 12;
+
+		// Register Pixel One for use on menu screens
+		var pixelOne = Assets.getFont(AssetPaths.pixel_one__ttf);
+		Font.registerFont(pixelOne);
+		menuFont = pixelOne.fontName;
 	}
 
 	private function configureDebug() {
