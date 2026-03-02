@@ -23,6 +23,8 @@ class FmodSFX {
     public static inline var PlayerStepDirt:String = "event:/SFX/Player/PlayerStepDirt";
     public static inline var PlayerStepGrass:String = "event:/SFX/Player/PlayerStepGrass";
     public static inline var PlayerStepWater:String = "event:/SFX/Player/PlayerStepWater";
+    public static inline var RockLandGround:String = "event:/SFX/Rock/RockLandGround";
+    public static inline var RockLandGroundLoud:String = "event:/SFX/Rock/RockLandGroundLoud";
     public static inline var RockSplash:String = "event:/SFX/Rock/RockSplash";
     public static inline var WeedsBurst:String = "event:/SFX/Weeds/WeedsBurst";
 }

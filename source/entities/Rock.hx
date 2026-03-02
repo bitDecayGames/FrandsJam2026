@@ -1,6 +1,7 @@
 package entities;
 
 import flixel.FlxSprite;
+import flixel.FlxG;
 import todo.TODO;
 
 class Rock extends FlxSprite {
@@ -29,7 +30,10 @@ class Rock extends FlxSprite {
 			if (onWaterSplash != null)
 				onWaterSplash(landX, landY, big);
 		} else {
-			TODO.sfx("rock_land");
+			FmodManager.PlaySoundOneShot(big ? FmodSFX.RockLandGroundLoud : FmodSFX.RockLandGround);
+			if (big) {
+				FlxG.camera.shake(0.005, 0.15);
+			}
 			if (onAddToWorld != null)
 				onAddToWorld(landX, landY, big);
 		}
