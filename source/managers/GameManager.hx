@@ -295,6 +295,9 @@ class GameManager {
 	public function endGame() {
 		trace("end the game");
 		net.disconnect();
+
+		reset();
+
 		FlxG.switchState(() -> new VictoryState());
 	}
 
@@ -334,6 +337,25 @@ class GameManager {
 				});
 			}
 		}
+	}
+
+	private function reset() {
+		totalRounds = 0;
+		currentRoundNumber = 0;
+
+		rounds = [];
+		roundStatus = RoundState.STATUS_INACTIVE;
+
+		sessions = [];
+		names = new Map<String, String>();
+		skins = new Map<String, Int>();
+		readyStates = new Map<String, Bool>();
+		scores = new Map<String, Int>();
+		soldFish = [];
+		weedKills = [];
+		wormKills = [];
+		mySessionId = "";
+		mySkinIndex = -1;
 	}
 
 	private function switchStateBasedOnStatus() {
