@@ -11,7 +11,10 @@ class FmodSongs {
 }
 
 class FmodSFX {
+    public static inline var BobberLandGround:String = "event:/SFX/Bobber/BobberLandGround";
+    public static inline var BobberLandWater:String = "event:/SFX/Bobber/BobberLandWater";
     public static inline var BushRustle:String = "event:/SFX/Bush/BushRustle";
+    public static inline var FishingRodCast:String = "event:/SFX/FishingRod/FishingRodCast";
     public static inline var FishingRodCharge:String = "event:/SFX/FishingRod/FishingRodCharge";
     public static inline var FishingRodCharge2:String = "event:/SFX/FishingRod/FishingRodCharge2";
     public static inline var MenuHover:String = "event:/SFX/Menu/MenuHover";

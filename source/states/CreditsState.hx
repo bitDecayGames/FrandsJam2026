@@ -11,6 +11,7 @@ import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
 import haxefmod.flixel.FmodFlxUtilities;
 import misc.FlxTextFactory;
+import ui.font.BitmapText.PressStart;
 import ui.MenuBuilder;
 
 using states.FlxStateExt;
@@ -26,7 +27,9 @@ class CreditsState extends FlxTransitionableState {
 	var _txtCreator:Array<FlxBitmapText>;
 
 	// Quick appearance variables
-	private var backgroundColor = FlxColor.BLACK;
+	private var backgroundColor:FlxColor = 0xff73efe8; // turquoise from title screen
+
+	private static var TEXT_COLOR:Int = 0xff2b4e95; // navy from title screen
 
 	static inline var entryLeftMargin = 50;
 	static inline var entryRightMargin = 50;
@@ -60,7 +63,7 @@ class CreditsState extends FlxTransitionableState {
 
 		_allCreditElements = new Array<FlxSprite>();
 
-		_txtCreditsTitle = FlxTextFactory.make("Credits", FlxG.width / 4, FlxG.height / 2, 40, FlxTextAlign.CENTER);
+		_txtCreditsTitle = FlxTextFactory.make("Credits", FlxG.width / 4, FlxG.height / 2, 40, FlxTextAlign.CENTER, TEXT_COLOR, PressStart.font);
 		center(_txtCreditsTitle);
 		add(_txtCreditsTitle);
 
@@ -109,7 +112,8 @@ class CreditsState extends FlxTransitionableState {
 			_allCreditElements.push(display);
 		}
 
-		_txtThankYou = FlxTextFactory.make("Thank you!", FlxG.width / 2, creditsVerticalOffset + FlxG.height / 2, 40, FlxTextAlign.CENTER);
+		_txtThankYou = FlxTextFactory.make("Thank you!", FlxG.width / 2, creditsVerticalOffset + FlxG.height / 2, 40, FlxTextAlign.CENTER, TEXT_COLOR,
+			PressStart.font);
 		_txtThankYou.alignment = FlxTextAlign.CENTER;
 		center(_txtThankYou);
 		add(_txtThankYou);
@@ -118,7 +122,7 @@ class CreditsState extends FlxTransitionableState {
 
 	private function AddSectionToCreditsTextArrays(role:String, creators:Array<String>, finalRoleArray:Array<FlxBitmapText>,
 			finalCreatorsArray:Array<FlxBitmapText>) {
-		var roleText = FlxTextFactory.make(role, 0, 0, 24);
+		var roleText = FlxTextFactory.make(role, 0, 0, 24, null, TEXT_COLOR, PressStart.font);
 		add(roleText);
 		finalRoleArray.push(roleText);
 		finalRoleArray.push(roleText);
@@ -134,7 +138,7 @@ class CreditsState extends FlxTransitionableState {
 			// Make an offset entry for the roles array
 			finalRoleArray.push(new FlxBitmapText());
 
-			var creatorText = FlxTextFactory.make(creator, 0, 0, 24, FlxTextAlign.RIGHT);
+			var creatorText = FlxTextFactory.make(creator, 0, 0, 24, FlxTextAlign.RIGHT, TEXT_COLOR, PressStart.font);
 			add(creatorText);
 			finalCreatorsArray.push(creatorText);
 			_allCreditElements.push(creatorText);

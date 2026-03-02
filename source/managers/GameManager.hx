@@ -271,15 +271,13 @@ class GameManager {
 			case RoundState.STATUS_LOBBY:
 				if (NetworkManager.IS_HOST) {
 					init([
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
 					]);
 					// needs to force this back to 0
 					nextRoundNumber = currentRoundNumber;
 				}
-				nextStatus = RoundState.STATUS_PRE_ROUND;
-			case RoundState.STATUS_PRE_ROUND:
 				nextStatus = RoundState.STATUS_ACTIVE;
 			case RoundState.STATUS_ACTIVE:
 				nextStatus = RoundState.STATUS_POST_ROUND;
@@ -290,7 +288,7 @@ class GameManager {
 					endGame();
 					return;
 				}
-				nextStatus = RoundState.STATUS_PRE_ROUND;
+				nextStatus = RoundState.STATUS_ACTIVE;
 			case RoundState.STATUS_END_GAME:
 				nextStatus = RoundState.STATUS_LOBBY;
 			case RoundState.STATUS_INACTIVE:
@@ -384,12 +382,6 @@ class GameManager {
 		switch (roundStatus) {
 			case RoundState.STATUS_LOBBY:
 				FlxG.switchState(() -> new LobbyState());
-			case RoundState.STATUS_PRE_ROUND:
-				trace('scooby doo 1');
-				FlxG.switchState(() -> {
-					trace('scooby doo 2');
-					return new PreRoundState();
-				});
 			case RoundState.STATUS_ACTIVE:
 				FlxG.switchState(() -> new PlayState(round));
 			case RoundState.STATUS_POST_ROUND:

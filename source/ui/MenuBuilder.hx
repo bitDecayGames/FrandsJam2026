@@ -17,6 +17,10 @@ class MenuBuilder {
 	 */
 	public static function createTextButton(Text:String, cb:Void->Void, ?clickSFX:FmodSFXE = MenuSelect, ?hoverSFX:FmodSFXE = MenuHover):FlxButton {
 		var button = new FlxButton(0, 0, Text);
+		button.makeGraphic(160, 40, FlxColor.WHITE);
+		button.label.setFormat(Main.menuFont, 20, 0x333333, "center");
+		button.label.fieldWidth = 160;
+		button.updateHitbox();
 		button.allowSwiping = false;
 		button.onOver.callback = function() {
 			if (hoverSFX != null) {

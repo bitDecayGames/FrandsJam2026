@@ -1,8 +1,5 @@
 package states;
 
-import ui.font.BitmapText.PressStart;
-import flixel.text.FlxBitmapText;
-import misc.FlxTextFactory;
 import flixel.text.FlxInputText;
 import goals.PersonalFishCountGoal;
 import goals.TimedGoal;
@@ -27,7 +24,7 @@ using states.FlxStateExt;
 class LobbyState extends FlxTransitionableState {
 	var _btnDone:FlxButton;
 	var _txtReady:FlxText;
-	var _txtRoomID:FlxBitmapText;
+	var _txtRoomID:FlxText;
 
 	var _txtTitle:FlxText;
 	var _inputField:FlxInputText;
@@ -50,19 +47,29 @@ class LobbyState extends FlxTransitionableState {
 	static inline var KICK_BTN_W:Int = 80;
 	static inline var ROW_H:Int = 22;
 
+	// Title screen colors
+	static var BG_COLOR:FlxColor = 0xff73efe8; // turquoise
+	static var TEXT_COLOR:FlxColor = 0xff2b4e95; // dark navy
+
+	public function new() {
+		super();
+	}
+
 	override public function create():Void {
 		super.create();
 		TODO.sfx("lobby_music");
-		bgColor = FlxColor.TRANSPARENT;
+		bgColor = BG_COLOR;
 
 		_txtTitle = new FlxText();
 		_txtTitle.setPosition(FlxG.width / 2, 20);
-		_txtTitle.size = 40;
-		_txtTitle.alignment = FlxTextAlign.CENTER;
+		_txtTitle.setFormat(Main.menuFont, 40, TEXT_COLOR, FlxTextAlign.CENTER);
 		_txtTitle.text = "Lobby";
 		add(_txtTitle);
 
-		_txtRoomID = FlxTextFactory.make("Room ID: ", 10, 10, 12, FlxTextAlign.LEFT, FlxColor.WHITE, PressStart.font);
+		_txtRoomID = new FlxText();
+		_txtRoomID.setPosition(10, 10);
+		_txtRoomID.setFormat(Main.menuFont, 12, TEXT_COLOR);
+		_txtRoomID.text = "Room ID: ";
 		add(_txtRoomID);
 
 		// Ready button at the bottom center — starts disabled
@@ -75,35 +82,35 @@ class LobbyState extends FlxTransitionableState {
 
 		// Large green "READY" text — hidden until the player clicks Ready
 		_txtReady = new FlxText();
-		_txtReady.size = 24;
-		_txtReady.alignment = FlxTextAlign.CENTER;
-		_txtReady.color = FlxColor.LIME;
+		_txtReady.setFormat(Main.menuFont, 24, TEXT_COLOR, FlxTextAlign.CENTER);
 		_txtReady.text = "READY";
 		_txtReady.setPosition(FlxG.width / 2 - _txtReady.width / 2, _btnDone.y);
 		_txtReady.visible = false;
 		add(_txtReady);
 
 		// Input field centered directly above the Ready button
-		_inputField = new FlxInputText(0, 0, 200, FlxG.save.data.name, 20, FlxColor.WHITE, FlxColor.GRAY);
+		_inputField = new FlxInputText(0, 0, 200, FlxG.save.data.name, 20, TEXT_COLOR, FlxColor.WHITE);
 		_inputField.maxChars = 20;
 		_inputField.setPosition(FlxG.width / 2 - _inputField.width / 2, _btnDone.y - _inputField.height - 8);
 		_inputField.onTextChange.add(updatePlayerName);
 		add(_inputField);
 
 		var _txtNameLabel = new FlxText();
-		_txtNameLabel.size = 12;
+		_txtNameLabel.setFormat(Main.menuFont, 12, TEXT_COLOR);
 		_txtNameLabel.text = "Enter your name:";
 		_txtNameLabel.setPosition(FlxG.width / 2 - _txtNameLabel.width / 2, _inputField.y - _txtNameLabel.height - 4);
 		add(_txtNameLabel);
 
 		// Header label for the other players section
-		_txtOtherHeader = new FlxText(0, 0, 0, "Other Players:", 10);
+		_txtOtherHeader = new FlxText(0, 0, 0, "Other Players:", 16);
+		_txtOtherHeader.setFormat(Main.menuFont, 16, TEXT_COLOR);
 		_txtOtherHeader.visible = false;
 		add(_txtOtherHeader);
 
 		// Pre-create kick rows (up to MAX_REMOTE_PLAYERS)
 		for (i in 0...MAX_REMOTE_PLAYERS) {
-			var label = new FlxText(0, 0, 150, "", 10);
+			var label = new FlxText(0, 0, 150, "", 12);
+			label.setFormat(Main.menuFont, 12, TEXT_COLOR);
 			label.visible = false;
 			add(label);
 
@@ -165,6 +172,12 @@ class LobbyState extends FlxTransitionableState {
 			add(border);
 			_skinBorders.push(border);
 
+			// Black background behind each skin icon
+			var skinBg = new FlxSprite();
+			skinBg.makeGraphic(SKIN_SIZE, SKIN_SIZE, FlxColor.BLACK);
+			skinBg.setPosition(slotX, skinY);
+			add(skinBg);
+
 			// Skin preview sprite — use the icons sheet (frame i = skin i), scaled 2x
 			var skinSprite = new FlxSprite();
 			skinSprite.loadGraphic(AssetPaths.icons__png, true, SKIN_ICON_NATIVE, SKIN_ICON_NATIVE);
@@ -178,8 +191,7 @@ class LobbyState extends FlxTransitionableState {
 
 			// Name label above each skin
 			var nameLabel = new FlxText();
-			nameLabel.size = 8;
-			nameLabel.alignment = FlxTextAlign.CENTER;
+			nameLabel.setFormat(Main.menuFont, 12, TEXT_COLOR, FlxTextAlign.CENTER);
 			nameLabel.text = "";
 			nameLabel.setPosition(slotX + SKIN_SIZE / 2, skinY - nameHeight);
 			add(nameLabel);
@@ -239,7 +251,7 @@ class LobbyState extends FlxTransitionableState {
 		for (i in 0..._skinBorders.length) {
 			if (i == _selectedSkinIndex) {
 				// Bright green border for the local player's selection
-				_skinBorders[i].makeGraphic(borderedSize, borderedSize, FlxColor.LIME);
+				_skinBorders[i].makeGraphic(borderedSize, borderedSize, TEXT_COLOR);
 				// Cut out the interior to make it a border frame
 				var pixels = _skinBorders[i].pixels;
 				for (py in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
@@ -340,7 +352,7 @@ class LobbyState extends FlxTransitionableState {
 
 		var sectionRight = FlxG.width - 10;
 		var sectionBottom = FlxG.height - 10;
-		var headerH = 16;
+		var headerH = 28;
 		var sectionH = others.length > 0 ? (others.length * ROW_H + headerH) : 0;
 
 		_txtOtherHeader.visible = others.length > 0;
