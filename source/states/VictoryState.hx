@@ -24,7 +24,7 @@ class VictoryState extends FlxTransitionableState {
 	static inline var FISH_ICON_NATIVE:Int = 32;
 	static inline var FISH_ICON_SIZE:Int = 48;
 	static inline var FISH_ICON_STEP:Int = 36;
-	static inline var FISH_LABEL_SIZE:Int = 8;
+	static inline var FISH_LABEL_SIZE:Int = 12;
 	static inline var FISH_LABEL_LINE_HEIGHT:Int = 10;
 	static inline var FISH_BLOCK_HEIGHT:Int = 48 + 10 + 10 + 6;
 	static inline var ROUND_SECTION_GAP:Int = 10;
@@ -32,7 +32,7 @@ class VictoryState extends FlxTransitionableState {
 	override public function create():Void {
 		super.create();
 		TODO.sfx("victory_music");
-		bgColor = FlxColor.TRANSPARENT;
+		bgColor = 0xff73efe8; // turquoise from title screen
 
 		var gm = GameManager.ME;
 
@@ -52,16 +52,13 @@ class VictoryState extends FlxTransitionableState {
 		}
 
 		_txtTitle = new FlxText();
-		_txtTitle.size = 36;
-		_txtTitle.alignment = FlxTextAlign.CENTER;
-		_txtTitle.color = FlxColor.YELLOW;
+		_txtTitle.setFormat(Main.menuFont, 36, FlxColor.RED, FlxTextAlign.CENTER);
 		_txtTitle.text = winnerName + " wins!";
 		_txtTitle.setPosition(FlxG.width / 2 - _txtTitle.width / 2, 20);
 		add(_txtTitle);
 
 		var totalText = new FlxText();
-		totalText.size = 16;
-		totalText.alignment = FlxTextAlign.CENTER;
+		totalText.setFormat(Main.menuFont, 16, 0xff2b4e95, FlxTextAlign.CENTER);
 		totalText.text = formatMoney(winnerScore) + " total";
 		totalText.setPosition(FlxG.width / 2 - totalText.width / 2, 62);
 		add(totalText);
@@ -73,8 +70,7 @@ class VictoryState extends FlxTransitionableState {
 			var fishEntries = gm.getSoldFish(roundNum, winnerSessionId);
 
 			var roundLabel = new FlxText();
-			roundLabel.size = ROUND_HEADER_SIZE;
-			roundLabel.color = FlxColor.fromRGB(200, 200, 200);
+			roundLabel.setFormat(Main.menuFont, ROUND_HEADER_SIZE, 0xff2b4e95);
 			roundLabel.text = "Round " + (roundNum + 1);
 			roundLabel.setPosition(LEFT_MARGIN, currentY);
 			add(roundLabel);
@@ -82,8 +78,7 @@ class VictoryState extends FlxTransitionableState {
 
 			if (fishEntries.length == 0) {
 				var noneText = new FlxText();
-				noneText.size = FISH_LABEL_SIZE;
-				noneText.color = FlxColor.fromRGB(120, 120, 120);
+				noneText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
 				noneText.text = "No fish sold";
 				noneText.setPosition(LEFT_MARGIN + 10, currentY);
 				add(noneText);
@@ -94,16 +89,14 @@ class VictoryState extends FlxTransitionableState {
 				for (fish in fishEntries) {
 					// Length label
 					var lenText = new FlxText();
-					lenText.size = FISH_LABEL_SIZE;
-					lenText.color = FlxColor.fromRGB(180, 180, 180);
+					lenText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
 					lenText.text = Std.string(fish.lengthCm) + "cm";
 					lenText.setPosition(fishX + FISH_ICON_SIZE / 2 - lenText.width / 2, currentY);
 					add(lenText);
 
 					// Value label
 					var valText = new FlxText();
-					valText.size = FISH_LABEL_SIZE;
-					valText.color = FlxColor.fromRGB(180, 180, 180);
+					valText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
 					valText.text = formatMoney(fish.value);
 					valText.setPosition(fishX + FISH_ICON_SIZE / 2 - valText.width / 2, currentY + FISH_LABEL_LINE_HEIGHT);
 					add(valText);
