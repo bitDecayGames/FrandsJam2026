@@ -132,6 +132,11 @@ class LobbyState extends FlxTransitionableState {
 			if (_inputField.text != null && _inputField.text != "") {
 				GameManager.ME.net.sendMessage("player_name_changed", {name: _inputField.text});
 			}
+
+			_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
+			if (_selectedSkinIndex > -1) {
+				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+			}
 		});
 	}
 
