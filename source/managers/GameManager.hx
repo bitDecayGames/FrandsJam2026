@@ -5,6 +5,7 @@ import goals.PersonalFishCountGoal;
 import goals.PersonalFishSoldGoal;
 import goals.TimedGoal;
 import goals.KeypressGoal;
+import entities.Player;
 import flixel.util.FlxSignal.FlxTypedSignal;
 import flixel.util.FlxTimer;
 import schema.RoundState;
@@ -198,6 +199,21 @@ class GameManager {
 	/** Get the current round number (0-indexed). */
 	public function getCurrentRoundNumber():Int {
 		return currentRoundNumber;
+	}
+
+	public function getFirstAvailableSkinIndex():Int {
+		var selectedSkinIdxs = [];
+		for (_ => sIdx in skins) {
+			selectedSkinIdxs.push(sIdx);
+		}
+
+		for (i in 0...Player.SKINS.length) {
+			if (!selectedSkinIdxs.contains(i)) {
+				return i;
+			}
+		}
+
+		return -1;
 	}
 
 	private function onPlayerAdded(sessionId:String, data:PlayerUpdateData) {

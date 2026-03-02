@@ -139,6 +139,11 @@ class LobbyState extends FlxTransitionableState {
 			if (_inputField.text != null && _inputField.text != "") {
 				GameManager.ME.net.sendMessage("player_name_changed", {name: _inputField.text});
 			}
+
+			_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
+			if (_selectedSkinIndex > -1) {
+				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+			}
 		});
 	}
 
@@ -347,7 +352,7 @@ class LobbyState extends FlxTransitionableState {
 
 		var sectionRight = FlxG.width - 10;
 		var sectionBottom = FlxG.height - 10;
-		var headerH = 16;
+		var headerH = 28;
 		var sectionH = others.length > 0 ? (others.length * ROW_H + headerH) : 0;
 
 		_txtOtherHeader.visible = others.length > 0;

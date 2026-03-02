@@ -48,6 +48,10 @@ class MainMenuState extends FlxTransitionableState {
 		startButton.y = FlxG.height * .6;
 		add(startButton);
 
+		var creditsButton = MenuBuilder.createTextButton("Credits", clickCredits, MenuSelect, MenuHover);
+		creditsButton.setPosition(10, FlxG.height - creditsButton.height - 10);
+		add(creditsButton);
+
 		FmodManager.PlaySong(FmodSongs.LetsGo);
 
 		// we will handle transitions manually
