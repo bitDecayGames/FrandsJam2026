@@ -22,7 +22,7 @@ class FishTypes {
 		new FishTypeData("Minnow", 5, 10, 25),
 		new FishTypeData("Goldfish", 10, 20, 50),
 		new FishTypeData("Anchovy", 15, 25, 60),
-		new FishTypeData("Bones", -10, 20, 30),
+		new FishTypeData("No Name", 18, 8, 30),
 		new FishTypeData("Trout", 20, 30, 45),
 		new FishTypeData("Stone Fish", 25, 30, 45),
 		new FishTypeData("Zebra Fish", 30, 30, 45),
