@@ -80,14 +80,14 @@
   "size": { "w": 24, "h": 24 },
   "scale": "1",
   "frameTags": [
-   { "name": "a", "from": 0, "to": 0, "direction": "forward", "repeat": "1", "color": "#000000ff" },
-   { "name": "b", "from": 1, "to": 1, "direction": "forward", "repeat": "1", "color": "#000000ff" },
-   { "name": "c", "from": 2, "to": 2, "direction": "forward", "repeat": "1", "color": "#000000ff" },
-   { "name": "d", "from": 3, "to": 3, "direction": "forward", "repeat": "1", "color": "#000000ff" },
-   { "name": "e", "from": 4, "to": 4, "direction": "forward", "repeat": "1", "color": "#000000ff" },
-   { "name": "f", "from": 5, "to": 5, "direction": "forward", "repeat": "1", "color": "#000000ff" },
-   { "name": "g", "from": 6, "to": 6, "direction": "forward", "repeat": "1", "color": "#000000ff" },
-   { "name": "h", "from": 7, "to": 7, "direction": "forward", "repeat": "1", "color": "#000000ff" }
+   { "name": "a", "from": 0, "to": 0, "direction": "forward", "repeat": 1, "color": "#000000ff" },
+   { "name": "b", "from": 1, "to": 1, "direction": "forward", "repeat": 1, "color": "#000000ff" },
+   { "name": "c", "from": 2, "to": 2, "direction": "forward", "repeat": 1, "color": "#000000ff" },
+   { "name": "d", "from": 3, "to": 3, "direction": "forward", "repeat": 1, "color": "#000000ff" },
+   { "name": "e", "from": 4, "to": 4, "direction": "forward", "repeat": 1, "color": "#000000ff" },
+   { "name": "f", "from": 5, "to": 5, "direction": "forward", "repeat": 1, "color": "#000000ff" },
+   { "name": "g", "from": 6, "to": 6, "direction": "forward", "repeat": 1, "color": "#000000ff" },
+   { "name": "h", "from": 7, "to": 7, "direction": "forward", "repeat": 1, "color": "#000000ff" }
   ],
   "layers": [
    { "name": "Layer 1", "opacity": 255, "blendMode": "normal" }

@@ -328,7 +328,12 @@ class PlayState extends FlxTransitionableState {
 		};
 
 		player.onBobberLanded = (bx, by) -> {
-			add(new Ripple(bx, by));
+			if (classifyGround(terrainLayer.sampleColorAt(bx, by)) == "water") {
+				FmodManager.PlaySoundOneShot(FmodSFX.BobberLandWater);
+				add(new Ripple(bx, by));
+			} else {
+				FmodManager.PlaySoundOneShot(FmodSFX.BobberLandGround);
+			}
 			FlxG.camera.shake(0.002, 0.1);
 		};
 

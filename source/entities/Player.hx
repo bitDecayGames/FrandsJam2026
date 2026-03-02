@@ -825,7 +825,7 @@ class Player extends FlxSprite {
 		reticleDir.put();
 		castTarget = FlxPoint.get(targetX, targetY);
 		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
-		TODO.sfx("cast_line");
+		FmodManager.PlaySoundOneShot(FmodSFX.FishingRodCast);
 		spawnBobberArc();
 	}
 
