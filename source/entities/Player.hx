@@ -26,6 +26,7 @@ import entities.Footprint;
 import entities.Inventory;
 import entities.Inventory.InventoryItem;
 import levels.ldtk.BDTilemap;
+import todo.TODO;
 
 class Player extends FlxSprite {
 	public static var anims = AsepriteMacros.tagNames("assets/aseprite/characters/playerA.json");
@@ -76,6 +77,11 @@ class Player extends FlxSprite {
 		if (inShallowWater) {
 			if (hotModeActive && inventory.hasWaders()) {
 				hotModeActive = false;
+				#if !local
+				if (!isRemote) {
+					GameManager.ME.net.sendHotPepper(false);
+				}
+				#end
 			}
 			offset.y -= SHALLOW_WATER_OFFSET;
 			clipRect = flixel.math.FlxRect.get(0, 0, 48, 28);
@@ -100,6 +106,10 @@ class Player extends FlxSprite {
 	var castState:CastState = IDLE;
 
 	public var castBobber(default, null):FlxSprite;
+
+	
+	// Holder variable to track fishing rod charge sound
+	var fishingRodChargeSound:String = "";
 
 	var castTarget:FlxPoint;
 	var castStartPos:FlxPoint;
@@ -242,6 +252,13 @@ class Player extends FlxSprite {
 				} else if (isBlue) {
 					groundType = "water";
 				}
+			}
+			if (isBrown) {
+				FmodManager.PlaySoundOneShot(FmodSFX.PlayerStepDirt);
+			} else if (isBlue) {
+				FmodManager.PlaySoundOneShot(FmodSFX.PlayerStepWater);
+			} else {
+				FmodManager.PlaySoundOneShot(FmodSFX.PlayerStepGrass);
 			}
 			if (isBrown || isBlue) {
 				var print = new Footprint(fx, fy, lastInputDir, groundColor, isBlue);
@@ -442,6 +459,59 @@ class Player extends FlxSprite {
 		updateFishingLine();
 		updateRock(delta);
 
+		// Hot mode timer and butt fire — run for both local and remote players
+		if (hotModeActive) {
+			hotModeTimer -= delta;
+			if (hotModeTimer <= 0) {
+				hotModeActive = false;
+				#if !local
+				if (!isRemote) {
+					GameManager.ME.net.sendHotPepper(false);
+				}
+				#end
+			} else {
+				fireEmitTimer += delta;
+				if (fireEmitTimer >= 0.03) {
+					fireEmitTimer = 0;
+					// Use the visual sprite center (not hitbox center, which is at the feet)
+					var cx = x - offset.x + frameWidth / 2;
+					var cy = y - offset.y + frameHeight / 2;
+					var dirX:Float = 0;
+					var dirY:Float = 0;
+					// Offset fire origin to the player's butt. Left/right/up views
+					// need cy -= 4 to align with the butt rather than the feet.
+					switch (lastInputDir) {
+						case N:
+							cy += 2;
+							dirY = 1;
+						case S:
+							cy -= 2;
+							dirY = -1;
+						case W:
+							cx += 6;
+							dirX = 1;
+						case E:
+							cx -= 6;
+							dirX = -1;
+						default:
+							cy += 2;
+							dirY = 1;
+					}
+					for (_ in 0...3) {
+						var fire = new ButtFire(cx + FlxG.random.float(-2, 2), cy + FlxG.random.float(-1, 1), dirX, dirY);
+						var effectsTarget:FlxGroup = groundEffectsGroup != null ? groundEffectsGroup : null;
+						if (effectsTarget != null) {
+							effectsTarget.add(fire);
+						} else {
+							state.add(fire);
+						}
+					}
+				}
+			}
+		} else {
+			fireEmitTimer = 0;
+		}
+
 		if (isRemote) {
 			updateRemoteInterpolation();
 			return;
@@ -464,18 +534,11 @@ class Player extends FlxSprite {
 			}
 
 			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
+			// Timer already ticked in the shared hot mode block above; just apply the velocity boost
 			if (hotModeActive) {
-				hotModeTimer -= delta;
-				if (hotModeTimer <= 0) {
-					hotModeActive = false;
-					if (inputDir == NONE) {
-						velocity.set();
-					}
-				} else {
-					var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
-					if (moveDir != NONE) {
-						moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
-					}
+				var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
+				if (moveDir != NONE) {
+					moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
 				}
 			} else {
 				if (inputDir != NONE) {
@@ -484,49 +547,6 @@ class Player extends FlxSprite {
 					velocity.set();
 				}
 			}
-		}
-
-		// Butt fire particles during hot mode
-		if (hotModeActive) {
-			fireEmitTimer += delta;
-			if (fireEmitTimer >= 0.03) {
-				fireEmitTimer = 0;
-				// Use the visual sprite center (not hitbox center, which is at the feet)
-				var cx = x - offset.x + frameWidth / 2;
-				var cy = y - offset.y + frameHeight / 2;
-				var dirX:Float = 0;
-				var dirY:Float = 0;
-				// Offset fire origin to the player's butt. Left/right/up views
-				// need cy -= 4 to align with the butt rather than the feet.
-				switch (lastInputDir) {
-					case N:
-						cy += 2;
-						dirY = 1;
-					case S:
-						cy -= 2;
-						dirY = -1;
-					case W:
-						cx += 6;
-						dirX = 1;
-					case E:
-						cx -= 6;
-						dirX = -1;
-					default:
-						cy += 2;
-						dirY = 1;
-				}
-				for (_ in 0...3) {
-					var fire = new ButtFire(cx + FlxG.random.float(-2, 2), cy + FlxG.random.float(-1, 1), dirX, dirY);
-					var effectsTarget:FlxGroup = groundEffectsGroup != null ? groundEffectsGroup : null;
-					if (effectsTarget != null) {
-						effectsTarget.add(fire);
-					} else {
-						state.add(fire);
-					}
-				}
-			}
-		} else {
-			fireEmitTimer = 0;
 		}
 
 		// Only update movement animations when fully idle (not casting, catching, or throwing)
@@ -720,6 +740,7 @@ class Player extends FlxSprite {
 	}
 
 	function launchRock() {
+		TODO.sfx("rock_throw");
 		var rockWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
 		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8 + rockWy, throwingBigRock) else new Rock(x + 4, y - 8 + rockWy, throwingBigRock);
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
@@ -804,6 +825,7 @@ class Player extends FlxSprite {
 		reticleDir.put();
 		castTarget = FlxPoint.get(targetX, targetY);
 		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
+		TODO.sfx("cast_line");
 		spawnBobberArc();
 	}
 
@@ -857,7 +879,6 @@ class Player extends FlxSprite {
 		castState = CAST_ANIM;
 		sendAnimUpdate("cast_" + castDirSuffix, true);
 	}
-
 	function updateCast(elapsed:Float) {
 		if (!isRemote) {
 			switch (castState) {
@@ -866,7 +887,12 @@ class Player extends FlxSprite {
 					if (SimpleController.just_pressed(A)) {
 						castState = CHARGING;
 						frozen = true;
-						sendAnimUpdate("stand_" + getDirSuffix(), true);
+						// FmodManager.PlaySoundAndAssignId(FmodSFX.FishingRodCharge2, fishingRodChargeSound);
+						castDirSuffix = getDirSuffix();
+						sendAnimUpdate("cast_" + castDirSuffix, false);
+						if (animation.curAnim != null) {
+							animation.curAnim.pause();
+						}
 						castPower = 0;
 						castPowerDir = 1;
 						var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
@@ -885,18 +911,21 @@ class Player extends FlxSprite {
 						castPower = 0;
 						castPowerDir = 1;
 					}
+					// FmodManager.SetEventParameterOnSound(fishingRodChargeSound, "PitchShift", castPower);
 					powerBarFill.scale.x = castPower;
 					var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
 					powerBarBg.setPosition(x - 8, y + 8 + barWy);
 					powerBarFill.setPosition(x - 8, y + 8 + barWy);
 
 					if (SimpleController.just_released(A)) {
+						// FmodManager.StopSoundImmediately(fishingRodChargeSound);
 						powerBarBg.visible = false;
 						powerBarFill.visible = false;
 
 						if (castPower < 0.05) {
 							castState = IDLE;
 							frozen = false;
+							playMovementAnim(true);
 						} else {
 							startCast();
 						}
@@ -927,6 +956,7 @@ class Player extends FlxSprite {
 					castState = LANDED;
 					frozen = false;
 					playMovementAnim(true);
+					TODO.sfx("bobber_land");
 					if (onBobberLanded != null)
 						onBobberLanded(castTarget.x + 4, castTarget.y + 4);
 				}
@@ -1010,6 +1040,11 @@ class Player extends FlxSprite {
 			if (!isRemote && !hasFish) {
 				GameManager.ME.net.sendLinePulled();
 			}
+			if (hasFish) {
+				TODO.sfx("fish_caught");
+			} else {
+				TODO.sfx("reel_in");
+			}
 			castState = CATCH_ANIM;
 			if (isRemote) {
 				remoteWasStationary = false;
@@ -1089,11 +1124,25 @@ class Player extends FlxSprite {
 		if (!hotModeActive) {
 			hotModeActive = true;
 			hotModeTimer = 3.0;
+			TODO.sfx("hot_mode_activate");
+			#if !local
+			if (!isRemote) {
+				GameManager.ME.net.sendHotPepper(true);
+			}
+			#end
 		}
 	}
 
+	public function deactivateHotMode() {
+		hotModeActive = false;
+	}
+
 	public function pickupItem(item:InventoryItem):Bool {
-		return inventory.add(item);
+		var added = inventory.add(item);
+		if (added) {
+			TODO.sfx("item_pickup");
+		}
+		return added;
 	}
 
 	function getDirSuffix():String {

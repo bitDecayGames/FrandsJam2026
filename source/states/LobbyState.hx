@@ -19,6 +19,7 @@ import flixel.text.FlxText;
 import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
 import entities.Player;
+import todo.TODO;
 import ui.MenuBuilder;
 
 using states.FlxStateExt;
@@ -30,7 +31,8 @@ class LobbyState extends FlxTransitionableState {
 
 	var _txtTitle:FlxText;
 	var _inputField:FlxInputText;
-	var _txtOtherPlayers:FlxText;
+	var _txtOtherHeader:FlxText;
+	var _kickRows:Array<{label:FlxText, btn:FlxButton, sessionId:String}> = [];
 
 	// Skin selection
 	var _skinSprites:Array<FlxSprite> = [];
@@ -44,9 +46,13 @@ class LobbyState extends FlxTransitionableState {
 	static inline var SKIN_SIZE:Int = 64; // displayed size (2x scale)
 	static inline var SKIN_PADDING:Int = 12;
 	static inline var BORDER_THICKNESS:Int = 2;
+	static inline var MAX_REMOTE_PLAYERS:Int = 5;
+	static inline var KICK_BTN_W:Int = 80;
+	static inline var ROW_H:Int = 22;
 
 	override public function create():Void {
 		super.create();
+		TODO.sfx("lobby_music");
 		bgColor = FlxColor.TRANSPARENT;
 
 		_txtTitle = new FlxText();
@@ -90,12 +96,30 @@ class LobbyState extends FlxTransitionableState {
 		_txtNameLabel.setPosition(FlxG.width / 2 - _txtNameLabel.width / 2, _inputField.y - _txtNameLabel.height - 4);
 		add(_txtNameLabel);
 
-		// Other players text in the lower-right corner
-		_txtOtherPlayers = new FlxText();
-		_txtOtherPlayers.size = 10;
-		_txtOtherPlayers.alignment = FlxTextAlign.RIGHT;
-		_txtOtherPlayers.text = "";
-		add(_txtOtherPlayers);
+		// Header label for the other players section
+		_txtOtherHeader = new FlxText(0, 0, 0, "Other Players:", 10);
+		_txtOtherHeader.visible = false;
+		add(_txtOtherHeader);
+
+		// Pre-create kick rows (up to MAX_REMOTE_PLAYERS)
+		for (i in 0...MAX_REMOTE_PLAYERS) {
+			var label = new FlxText(0, 0, 150, "", 10);
+			label.visible = false;
+			add(label);
+
+			var capturedI = i;
+			var btn = new FlxButton(0, 0, "Kick");
+			btn.onUp.callback = () -> kickPlayer(capturedI);
+			btn.onOver.callback = () -> btn.color = FlxColor.GRAY;
+			btn.onOut.callback = () -> btn.color = FlxColor.WHITE;
+			btn.visible = false;
+			add(btn);
+
+			_kickRows.push({label: label, btn: btn, sessionId: ""});
+		}
+
+		GameManager.ME.net.onKicked.addOnce(handleKicked);
+		GameManager.ME.net.onPlayerRemoved.add(onRemotePlayerRemoved);
 
 		// Create skin selection sprites
 		createSkinSelection();
@@ -301,36 +325,67 @@ class LobbyState extends FlxTransitionableState {
 		// Refresh borders since other players' skins may have changed
 		refreshBorders();
 
-		// Build the "Other Players:" list — always shows all other players
-		var playerLines = new Array<String>();
+		// Build the kick rows for all other players
+		var others:Array<String> = [];
 		for (sessionId in gm.sessions) {
-			if (sessionId == gm.mySessionId) {
-				continue;
+			if (sessionId != gm.mySessionId) {
+				others.push(sessionId);
 			}
-			var name = gm.names.get(sessionId);
-			if (name == null || name == "") {
-				name = "???";
-			}
-			var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
-			if (isReady) {
-				playerLines.push(name + " (READY)");
+		}
+
+		var sectionRight = FlxG.width - 10;
+		var sectionBottom = FlxG.height - 10;
+		var headerH = 16;
+		var sectionH = others.length > 0 ? (others.length * ROW_H + headerH) : 0;
+
+		_txtOtherHeader.visible = others.length > 0;
+		if (others.length > 0) {
+			_txtOtherHeader.x = sectionRight - _txtOtherHeader.width;
+			_txtOtherHeader.y = sectionBottom - sectionH;
+		}
+
+		for (i in 0...MAX_REMOTE_PLAYERS) {
+			var row = _kickRows[i];
+			if (i < others.length) {
+				var sessionId = others[i];
+				var name = gm.names.get(sessionId);
+				if (name == null || name == "") {
+					name = "???";
+				}
+				var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
+
+				row.sessionId = sessionId;
+				row.label.text = name + (isReady ? " (READY)" : "");
+
+				var rowY = sectionBottom - sectionH + headerH + i * ROW_H;
+				row.btn.x = sectionRight - KICK_BTN_W;
+				row.btn.y = rowY;
+				row.btn.visible = true;
+
+				row.label.x = row.btn.x - row.label.width - 4;
+				row.label.y = rowY + 6; // vertically center the text in the row
+				row.label.visible = true;
 			} else {
-				playerLines.push(name);
+				row.label.visible = false;
+				row.btn.visible = false;
+				row.sessionId = "";
 			}
 		}
+	}
 
-		var newText = if (playerLines.length > 0) {
-			"Other Players:\n" + playerLines.join("\n");
-		} else {
-			"";
-		};
+	private function onRemotePlayerRemoved(sessionId:String):Void {
+		updateNameLabels();
+	}
 
-		if (_txtOtherPlayers.text != newText) {
-			_txtOtherPlayers.text = newText;
+	private function kickPlayer(rowIndex:Int):Void {
+		var row = _kickRows[rowIndex];
+		if (row.sessionId != "") {
+			GameManager.ME.net.sendKick(row.sessionId);
 		}
-		// Position in the lower-right corner
-		_txtOtherPlayers.x = FlxG.width - _txtOtherPlayers.width - 10;
-		_txtOtherPlayers.y = FlxG.height - _txtOtherPlayers.height - 10;
+	}
+
+	private function handleKicked():Void {
+		FlxG.switchState(() -> new MainMenuState());
 	}
 
 	function clickReady():Void {
@@ -349,6 +404,11 @@ class LobbyState extends FlxTransitionableState {
 		_btnDone.active = false;
 		_txtReady.visible = true;
 		_txtReady.x = FlxG.width / 2 - _txtReady.width / 2;
+	}
+
+	override public function destroy():Void {
+		GameManager.ME.net.onPlayerRemoved.remove(onRemotePlayerRemoved);
+		super.destroy();
 	}
 
 	override public function onFocusLost() {

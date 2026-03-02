@@ -4,6 +4,7 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
+import todo.TODO;
 
 class GroundFish extends FlxSprite {
 	var flopTimer:Float = 0;
@@ -80,6 +81,7 @@ class GroundFish extends FlxSprite {
 				arcStart = null;
 				arcEnd.put();
 				arcEnd = null;
+				TODO.sfx("fish_flop");
 			}
 		} else {
 			super.update(elapsed);

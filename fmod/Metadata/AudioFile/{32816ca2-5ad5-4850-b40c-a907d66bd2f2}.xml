@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objects serializationModel="Studio.02.03.00">
+	<object class="AudioFile" id="{32816ca2-5ad5-4850-b40c-a907d66bd2f2}">
+		<property name="assetPath">
+			<value>weeds_burst.ogg</value>
+		</property>
+		<property name="frequencyInKHz">
+			<value>48</value>
+		</property>
+		<property name="channelCount">
+			<value>2</value>
+		</property>
+		<property name="length">
+			<value>0.92308333333333337</value>
+		</property>
+		<relationship name="masterAssetFolder">
+			<destination>{8437bb97-ead8-45e7-929a-eda2e732a050}</destination>
+		</relationship>
+	</object>
+</objects>

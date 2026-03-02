@@ -160,6 +160,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
 		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
+		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 	}
 
@@ -177,6 +178,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
 		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
+		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -209,6 +211,7 @@ class PlayState extends FlxTransitionableState {
 		var level = new Level(level);
 		if (level.songEvent != "") {
 			// FmodManager.PlaySong(level.songEvent);
+			TODO.sfx("Play song");
 		}
 		terrainLayer = level.terrainLayer;
 		midGroundGroup.add(terrainLayer);
@@ -288,7 +291,7 @@ class PlayState extends FlxTransitionableState {
 		spawnWeeds();
 		spawnWorldItems(level);
 		#else
-		FlxTimer.wait(10, () -> {
+		FlxTimer.wait(1, () -> {
 			if (NetworkManager.IS_HOST) {
 				spawnWeeds();
 				spawnWorldItems(level);
@@ -537,6 +540,18 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	function onRemoteHotPepper(sessionId:String, isStart:Bool) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote == null) {
+			return;
+		}
+		if (isStart) {
+			remote.activateHotMode();
+		} else {
+			remote.deactivateHotMode();
+		}
+	}
+
 	function unload() {
 		for (t in transitions) {
 			t.destroy();
@@ -704,6 +719,7 @@ class PlayState extends FlxTransitionableState {
 			GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
 		});
 		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
+			TODO.sfx("worm_squish");
 			midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
 			worm.kill();
 			GameManager.ME.net.sendMessage("worm_killed", {});
@@ -728,9 +744,6 @@ class PlayState extends FlxTransitionableState {
 		if (player.hotModeActive && !hotText.isFlashing()) {
 			hotText.start();
 		}
-
-		// TODO helps devs call audio correctly, and helps audio folks find where sounds are needed
-		TODO.sfx('scarySound');
 
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
@@ -777,7 +790,7 @@ class PlayState extends FlxTransitionableState {
 		if (wormTimer > 0) {
 			return;
 		}
-		wormTimer = FlxG.random.float(5.0, 9.0);
+		wormTimer = FlxG.random.float(2.5, 4.5);
 
 		var bounds = FlxG.worldBounds;
 		var grid = 16;
