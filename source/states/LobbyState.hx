@@ -347,7 +347,7 @@ class LobbyState extends FlxTransitionableState {
 
 		var sectionRight = FlxG.width - 10;
 		var sectionBottom = FlxG.height - 10;
-		var headerH = 16;
+		var headerH = 28;
 		var sectionH = others.length > 0 ? (others.length * ROW_H + headerH) : 0;
 
 		_txtOtherHeader.visible = others.length > 0;
