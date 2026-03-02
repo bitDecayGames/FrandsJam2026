@@ -255,9 +255,9 @@ class GameManager {
 			case RoundState.STATUS_LOBBY:
 				if (NetworkManager.IS_HOST) {
 					init([
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(3), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
 					]);
 					// needs to force this back to 0
 					nextRoundNumber = currentRoundNumber;
