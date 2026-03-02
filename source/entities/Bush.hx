@@ -3,6 +3,7 @@ package entities;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
+import todo.TODO;
 
 class Bush extends FlxSprite {
 	static inline var SHAKE_DURATION:Float = 0.3;
@@ -44,6 +45,7 @@ class Bush extends FlxSprite {
 		if (cooldownTimer > 0) {
 			return;
 		}
+		FmodManager.PlaySoundOneShot(FmodSFX.BushRustle);
 		shakeDirX = dirX;
 		shakeDirY = dirY;
 		shakeTimer = SHAKE_DURATION;

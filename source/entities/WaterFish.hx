@@ -7,6 +7,7 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
+import todo.TODO;
 
 class WaterFish extends FlxSprite {
 	var waterTiles:Array<FlxPoint> = [];
@@ -257,6 +258,7 @@ class WaterFish extends FlxSprite {
 	}
 
 	public function scare(fromX:Float, fromY:Float) {
+		TODO.sfx("fish_scared");
 		attracted = false;
 		fleeFrom(fromX, fromY);
 		velocity.scale(1.5);

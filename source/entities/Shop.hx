@@ -8,6 +8,7 @@ import com.bitdecay.textpop.style.builtin.FloatAway;
 import com.bitdecay.textpop.TextPop;
 import entities.FishTypes;
 import managers.GameManager;
+import todo.TODO;
 
 class Shop extends FlxSprite {
 	var playerInside:Bool = false;
@@ -121,6 +122,7 @@ class Shop extends FlxSprite {
 			fishData = player.inventory.removeAnyFishFull();
 		}
 		if (count > 0) {
+			TODO.sfx("fish_sold");
 			player.score += totalValue;
 			GameManager.ME.scores.set(GameManager.ME.mySessionId, player.score);
 			QLog.notice('Sold $count fish for ' + "$" + '$totalValue. Total score: ${player.score}');

@@ -3,6 +3,7 @@ package entities;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
+import todo.TODO;
 
 class Weed extends FlxSprite {
 	var parentState:FlxState;
@@ -24,6 +25,7 @@ class Weed extends FlxSprite {
 	}
 
 	public function burst() {
+		FmodManager.PlaySoundOneShot(FmodSFX.WeedsBurst);
 		var cx = x - offset.x + frameWidth / 2;
 		var cy = y - offset.y + frameHeight / 2;
 		for (_ in 0...12) {

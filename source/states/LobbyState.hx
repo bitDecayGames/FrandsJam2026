@@ -16,6 +16,7 @@ import flixel.text.FlxText;
 import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
 import entities.Player;
+import todo.TODO;
 import ui.MenuBuilder;
 
 using states.FlxStateExt;
@@ -43,6 +44,7 @@ class LobbyState extends FlxTransitionableState {
 
 	override public function create():Void {
 		super.create();
+		TODO.sfx("lobby_music");
 		bgColor = FlxColor.TRANSPARENT;
 
 		_txtTitle = new FlxText();

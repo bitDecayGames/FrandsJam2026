@@ -6,6 +6,7 @@ import flixel.text.FlxText;
 import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
 import haxefmod.flixel.FmodFlxUtilities;
+import todo.TODO;
 import ui.MenuBuilder;
 
 using states.FlxStateExt;
@@ -17,6 +18,7 @@ class VictoryState extends FlxTransitionableState {
 
 	override public function create():Void {
 		super.create();
+		TODO.sfx("victory_music");
 		bgColor = FlxColor.TRANSPARENT;
 
 		_txtTitle = new FlxText();

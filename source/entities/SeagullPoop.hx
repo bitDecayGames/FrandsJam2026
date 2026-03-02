@@ -6,6 +6,7 @@ import flixel.FlxState;
 import flixel.group.FlxGroup;
 import flixel.util.FlxColor;
 import levels.ldtk.BDTilemap;
+import todo.TODO;
 
 class SeagullPoop extends FlxSprite {
 	static inline var GRAVITY:Float = 200;
@@ -47,11 +48,13 @@ class SeagullPoop extends FlxSprite {
 				}
 			}
 			if (isWater) {
+				TODO.sfx("poop_water_splash");
 				parentState.add(new Splash(landX, landY, false));
 				if (fishSpawner != null) {
 					fishSpawner.scareFish(landX, landY, SCARE_RADIUS);
 				}
 			} else {
+				TODO.sfx("poop_splat");
 				groundGroup.add(new PoopSplat(landX, landY));
 			}
 			kill();

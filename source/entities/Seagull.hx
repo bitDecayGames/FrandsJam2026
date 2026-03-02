@@ -7,6 +7,7 @@ import flixel.group.FlxGroup;
 import flixel.util.FlxColor;
 import flixel.util.FlxSpriteUtil;
 import levels.ldtk.BDTilemap;
+import todo.TODO;
 
 class Seagull extends FlxSprite {
 	static inline var SPEED_MIN:Float = 40;
@@ -111,6 +112,7 @@ class Seagull extends FlxSprite {
 	}
 
 	function doPoop() {
+		TODO.sfx("seagull_poop");
 		var altitude = Math.max(0, (FlxG.height - 8 - y) / (FlxG.height));
 		var shadowOffsetY = SHADOW_BASE_OFFSET + altitude * 40;
 		var worldX = FlxG.camera.scroll.x + x + width / 2;

@@ -209,6 +209,7 @@ class PlayState extends FlxTransitionableState {
 		var level = new Level(level);
 		if (level.songEvent != "") {
 			// FmodManager.PlaySong(level.songEvent);
+			TODO.sfx("Play song");
 		}
 		terrainLayer = level.terrainLayer;
 		midGroundGroup.add(terrainLayer);
@@ -701,6 +702,7 @@ class PlayState extends FlxTransitionableState {
 			GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
 		});
 		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
+			TODO.sfx("worm_squish");
 			midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
 			worm.kill();
 			GameManager.ME.net.sendMessage("worm_killed", {});
@@ -725,9 +727,6 @@ class PlayState extends FlxTransitionableState {
 		if (player.hotModeActive && !hotText.isFlashing()) {
 			hotText.start();
 		}
-
-		// TODO helps devs call audio correctly, and helps audio folks find where sounds are needed
-		TODO.sfx('scarySound');
 
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
@@ -774,7 +773,7 @@ class PlayState extends FlxTransitionableState {
 		if (wormTimer > 0) {
 			return;
 		}
-		wormTimer = FlxG.random.float(5.0, 9.0);
+		wormTimer = FlxG.random.float(2.5, 4.5);
 
 		var bounds = FlxG.worldBounds;
 		var grid = 16;

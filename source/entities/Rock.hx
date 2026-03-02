@@ -1,6 +1,7 @@
 package entities;
 
 import flixel.FlxSprite;
+import todo.TODO;
 
 class Rock extends FlxSprite {
 	public var big:Bool;
@@ -28,6 +29,7 @@ class Rock extends FlxSprite {
 			if (onWaterSplash != null)
 				onWaterSplash(landX, landY, big);
 		} else {
+			TODO.sfx("rock_land");
 			if (onAddToWorld != null)
 				onAddToWorld(landX, landY, big);
 		}

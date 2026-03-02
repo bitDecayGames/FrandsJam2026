@@ -8,6 +8,7 @@ import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
 import haxefmod.flixel.FmodFlxUtilities;
 import misc.FlxTextFactory;
+import todo.TODO;
 import ui.MenuBuilder;
 
 using states.FlxStateExt;
@@ -19,6 +20,7 @@ class FailState extends FlxTransitionableState {
 
 	override public function create():Void {
 		super.create();
+		TODO.sfx("fail_music");
 		bgColor = FlxColor.TRANSPARENT;
 
 		_txtTitle = FlxTextFactory.make("Game Over", FlxG.width / 2, FlxG.height / 4, 40, FlxTextAlign.CENTER);

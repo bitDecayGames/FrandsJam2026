@@ -1,6 +1,7 @@
 package entities;
 
 import flixel.FlxSprite;
+import todo.TODO;
 
 enum WormState {
 	EMERGING;
@@ -46,6 +47,7 @@ class Worm extends FlxSprite {
 		animation.add("dig", [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41], 10, false);
 
 		flipX = destX < srcX;
+		TODO.sfx("worm_emerge");
 		animation.play("emerge");
 		applyFrameHitbox();
 	}
@@ -127,6 +129,7 @@ class Worm extends FlxSprite {
 				}
 			case DIGGING:
 				if (animation.finished) {
+					TODO.sfx("worm_burrow");
 					kill();
 				}
 		}
