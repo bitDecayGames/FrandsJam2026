@@ -57,7 +57,7 @@ class WaterFish extends FlxSprite {
 	}
 
 	private function handleDespawn(id:String, respawnTime:Float):Void {
-		if (fishId != id) {
+		if (fishId != id || !alive) {
 			return;
 		}
 		alive = false;
