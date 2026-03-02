@@ -1,11 +1,12 @@
-import GameState.BushState;
-import GameState.FishState;
+import schema.GameState;
+import schema.BushState;
+import schema.FishState;
+import schema.PlayerState;
+import schema.RoundState;
 import haxe.Json;
 import colyseus.server.Client;
 import colyseus.server.Room.RoomOf;
 import colyseus.server.Room.CloseCode;
-import GameState.PlayerState;
-import GameState.RoundState;
 import haxe.extern.EitherType;
 import js.lib.Promise;
 
