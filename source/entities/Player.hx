@@ -1140,7 +1140,7 @@ class Player extends FlxSprite {
 	public function pickupItem(item:InventoryItem):Bool {
 		var added = inventory.add(item);
 		if (added) {
-			TODO.sfx("item_pickup");
+			FmodManager.PlaySoundOneShot(FmodSFX.ItemCollect);
 		}
 		return added;
 	}

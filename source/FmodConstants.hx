@@ -17,6 +17,7 @@ class FmodSFX {
     public static inline var FishingRodCast:String = "event:/SFX/FishingRod/FishingRodCast";
     public static inline var FishingRodCharge:String = "event:/SFX/FishingRod/FishingRodCharge";
     public static inline var FishingRodCharge2:String = "event:/SFX/FishingRod/FishingRodCharge2";
+    public static inline var ItemCollect:String = "event:/SFX/Item/ItemCollect";
     public static inline var MenuHover:String = "event:/SFX/Menu/MenuHover";
     public static inline var MenuSelect:String = "event:/SFX/Menu/MenuSelect";
     public static inline var New:String = "event:/SFX/New";
