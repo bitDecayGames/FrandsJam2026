@@ -1,14 +1,15 @@
 package goals;
 
-import flixel.text.FlxText.FlxTextAlign;
-import ui.font.BitmapText.PressStart;
-import flixel.util.FlxColor;
 import states.PlayState;
-import flixel.FlxG;
+import managers.GameManager;
+import net.NetworkManager;
 
 class TimedGoal extends Goal {
-	private var text:PressStart;
 	private var secondsToFinish:Float = 0;
+
+	static inline var SYNC_INTERVAL:Float = 5.0;
+
+	private var syncCooldown:Float = SYNC_INTERVAL;
 
 	override public function new(secondsToFinish:Float = 90) {
 		super();
@@ -17,30 +18,32 @@ class TimedGoal extends Goal {
 
 	override function initialize(state:PlayState) {
 		super.initialize(state);
-		this.text = new PressStart(FlxG.width * .5, FlxG.height * .5, "Hello World");
-		this.text.color = FlxColor.CYAN;
-		this.text.alignment = FlxTextAlign.CENTER;
-		// TODO: MW need to add to a specific UI group here for sprite sorting
-		state.add(text);
+
+		// Non-host goal doesn't tick — PlayState owns timer display for all clients
+		if (!NetworkManager.IS_HOST) {
+			paused = true;
+		}
 	}
 
 	override public function update(delta:Float) {
 		super.update(delta);
+
+		if (!NetworkManager.IS_HOST) {
+			return;
+		}
+
+		// Host periodically broadcasts current timer state and fires locally for PlayState HUD
+		syncCooldown -= delta;
+		if (syncCooldown <= 0) {
+			syncCooldown = SYNC_INTERVAL;
+			GameManager.ME.net.sendTimerSync(runTimeSec, secondsToFinish);
+			GameManager.ME.net.onTimerSync.dispatch(runTimeSec, secondsToFinish);
+		}
+
 		if (runTimeSec > secondsToFinish) {
 			this.onComplete();
 			runTimeSec = secondsToFinish;
 			paused = true;
 		}
-		if (text != null) {
-			secondsRemaining();
-		}
-	}
-
-	public function secondsRemaining() {
-		var secs = secondsToFinish - runTimeSec;
-		var minutes = Math.floor(secs / 60);
-		secs = Math.floor(secs - (minutes * 60));
-
-		text.text = '${minutes}:${secs < 10 ? "0" : ""}${secs}';
 	}
 }

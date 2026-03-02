@@ -137,6 +137,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("hot_pepper", {sessionId: client.sessionId, isStart: data.isStart}, {except: client});
 		});
 
+		// host periodically broadcasts the timer state so non-host clients can sync
+		onMessage("timer_sync", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: sent "timer_sync": runTimeSec=${data.runTimeSec} totalSec=${data.totalSec}');
+			broadcast("timer_sync", {runTimeSec: data.runTimeSec, totalSec: data.totalSec}, {except: client});
+		});
+
 		// sent when a player sells a fish — broadcast to other clients so they can track it
 		onMessage("fish_sold", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_sold" message: fishType=${data.fishType} lengthCm=${data.lengthCm} value=${data.value}');
