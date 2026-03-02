@@ -1,5 +1,7 @@
 package states;
 
+import bitdecay.flixel.graphics.AsepriteMacros;
+import bitdecay.flixel.graphics.Aseprite;
 import haxefmod.FlxFmod;
 import ui.MenuBuilder;
 import com.bitdecay.analytics.Bitlytics;
@@ -19,6 +21,8 @@ import states.AchievementsState;
 using states.FlxStateExt;
 
 class MainMenuState extends FlxTransitionableState {
+	public static var anims = AsepriteMacros.tagNames("assets/aseprite/title.json");
+
 	var startButton:FlxButton;
 	var handleInput = true;
 
@@ -31,7 +35,9 @@ class MainMenuState extends FlxTransitionableState {
 		bgColor = FlxColor.TRANSPARENT;
 		FlxG.camera.pixelPerfectRender = true;
 
-		var bgImage = new FlxSprite(AssetPaths.title__png);
+		var bgImage = new FlxSprite();
+		Aseprite.loadAllAnimations(bgImage, AssetPaths.title__json);
+		bgImage.animation.play(anims.all_frames);
 		bgImage.scale.set(camera.width / bgImage.width, camera.height / bgImage.height);
 		bgImage.screenCenter();
 		add(bgImage);
@@ -69,12 +75,7 @@ class MainMenuState extends FlxTransitionableState {
 
 	function clickPlay():Void {
 		FmodManager.StopSong();
-		var swirlOut = new SwirlTransition(TransitionDirection.OUT, () -> {
-			// make sure our music is stopped;
-			FmodManager.StopSongImmediately();
-			FlxG.switchState(() -> new LobbyState());
-		}, FlxColor.GRAY, 0.75);
-		openSubState(swirlOut);
+		FlxG.switchState(() -> new LobbyState());
 	}
 
 	// If we want to add a way to go to credits from main menu, call this

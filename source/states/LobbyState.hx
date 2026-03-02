@@ -50,6 +50,10 @@ class LobbyState extends FlxTransitionableState {
 	static inline var KICK_BTN_W:Int = 80;
 	static inline var ROW_H:Int = 22;
 
+	public function new() {
+		super();
+	}
+
 	override public function create():Void {
 		super.create();
 		TODO.sfx("lobby_music");
