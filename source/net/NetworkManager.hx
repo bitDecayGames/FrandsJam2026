@@ -65,6 +65,7 @@ class NetworkManager {
 	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
 	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
 	public var onKicked = new FlxTypedSignal<Void->Void>();
+	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 
 	public static inline var roomName:String = "game_room";
 
@@ -299,6 +300,11 @@ class NetworkManager {
 				trace('[NetMan] player_kicked => ${message.sessionId}');
 				onPlayerRemoved.dispatch(message.sessionId);
 			});
+
+			room.onMessage("timer_sync", (message:Dynamic) -> {
+				trace('[NetMan] timer_sync received: runTimeSec=${message.runTimeSec} totalSec=${message.totalSec}');
+				onTimerSync.dispatch(message.runTimeSec, message.totalSec);
+			});
 		});
 	}
 
@@ -316,6 +322,10 @@ class NetworkManager {
 
 	public function sendSpawnLocations(locations:Dynamic) {
 		sendMessage("spawn_locations", locations);
+	}
+
+	public function sendTimerSync(runTimeSec:Float, totalSec:Float) {
+		sendMessage("timer_sync", {runTimeSec: runTimeSec, totalSec: totalSec});
 	}
 
 	public function getState():GameState {

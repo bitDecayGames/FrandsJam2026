@@ -48,6 +48,7 @@ import flixel.util.FlxSort;
 import ui.FlashingText;
 import ui.InventoryHUD;
 import ui.ScoreHUD;
+import flixel.text.FlxText;
 
 using states.FlxStateExt;
 
@@ -88,6 +89,12 @@ class PlayState extends FlxTransitionableState {
 	var ldtk = new LdtkProject();
 
 	var round:RoundManager;
+
+	// Timer HUD — shown on all clients
+	var timerHUD:FlxText;
+	var timerRunSec:Float = 0;
+	var timerTotalSec:Float = 0;
+	var timerSynced:Bool = false;
 
 	public function new(round:RoundManager) {
 		this.round = round;
@@ -138,6 +145,13 @@ class PlayState extends FlxTransitionableState {
 			round.initialize(this);
 		}
 
+		timerHUD = new FlxText(0, 4, FlxG.width, "--:--");
+		timerHUD.size = 16;
+		timerHUD.alignment = FlxTextAlign.CENTER;
+		timerHUD.color = FlxColor.WHITE;
+		timerHUD.scrollFactor.set(0, 0);
+		add(timerHUD);
+
 		if (NetworkManager.IS_HOST) {
 			GameManager.ME.net.sendMessage("round_update", {
 				status: RoundState.STATUS_ACTIVE,
@@ -162,6 +176,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
 		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
+		GameManager.ME.net.onTimerSync.remove(onTimerSync);
 	}
 
 	function setupNetwork() {
@@ -179,6 +194,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
 		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
 		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
+		GameManager.ME.net.onTimerSync.add(onTimerSync);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -373,7 +389,7 @@ class PlayState extends FlxTransitionableState {
 		player.inventory.onChange.add(onInventoryChanged);
 		onInventoryChanged();
 
-		scoreHUD = new ScoreHUD(player);
+		scoreHUD = new ScoreHUD();
 		add(scoreHUD);
 
 		for (t in level.camTransitions) {
@@ -699,8 +715,43 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	function onTimerSync(runTimeSec:Float, totalSec:Float) {
+		timerRunSec = runTimeSec;
+		timerTotalSec = totalSec;
+		timerSynced = true;
+	}
+
+	function updateTimerHUD(elapsed:Float) {
+		if (NetworkManager.IS_HOST) {
+			// Host reads directly from its own TimedGoal via runTimeSec sent in syncs —
+			// just tick locally so the display stays smooth between broadcasts
+			if (timerSynced) {
+				timerRunSec += elapsed;
+			}
+		} else {
+			if (timerSynced) {
+				timerRunSec += elapsed;
+			}
+		}
+
+		if (!timerSynced) {
+			timerHUD.text = "--:--";
+			return;
+		}
+
+		var remaining = timerTotalSec - timerRunSec;
+		if (remaining < 0) {
+			remaining = 0;
+		}
+		var minutes = Math.floor(remaining / 60);
+		var secs = Math.floor(remaining - minutes * 60);
+		timerHUD.text = '${minutes}:${secs < 10 ? "0" : ""}${secs}';
+	}
+
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
+
+		updateTimerHUD(elapsed);
 
 		if (FlxG.mouse.justPressed) {
 			EventBus.fire(new Click(FlxG.mouse.x, FlxG.mouse.y));
