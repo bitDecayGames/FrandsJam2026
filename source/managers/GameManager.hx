@@ -70,6 +70,7 @@ class GameManager {
 		net.onFishSold.add(onFishSold);
 		net.onWormKilled.add(recordWormKill);
 		net.onHostChanged.add(onHostChange);
+		net.onKicked.add(handleKicked);
 	}
 
 	private function init(rounds:Array<Round>) {
@@ -95,6 +96,10 @@ class GameManager {
 			currentRound: currentRoundNumber,
 			totalRounds: totalRounds,
 		});
+	}
+
+	private function handleKicked() {
+		sessions = [];
 	}
 
 	private function onPlayerJoined(sessionId:String) {

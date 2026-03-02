@@ -221,6 +221,41 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
+		onMessage("kick", (client:Client, data:{targetSessionId:String}) -> {
+			trace('${client.sessionId}: wants to kick ${data.targetSessionId}');
+			var target = clients.getById(data.targetSessionId);
+			if (target == null) {
+				return;
+			}
+
+			// Remove the player from state immediately so other clients see it right away.
+			// onLeave will also fire after the WebSocket closes but will safely no-op.
+			state.players.delete(data.targetSessionId);
+
+			// Rotate host if the kicked player was the host
+			if (data.targetSessionId == state.hostSessionId) {
+				var remaining = [];
+				for (sId => _ in state.players) {
+					remaining.push(sId);
+				}
+				if (remaining.length > 0) {
+					state.hostSessionId = remaining[Std.random(remaining.length)];
+					trace('host changed ${data.targetSessionId} -> ${state.hostSessionId}');
+				} else {
+					disconnect();
+					return;
+				}
+			}
+
+			// Tell all remaining clients explicitly so they can update their player lists
+			// without relying on the schema patch cycle or background-thread schema callbacks
+			broadcast("player_kicked", {sessionId: data.targetSessionId}, {except: target});
+
+			// Notify the kicked client and disconnect them via standard Colyseus method
+			target.send("kicked", {});
+			target.leave(CloseCode.CONSENTED);
+		});
+
 		onMessage("player_ready", (client:Client, _) -> {
 			if (state.round.status != RoundState.STATUS_LOBBY
 				&& state.round.status != RoundState.STATUS_PRE_ROUND

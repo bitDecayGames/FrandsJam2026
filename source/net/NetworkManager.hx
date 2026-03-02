@@ -1,5 +1,6 @@
 package net;
 
+import managers.GameManager;
 import flixel.math.FlxPoint;
 import config.Configure;
 import flixel.util.FlxSignal;
@@ -63,6 +64,7 @@ class NetworkManager {
 	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
 	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
 	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
+	public var onKicked = new FlxTypedSignal<Void->Void>();
 
 	public static inline var roomName:String = "game_room";
 
@@ -285,7 +287,23 @@ class NetworkManager {
 				trace('[NetMan] spawn_locations received');
 				onSpawnLocations.dispatch(message);
 			});
+
+			room.onMessage("kicked", (_) -> {
+				trace('[NetMan] we got kicked!');
+				room.leave(true);
+				room = null;
+				onKicked.dispatch();
+			});
+
+			room.onMessage("player_kicked", (message:{sessionId:String}) -> {
+				trace('[NetMan] player_kicked => ${message.sessionId}');
+				onPlayerRemoved.dispatch(message.sessionId);
+			});
 		});
+	}
+
+	public function sendKick(targetSessionId:String) {
+		sendMessage("kick", {targetSessionId: targetSessionId});
 	}
 
 	public function sendWorldSetup(bushPositions:Array<{x:Float, y:Float}>, shopX:Float, shopY:Float) {
