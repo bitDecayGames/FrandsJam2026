@@ -1,5 +1,6 @@
 package states;
 
+import bitdecay.flixel.spacial.Align;
 import flixel.text.FlxInputText;
 import goals.PersonalFishCountGoal;
 import goals.TimedGoal;
@@ -194,6 +195,8 @@ class LobbyState extends FlxTransitionableState {
 			nameLabel.setFormat(Main.menuFont, 12, TEXT_COLOR, FlxTextAlign.CENTER);
 			nameLabel.text = "";
 			nameLabel.setPosition(slotX + SKIN_SIZE / 2, skinY - nameHeight);
+			Align.center(nameLabel, skinSprite, X);
+			Align.stack(nameLabel, skinSprite, UP, 2);
 			add(nameLabel);
 			_skinNameLabels.push(nameLabel);
 		}
