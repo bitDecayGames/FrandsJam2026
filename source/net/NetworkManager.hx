@@ -26,6 +26,7 @@ class NetworkManager {
 	public static var IS_HOST:Bool = #if local true #else false #end;
 
 	var client:Client;
+	var lobby:Room<Dynamic>;
 	var room:Room<GameState>;
 
 	public var mySessionId:String = "";
@@ -67,6 +68,8 @@ class NetworkManager {
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 
+	public static inline var lobbyRoom:String = "lobby";
+	public static inline var queueRoom:String = "queue";
 	public static inline var roomName:String = "game_room";
 
 	public function new() {}
@@ -85,226 +88,298 @@ class NetworkManager {
 		trace('attempting to connect to: ${addr}');
 		if (client == null) {
 			client = new Client(addr);
+			client.getLatency((e, l) -> {
+				QLog.notice('Latency Check: ${l}ms');
+			});
 		}
 		if (room != null) {
 			trace('already connected to a room ${room.roomId}, not re-connecting');
 			return;
 		}
-		client.joinOrCreate(roomName, new Map<String, Dynamic>(), GameState, (err, joinedRoom) -> {
+
+		// joinLobby();
+		joinQueue();
+	}
+
+	function joinLobby() {
+		client.joinOrCreate(queueRoom, new Map<String, Dynamic>(), GameState, (err, joinedRoom) -> {
 			if (err != null) {
 				trace('NetworkManager: failed to join room — $err');
 				return;
 			}
 
-			room = joinedRoom;
+			lobby = joinedRoom;
 
-			mySessionId = room.sessionId;
-			trace('NetworkManager: joined room ${roomName} (id: ${room.roomId}) as $mySessionId');
-			onJoined.dispatch(mySessionId);
-
-			var cb = Callbacks.get(room);
-
-			cb.listen("hostSessionId", (val:String, prev:String) -> {
-				var prevIsHost = IS_HOST;
-				IS_HOST = val == mySessionId;
-				trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
-				onHostChanged.dispatch(IS_HOST, prevIsHost);
-			});
-
-			cb.listen("round", (round:RoundState) -> {
-				trace('RoundState: ${round}');
-				onRoundUpdate.dispatch(round);
-			});
-
-			room.onMessage("players_ready", (message) -> {
-				trace('players ready');
-				onPlayersReady.dispatch();
-			});
-
-			cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
-				trace('NetworkManager: fish added ${id}');
-				onFishAdded.dispatch(id, fish);
-
-				cb.listen(fish, "x", (_, _) -> {
-					// trace('NetMan: (fish: ${id} x update');
-					onFishMove.dispatch(id, fish);
-				});
-				cb.listen(fish, "y", (_, _) -> {
-					// trace('NetMan: (fish: ${id} y update');
-					onFishMove.dispatch(id, fish);
-				});
-			});
-
-			cb.onAdd(room.state, "bushes", (bush:BushState, id:String) -> {
-				trace('NetworkManager: bush added ${id} at ${bush.x}, ${bush.y}');
-				onBushAdded.dispatch(bush.x, bush.y);
-			});
-
-			cb.listen("shopReady", (val:Bool, _:Bool) -> {
-				if (val) {
-					trace('NetworkManager: shop placed at ${room.state.shopX}, ${room.state.shopY}');
-					onShopPlaced.dispatch(room.state.shopX, room.state.shopY);
+			var allRooms:Array<Dynamic> = [];
+			lobby.onMessage("rooms", (rooms:Array<Dynamic>) -> {
+				allRooms = rooms;
+				QLog.notice("Lobby Rooms on start:");
+				for (_ => r in allRooms) {
+					QLog.notice('  - ${r.roomId}');
 				}
 			});
 
-			cb.onAdd(room.state, "players", (player:PlayerState, sessionId:String) -> {
-				playerDebugTrace('NetworkManager: player added $sessionId');
-				if (sessionId == mySessionId) {
-					return;
+			lobby.onMessage("clients", function(count:Int) {
+				trace("Players in your group: " + Std.string(count));
+			});
+
+			lobby.onMessage("+", (message:Dynamic) -> {
+				var roomId:String = message[0];
+				var room:Dynamic = message[1];
+				var found = false;
+				for (i in 0...allRooms.length) {
+					if (allRooms[i].roomId == roomId) {
+						allRooms[i] = room;
+						found = true;
+						break;
+					}
 				}
-				onPlayerAdded.dispatch(sessionId, {state: player});
-
-				cb.listen(player, "x", (_, prevX:Float) -> {
-					playerDebugTrace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');
-					onPlayerChanged.dispatch(sessionId, {state: player, prevX: prevX});
-				});
-				cb.listen(player, "y", (_, prevY:Float) -> {
-					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
-					onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
-				});
-				cb.listen(player, "velocityX", (_, prevY:Float) -> {
-					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
-					onPlayerChanged.dispatch(sessionId, {state: player});
-				});
-				cb.listen(player, "velocitY", (_, prevY:Float) -> {
-					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
-					onPlayerChanged.dispatch(sessionId, {state: player});
-				});
-
-				cb.listen(player, "name", (_, _) -> {
-					playerDebugTrace('NetMan: sesh: ${sessionId} name: ${player.name}');
-					onPlayerNameChanged.dispatch(sessionId, player.name);
-				});
-				cb.listen(player, "skinIndex", (_, _) -> {
-					playerDebugTrace('NetMan: sesh: ${sessionId} skinIndex: ${player.skinIndex}');
-					onSkinChanged.dispatch(sessionId, player.skinIndex);
-				});
-				cb.listen(player, "ready", (_, _) -> {
-					playerDebugTrace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
-					onPlayerReadyChanged.dispatch(sessionId, player.ready);
-				});
-				cb.listen(player, "score", (_, _) -> {
-					playerDebugTrace('NetMan: sesh: ${sessionId} score: ${player.score}');
-					onScoreChanged.dispatch(sessionId, player.score);
-				});
-			});
-
-			cb.onRemove(room.state, "players", (player:PlayerState, sessionId:String) -> {
-				playerDebugTrace('NetworkManager: player removed $sessionId');
-				if (sessionId == mySessionId) {
-					return;
+				if (!found) {
+					allRooms.push(room);
+					QLog.notice('New room found: ${room.roomId}');
 				}
-				onPlayerRemoved.dispatch(sessionId);
 			});
 
-			room.onMessage("cast_line", (message:{
-				sessionId:String,
-				x:Float,
-				y:Float,
-				dir:String
-			}) -> {
-				trace('[NetMan] cast_line => ${message.sessionId} ${message.x},${message.y} dir:${message.dir}');
-				// var x:Float = message.x;
-				// var y:Float = message.y;
-				onCastLine.dispatch(message.sessionId, message.x, message.y, message.dir);
+			lobby.onMessage("-", (roomId:String) -> {
+				allRooms = allRooms.filter((room) -> room.roomId != roomId);
+				QLog.notice('Room no longer available: ${roomId}');
+			});
+		});
+	}
+
+	function joinQueue() {
+		client.joinOrCreate(queueRoom, new Map<String, Dynamic>(), GameState, (err, queueRoom) -> {
+			if (err != null) {
+				trace('NetworkManager: failed to join room — $err');
+				return;
+			}
+
+			queueRoom.onMessage("seat", function(reservation:Dynamic) {
+				// Optionally confirm the reservation to the queue
+				lobby.send("confirm");
+
+				// Join the match room with the reservation
+				client.consumeSeatReservation(reservation, GameState, function(err, match:Room<GameState>) {
+					if (err != null) {
+						trace("join error: " + err);
+						return;
+					}
+					trace("Joined match " + match.roomId);
+					setupGameRoom(match);
+				});
+			});
+		});
+	}
+
+	function setupGameRoom(room:Room<GameState>) {
+		this.room = room;
+
+		mySessionId = room.sessionId;
+		trace('NetworkManager: joined room ${roomName} (id: ${room.roomId}) as $mySessionId');
+		onJoined.dispatch(mySessionId);
+
+		var cb = Callbacks.get(room);
+
+		cb.listen("hostSessionId", (val:String, prev:String) -> {
+			var prevIsHost = IS_HOST;
+			IS_HOST = val == mySessionId;
+			trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
+			onHostChanged.dispatch(IS_HOST, prevIsHost);
+		});
+
+		cb.listen("round", (round:RoundState) -> {
+			trace('RoundState: ${round}');
+			onRoundUpdate.dispatch(round);
+		});
+
+		room.onMessage("players_ready", (message) -> {
+			trace('players ready');
+			onPlayersReady.dispatch();
+		});
+
+		cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
+			trace('NetworkManager: fish added ${id}');
+			onFishAdded.dispatch(id, fish);
+
+			cb.listen(fish, "x", (_, _) -> {
+				// trace('NetMan: (fish: ${id} x update');
+				onFishMove.dispatch(id, fish);
+			});
+			cb.listen(fish, "y", (_, _) -> {
+				// trace('NetMan: (fish: ${id} y update');
+				onFishMove.dispatch(id, fish);
+			});
+		});
+
+		cb.onAdd(room.state, "bushes", (bush:BushState, id:String) -> {
+			trace('NetworkManager: bush added ${id} at ${bush.x}, ${bush.y}');
+			onBushAdded.dispatch(bush.x, bush.y);
+		});
+
+		cb.listen("shopReady", (val:Bool, _:Bool) -> {
+			if (val) {
+				trace('NetworkManager: shop placed at ${room.state.shopX}, ${room.state.shopY}');
+				onShopPlaced.dispatch(room.state.shopX, room.state.shopY);
+			}
+		});
+
+		cb.onAdd(room.state, "players", (player:PlayerState, sessionId:String) -> {
+			playerDebugTrace('NetworkManager: player added $sessionId');
+			if (sessionId == mySessionId) {
+				return;
+			}
+			onPlayerAdded.dispatch(sessionId, {state: player});
+
+			cb.listen(player, "x", (_, prevX:Float) -> {
+				playerDebugTrace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');
+				onPlayerChanged.dispatch(sessionId, {state: player, prevX: prevX});
+			});
+			cb.listen(player, "y", (_, prevY:Float) -> {
+				playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+				onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
+			});
+			cb.listen(player, "velocityX", (_, prevY:Float) -> {
+				playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+				onPlayerChanged.dispatch(sessionId, {state: player});
+			});
+			cb.listen(player, "velocitY", (_, prevY:Float) -> {
+				playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+				onPlayerChanged.dispatch(sessionId, {state: player});
 			});
 
-			room.onMessage("fish_caught", (message:Dynamic) -> {
-				trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId} fishType:${message.fishType}');
-				var ft:Int = message.fishType != null ? Std.int(message.fishType) : 0;
-				onFishCaught.dispatch(message.sessionId, message.fishId, ft);
+			cb.listen(player, "name", (_, _) -> {
+				playerDebugTrace('NetMan: sesh: ${sessionId} name: ${player.name}');
+				onPlayerNameChanged.dispatch(sessionId, player.name);
 			});
-			room.onMessage("fish_pocketed", (message) -> {
-				trace('[NetMan] fish_pocketed => sessionId:${message.sessionId} fishId:${message.fishId}');
-				onFishPocketed.dispatch(message.sessionId, message.fishId);
+			cb.listen(player, "skinIndex", (_, _) -> {
+				playerDebugTrace('NetMan: sesh: ${sessionId} skinIndex: ${player.skinIndex}');
+				onSkinChanged.dispatch(sessionId, player.skinIndex);
 			});
-			room.onMessage("fish_banked", (message) -> {
-				trace('[NetMan] fish_banked => sessionId:${message.sessionId} fishId:${message.fishId}');
-				onFishBanked.dispatch(message.sessionId, message.fishId);
+			cb.listen(player, "ready", (_, _) -> {
+				playerDebugTrace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
+				onPlayerReadyChanged.dispatch(sessionId, player.ready);
 			});
+			cb.listen(player, "score", (_, _) -> {
+				playerDebugTrace('NetMan: sesh: ${sessionId} score: ${player.score}');
+				onScoreChanged.dispatch(sessionId, player.score);
+			});
+		});
 
-			room.onMessage("line_pulled", (message) -> {
-				trace('[NetMan] line_pulled => sessionId:${message.sessionId}');
-				onLinePulled.dispatch(message.sessionId);
-			});
+		cb.onRemove(room.state, "players", (player:PlayerState, sessionId:String) -> {
+			playerDebugTrace('NetworkManager: player removed $sessionId');
+			if (sessionId == mySessionId) {
+				return;
+			}
+			onPlayerRemoved.dispatch(sessionId);
+		});
 
-			room.onMessage("fish_despawn", (message:{id:String, respawnTime:Float}) -> {
-				trace('[NetMan] fish_despawn => fishId:${message.id} respawnTime:${message.respawnTime}');
-				onFishDespawn.dispatch(message.id, message.respawnTime);
-			});
+		room.onMessage("cast_line", (message:{
+			sessionId:String,
+			x:Float,
+			y:Float,
+			dir:String
+		}) -> {
+			trace('[NetMan] cast_line => ${message.sessionId} ${message.x},${message.y} dir:${message.dir}');
+			// var x:Float = message.x;
+			// var y:Float = message.y;
+			onCastLine.dispatch(message.sessionId, message.x, message.y, message.dir);
+		});
 
-			room.onMessage("rock_splash", (message:Dynamic) -> {
-				var sx:Float = message.x;
-				var sy:Float = message.y;
-				var sbig:Bool = message.big;
-				trace('[NetMan] rock_splash => $sx, $sy big=$sbig');
-				onRockSplash.dispatch(sx, sy, sbig);
-			});
+		room.onMessage("fish_caught", (message:Dynamic) -> {
+			trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId} fishType:${message.fishType}');
+			var ft:Int = message.fishType != null ? Std.int(message.fishType) : 0;
+			onFishCaught.dispatch(message.sessionId, message.fishId, ft);
+		});
+		room.onMessage("fish_pocketed", (message) -> {
+			trace('[NetMan] fish_pocketed => sessionId:${message.sessionId} fishId:${message.fishId}');
+			onFishPocketed.dispatch(message.sessionId, message.fishId);
+		});
+		room.onMessage("fish_banked", (message) -> {
+			trace('[NetMan] fish_banked => sessionId:${message.sessionId} fishId:${message.fishId}');
+			onFishBanked.dispatch(message.sessionId, message.fishId);
+		});
 
-			room.onMessage("throw_rock", (message:Dynamic) -> {
-				trace('[NetMan] throw_rock => sessionId:${message.sessionId} target:(${message.targetX},${message.targetY}) big:${message.big} dir:${message.dir}');
+		room.onMessage("line_pulled", (message) -> {
+			trace('[NetMan] line_pulled => sessionId:${message.sessionId}');
+			onLinePulled.dispatch(message.sessionId);
+		});
 
-				var dest = FlxPoint.get(message.targetX, message.targetY);
-				onThrowRock.dispatch(message.sessionId, dest, message.big, message.dir);
-				dest.put();
-			});
+		room.onMessage("fish_despawn", (message:{id:String, respawnTime:Float}) -> {
+			trace('[NetMan] fish_despawn => fishId:${message.id} respawnTime:${message.respawnTime}');
+			onFishDespawn.dispatch(message.id, message.respawnTime);
+		});
 
-			room.onMessage("fish_sold", (message:Dynamic) -> {
-				trace('[NetMan] fish_sold => sessionId:${message.sessionId} fishType:${message.fishType} lengthCm:${message.lengthCm} value:${message.value}');
-				onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
-			});
+		room.onMessage("rock_splash", (message:Dynamic) -> {
+			var sx:Float = message.x;
+			var sy:Float = message.y;
+			var sbig:Bool = message.big;
+			trace('[NetMan] rock_splash => $sx, $sy big=$sbig');
+			onRockSplash.dispatch(sx, sy, sbig);
+		});
 
-			room.onMessage("weed_burst", (message:Dynamic) -> {
-				trace('[NetMan] weed_burst => sessionId:${message.sessionId} index:${message.index}');
-				onWeedBurst.dispatch(message.sessionId, Std.int(message.index));
-			});
+		room.onMessage("throw_rock", (message:Dynamic) -> {
+			trace('[NetMan] throw_rock => sessionId:${message.sessionId} target:(${message.targetX},${message.targetY}) big:${message.big} dir:${message.dir}');
 
-			room.onMessage("world_items", (message:Dynamic) -> {
-				trace('[NetMan] world_items received');
-				onWorldItems.dispatch(message);
-			});
+			var dest = FlxPoint.get(message.targetX, message.targetY);
+			onThrowRock.dispatch(message.sessionId, dest, message.big, message.dir);
+			dest.put();
+		});
 
-			room.onMessage("item_pickup", (message:Dynamic) -> {
-				trace('[NetMan] item_pickup => sessionId:${message.sessionId} itemType:${message.itemType} index:${message.index}');
-				onItemPickup.dispatch(message.sessionId, message.itemType, Std.int(message.index));
-			});
+		room.onMessage("fish_sold", (message:Dynamic) -> {
+			trace('[NetMan] fish_sold => sessionId:${message.sessionId} fishType:${message.fishType} lengthCm:${message.lengthCm} value:${message.value}');
+			onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
+		});
 
-			room.onMessage("bush_rustle", (message:Dynamic) -> {
-				trace('[NetMan] bush_rustle => index:${message.index} dir:(${message.dirX},${message.dirY})');
-				onBushRustle.dispatch(Std.int(message.index), message.dirX, message.dirY);
-			});
+		room.onMessage("weed_burst", (message:Dynamic) -> {
+			trace('[NetMan] weed_burst => sessionId:${message.sessionId} index:${message.index}');
+			onWeedBurst.dispatch(message.sessionId, Std.int(message.index));
+		});
 
-			room.onMessage("worm_killed", (message:Dynamic) -> {
-				trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
-				onWormKilled.dispatch(message.sessionId);
-			});
+		room.onMessage("world_items", (message:Dynamic) -> {
+			trace('[NetMan] world_items received');
+			onWorldItems.dispatch(message);
+		});
 
-			room.onMessage("hot_pepper", (message:Dynamic) -> {
-				trace('[NetMan] hot_pepper => sessionId:${message.sessionId} isStart:${message.isStart}');
-				onHotPepper.dispatch(message.sessionId, message.isStart == true);
-			});
+		room.onMessage("item_pickup", (message:Dynamic) -> {
+			trace('[NetMan] item_pickup => sessionId:${message.sessionId} itemType:${message.itemType} index:${message.index}');
+			onItemPickup.dispatch(message.sessionId, message.itemType, Std.int(message.index));
+		});
 
-			room.onMessage("spawn_locations", (message:Dynamic) -> {
-				trace('[NetMan] spawn_locations received');
-				onSpawnLocations.dispatch(message);
-			});
+		room.onMessage("bush_rustle", (message:Dynamic) -> {
+			trace('[NetMan] bush_rustle => index:${message.index} dir:(${message.dirX},${message.dirY})');
+			onBushRustle.dispatch(Std.int(message.index), message.dirX, message.dirY);
+		});
 
-			room.onMessage("kicked", (_) -> {
-				trace('[NetMan] we got kicked!');
-				room.leave(true);
-				room = null;
-				onKicked.dispatch();
-			});
+		room.onMessage("worm_killed", (message:Dynamic) -> {
+			trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
+			onWormKilled.dispatch(message.sessionId);
+		});
 
-			room.onMessage("player_kicked", (message:{sessionId:String}) -> {
-				trace('[NetMan] player_kicked => ${message.sessionId}');
-				onPlayerRemoved.dispatch(message.sessionId);
-			});
+		room.onMessage("hot_pepper", (message:Dynamic) -> {
+			trace('[NetMan] hot_pepper => sessionId:${message.sessionId} isStart:${message.isStart}');
+			onHotPepper.dispatch(message.sessionId, message.isStart == true);
+		});
 
-			room.onMessage("timer_sync", (message:Dynamic) -> {
-				trace('[NetMan] timer_sync received: runTimeSec=${message.runTimeSec} totalSec=${message.totalSec}');
-				onTimerSync.dispatch(message.runTimeSec, message.totalSec);
-			});
+		room.onMessage("spawn_locations", (message:Dynamic) -> {
+			trace('[NetMan] spawn_locations received');
+			onSpawnLocations.dispatch(message);
+		});
+
+		room.onMessage("kicked", (_) -> {
+			trace('[NetMan] we got kicked!');
+			room.leave(true);
+			room = null;
+			onKicked.dispatch();
+		});
+
+		room.onMessage("player_kicked", (message:{sessionId:String}) -> {
+			trace('[NetMan] player_kicked => ${message.sessionId}');
+			onPlayerRemoved.dispatch(message.sessionId);
+		});
+
+		room.onMessage("timer_sync", (message:Dynamic) -> {
+			trace('[NetMan] timer_sync received: runTimeSec=${message.runTimeSec} totalSec=${message.totalSec}');
+			onTimerSync.dispatch(message.runTimeSec, message.totalSec);
 		});
 	}
 

@@ -753,10 +753,6 @@ class PlayState extends FlxTransitionableState {
 
 		updateTimerHUD(elapsed);
 
-		if (FlxG.mouse.justPressed) {
-			EventBus.fire(new Click(FlxG.mouse.x, FlxG.mouse.y));
-		}
-
 		FlxG.collide(midGroundGroup, player);
 		FlxG.collide(bushGroup, player, (bush:Bush, p:Player) -> {
 			var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);

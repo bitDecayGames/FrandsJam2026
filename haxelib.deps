@@ -36,3 +36,5 @@ haxefmod git https://github.com/Tanz0rz/haxe-fmod.git 1.1.2-beta
 # networking libs
 colyseus 0.17.6
 hxWebSockets 1.4.0
+colyseus-hxjs git https://github.com/bitDecayGames/colyseus-hxjs.git
+hxnodejs 12.2.0

@@ -1,5 +1,6 @@
 package states;
 
+import bitdecay.flixel.spacial.Align;
 import bitdecay.flixel.graphics.AsepriteMacros;
 import bitdecay.flixel.graphics.Aseprite;
 import haxefmod.FlxFmod;
@@ -24,6 +25,7 @@ class MainMenuState extends FlxTransitionableState {
 	public static var anims = AsepriteMacros.tagNames("assets/aseprite/title.json");
 
 	var startButton:FlxButton;
+	var friendsButton:FlxButton;
 	var handleInput = true;
 
 	public function new() {
@@ -47,6 +49,12 @@ class MainMenuState extends FlxTransitionableState {
 		startButton.screenCenter(X);
 		startButton.y = FlxG.height * .6;
 		add(startButton);
+
+		// This can be swapped out for an image instead
+		friendsButton = MenuBuilder.createTextButton("Play with Friends", clickPlay, MenuSelect, MenuHover);
+		Align.center(friendsButton, startButton, X);
+		Align.stack(friendsButton, startButton, DOWN, 5);
+		add(friendsButton);
 
 		var creditsButton = MenuBuilder.createTextButton("Credits", clickCredits, MenuSelect, MenuHover);
 		creditsButton.setPosition(10, FlxG.height - creditsButton.height - 10);
