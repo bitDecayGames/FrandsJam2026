@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 FrandsJam is a HaxeFlixel game built with Haxe, OpenFL/Lime, and FMOD audio. It uses LDTK for level design, integrates with Newgrounds for medals/leaderboards, and reports analytics via Bitlytics/InfluxDB.
 
+## Important Restrictions
+
+- **NEVER attempt to read from or browse the logged-in user's home/user directory.** Do not default to looking in `~/`, `$HOME`, `C:\Users\<username>\`, or any user profile path. Only work within the project directory and paths explicitly provided.
+
 ## Build & Development Commands
 
 ```bash
@@ -134,6 +138,87 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 - `assets/aseprite/fish.png` — caught/ground fish spritesheet, 32x32 frames (3 columns x 2 rows), 5 fish types of varying sizes within the cells
 - `assets/aseprite/bobber.png` — fishing bobber sprite
 - `assets/aseprite/aimingTarget.png` — reticle/aiming target, 8x8 frames, 4-frame animation
+
+## Behavior Tree (BitdecayBTree)
+
+Library: `bitdecaybtree` (installed via `haxelib.deps` from `https://github.com/bitDecayGames/BehaviorTree.git`). Already in `Project.xml`. Debug inspector (`BTreeInspector`) is registered in `Main.hx` via DebugSuite. Enable `-D btree` compile flag for extra logging.
+
+### Core Architecture
+- **`BTExecutor`** — drives a tree. Construct with a root `Node`, call `executor.init(ctx)` then `executor.process(delta)` each frame. Has a public `ctx:BTContext` and `status:NodeStatus`.
+- **`BTContext`** — shared key-value blackboard (`Map<String, Dynamic>`). Methods: `get(key)`, `set(key, value)`, `has(key)`, `remove(key)`, `getBool(key)`, `getFloat(key)`, `dump()`. All nodes in a tree share one context.
+- **`Node`** interface — `init(ctx)`, `process(delta):NodeStatus`, `cancel()`, `clone()`, `getName()`.
+- **`NodeStatus`** enum — `UNKNOWN`, `SUCCESS`, `FAIL`, `RUNNING`.
+
+### Node Types
+
+**Composites** (multiple children, `ChildOrder` = `IN_ORDER` or `RANDOM(weights)`):
+- `Sequence(order, children)` — runs children in order; returns SUCCESS if ALL succeed, FAIL on first failure (logical AND). Re-inits children that were UNKNOWN before processing.
+- `Fallback(order, children)` — runs children in order; returns SUCCESS on first success, FAIL if all fail (logical OR).
+- `Parallel(condition, children)` — runs ALL children every tick. `EndCondition`: `FAIL_ON_FIRST_FAIL`, `SUCCEED_ON_FIRST_SUCCESS`, `UNTIL_N_COMPLETE(n)`, `UNTIL_ALL_COMPLETE`.
+
+**Decorators** (single child, wrap behavior):
+- `Inverter(child)` — flips SUCCESS↔FAIL, passes RUNNING through.
+- `Succeeder(child)` — always returns SUCCESS when child completes (regardless of child status).
+- `Failer(child)` — always returns FAIL when child completes.
+- `Repeater(type, child)` — `RepeatType`: `FOREVER`, `COUNT(n)`, `UNTIL_FAIL(max)`, `UNTIL_SUCCESS(max)`. Max of 0 = no limit.
+- `TimeLimit(time, child)` — returns FAIL if child doesn't finish within time limit. Cancels child on timeout.
+- `HierarchicalContext(child)` — creates a scoped sub-context. Child writes are local; reads fall back to parent context.
+- `Subtree(name)` — looks up a named tree from `Registry` and clones it as the child.
+
+**Leaf Nodes** (terminal, business logic):
+- `Action(name, wrappedFunc)` — runs callback `(ctx) -> Void`, always returns SUCCESS. Use for fire-and-forget side effects.
+- `StatusAction(name, wrappedProcessFunc, ?onCancel)` — runs callback `(ctx, delta) -> NodeStatus`, returns whatever the callback returns. The main way to write custom behavior that can return RUNNING. Optional `onCancel` callback `(ctx) -> Void`.
+- `Condition(name, type)` — returns SUCCESS or FAIL. `ConditionType`: `VAR_SET(varName)` (checks context key exists), `VAR_CMP(varName, comparison)` (LT/LTE/GT/GTE/EQ/NEQ against a value), `FUNC(wrappedConditionFunc)` (custom `(ctx) -> Bool`).
+- `Wait(min, ?max)` — returns RUNNING until time elapses, then SUCCESS. Random duration between min and max. `Time` enum: `CONST(seconds)` or `VAR(contextKey, fallbackSeconds)`.
+- `SetVariable(name, valueType)` — sets a context variable. `ValueType`: `CONST(val)`, `FROM_CTX(key)`, `TIMESTAMP(offsetSeconds)`.
+- `RemoveVariable(name)` — removes a context variable, always SUCCESS.
+- `IsVarNull(name)` — SUCCESS if var is unset/null, FAIL if set.
+- `Success` / `Fail` — always return their respective status.
+
+### Wrapped Functions (BT.wrapFn macro)
+All Action/StatusAction/Condition callbacks must be wrapped with `BT.wrapFn()` for debug tooling:
+```haxe
+new Action("do thing", BT.wrapFn(myFunction));
+new StatusAction("move to target", BT.wrapFn(moveToTarget));
+new Condition("has fish?", FUNC(BT.wrapFn(checkHasFish)));
+```
+`BT.wrapFn()` is a macro that captures the function name, file, and line number for the inspector.
+
+### Registry (Subtrees)
+`Registry.register(name, tree)` saves a tree blueprint. `new Subtree(name)` clones and injects it. Useful for reusable behavior patterns.
+
+### Shorthand Helpers
+`Shorthand.interrupter(condition, child)` — creates a Sequence that inverts the condition check (aborts child while condition is true).
+
+### Usage Pattern
+```haxe
+import bitdecay.behavior.tree.*;
+import bitdecay.behavior.tree.composite.*;
+import bitdecay.behavior.tree.decorator.*;
+import bitdecay.behavior.tree.leaf.*;
+import bitdecay.behavior.tree.context.BTContext;
+
+// Build tree
+var tree = new Fallback(IN_ORDER, [
+    new Sequence(IN_ORDER, [
+        new Condition("water nearby?", FUNC(BT.wrapFn(isWaterNearby))),
+        new StatusAction("walk to water", BT.wrapFn(walkToWater)),
+        new StatusAction("cast line", BT.wrapFn(castLine)),
+        new Wait(CONST(2.0), CONST(5.0)),
+        new Action("reel in", BT.wrapFn(reelIn))
+    ]),
+    new Sequence(IN_ORDER, [
+        new Wait(CONST(0.5), CONST(1.5)),
+        new Action("wander", BT.wrapFn(wander))
+    ])
+]);
+
+// Create executor and tick each frame
+var executor = new BTExecutor(tree);
+executor.init(new BTContext());
+// In update():
+executor.process(elapsed);
+```
 
 ## Git Hooks
 
