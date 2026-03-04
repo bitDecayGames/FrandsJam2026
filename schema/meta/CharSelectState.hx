@@ -19,6 +19,7 @@ class CharSelectState extends Schema {
 
 	public function new() {
 		super();
+		this.players = new MapSchema<PlayerLobbyState>();
 	}
 }
 

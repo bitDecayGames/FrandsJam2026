@@ -30,6 +30,13 @@ class CharacterSelectRoom extends RoomOf<CharSelectState, Dynamic> {
 			trace('${client.sessionId}: sent "skin_changed" message: skinIndex=${data.skinIndex}');
 			var player:PlayerLobbyState = state.players.get(client.sessionId);
 			if (player != null) {
+				for (p in state.players) {
+					if (p.skinIndex == data.skinIndex) {
+						// rejected
+						return;
+					}
+				}
+				// Nobody else had that index, so update!
 				player.skinIndex = data.skinIndex;
 			}
 		});
@@ -92,7 +99,15 @@ class CharacterSelectRoom extends RoomOf<CharSelectState, Dynamic> {
 
 	override public function onJoin(client:Client, ?options:Dynamic):EitherType<Void, Promise<Dynamic>> {
 		trace('player joined: ${client.sessionId}');
-		state.players.set(client.sessionId, new PlayerLobbyState(client.sessionId, "Player 1", 1));
+		var freeSlot = 0;
+		for (i in 0...6) {
+			for (p in state.players) {
+				if (p.skinIndex != i) {
+					freeSlot = i;
+				}
+			}
+		}
+		state.players.set(client.sessionId, new PlayerLobbyState(client.sessionId, "Unnamed Player", freeSlot));
 		return null;
 	}
 

@@ -60,6 +60,7 @@ class GameManager {
 		fish = new FishManager(new FishDb());
 		net = new NetworkManager();
 		net.onJoined.add(onPlayerJoined);
+		net.onPlayerJoinLobby.add(onPlayerJoinLobby);
 		net.onPlayerAdded.add(onPlayerAdded);
 		net.onPlayerRemoved.add(onPlayerRemoved);
 		net.onRoundUpdate.add(sync);
@@ -216,12 +217,25 @@ class GameManager {
 		return -1;
 	}
 
+	private function onPlayerJoinLobby(sessionId:String, data:PlayerLobbyData) {
+		if (sessionId == mySessionId) {
+			return;
+		}
+
+		trace('GameMan: new player joined lobby: $sessionId');
+		sessions.push(sessionId);
+		names.set(sessionId, data.name);
+		if (data.skinIndex >= 0) {
+			skins.set(sessionId, data.skinIndex);
+		}
+	}
+
 	private function onPlayerAdded(sessionId:String, data:PlayerUpdateData) {
 		if (sessionId == mySessionId) {
 			return;
 		}
 
-		trace('GameMan: new session added: $sessionId');
+		trace('GameMan: new session added to game: $sessionId');
 		sessions.push(sessionId);
 		names.set(sessionId, data.state.name);
 		if (data.state.skinIndex >= 0) {

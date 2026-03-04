@@ -12,11 +12,10 @@ class Main {
 		gameServer.define("char_select", CharacterSelectRoom);
 		gameServer.define("char_select_public", CharacterSelectRoom).enableRealtimeListing();
 		gameServer.define("game_room", GameRoom);
-		gameServer.define("queue", QueueRoom,
-			{
-				matchRoomName: "char_select",
-				maxPlayers: 2,
-			}); // This currently doesn't actually exist in the bindings. But I'm sure claude can help me.
+		gameServer.define("queue", QueueRoom, {
+			matchRoomName: "char_select",
+			maxPlayers: 2,
+		});
 
 		gameServer.listen(port, "0.0.0.0").then((_) -> {
 			trace('Listening on ws://localhost:$port');
