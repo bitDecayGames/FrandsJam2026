@@ -22,7 +22,7 @@ import ui.MenuBuilder;
 
 using states.FlxStateExt;
 
-class LobbyState extends FlxTransitionableState {
+class NewLobbyState extends FlxTransitionableState {
 	var _btnDone:FlxButton;
 	var _txtReady:FlxText;
 	var _txtRoomID:FlxText;
@@ -132,6 +132,9 @@ class LobbyState extends FlxTransitionableState {
 		// Create skin selection sprites
 		createSkinSelection();
 
+		#if !local
+		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
+		#end
 		FlxTimer.wait(2, () -> {
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
 			if (_inputField.text != null && _inputField.text != "") {

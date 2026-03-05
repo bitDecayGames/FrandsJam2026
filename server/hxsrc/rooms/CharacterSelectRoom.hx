@@ -27,7 +27,7 @@ class CharacterSelectRoom extends RoomOf<CharSelectState, Dynamic> {
 
 		// sent when a player changes their skin selection in the lobby
 		onMessage("skin_changed", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "skin_changed" message: skinIndex=${data.skinIndex}');
+			trace('(${client.sessionId}): "skin_changed" skinIndex=${data.skinIndex}');
 			var player:PlayerLobbyState = state.players.get(client.sessionId);
 			if (player != null) {
 				for (p in state.players) {

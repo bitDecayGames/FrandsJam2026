@@ -1,5 +1,6 @@
 package net;
 
+import io.colyseus.error.HttpException;
 import io.colyseus.serializer.schema.Schema;
 import managers.GameManager;
 import flixel.math.FlxPoint;
@@ -28,10 +29,12 @@ typedef HostSignal = FlxTypedSignal<Bool->Bool->Void>; // cur, prev
 typedef RockThrowSignal = FlxTypedSignal<(String, FlxPoint, Bool, String) -> Void>; // sessionId, targetX, targetY, big, dir
 
 class NetworkManager {
+	public static var ME(get, null):NetworkManager;
 	public static var IS_HOST:Bool = #if local true #else false #end;
 
 	var client:Client;
-	var lobby:Room<Dynamic>;
+
+	// The current room that the network is connected to. Can be of various types
 	var room:Room<Dynamic>;
 
 	public var mySessionId:String = "";
@@ -80,7 +83,18 @@ class NetworkManager {
 	public static inline var queueRoom:String = "queue";
 	public static inline var roomName:String = "game_room";
 
-	public function new() {}
+	private function new() {
+		#if !local
+		connect(Configure.getServerURL(), Configure.getServerPort());
+		#end
+	}
+
+	public static function get_ME():NetworkManager {
+		if (ME == null) {
+			ME = new NetworkManager();
+		}
+		return ME;
+	}
 
 	public function disconnect() {
 		if (room == null) {
@@ -100,23 +114,23 @@ class NetworkManager {
 				QLog.notice('Latency Check: ${l}ms');
 			});
 		}
-		if (room != null) {
-			trace('already connected to a room ${room.roomId}, not re-connecting');
-			return;
-		}
+		// if (room != null) {
+		// 	trace('already connected to a room ${room.roomId}, not re-connecting');
+		// 	return;
+		// }
 
 		// joinLobby();
-		joinQueue();
+		// joinQueue();
 	}
 
-	function joinLobby() {
-		client.joinOrCreate(lobbyRoom, new Map<String, Dynamic>(), GameState, (err, joinedRoom) -> {
+	public function joinLobby() {
+		client.joinOrCreate(lobbyRoom, new Map<String, Dynamic>(), GameState, (err, lobby) -> {
 			if (err != null) {
 				trace('NetworkManager: failed to join room — $err');
 				return;
 			}
 
-			lobby = joinedRoom;
+			room = lobby;
 
 			var allRooms:Array<Dynamic> = [];
 			lobby.onMessage("rooms", (rooms:Array<Dynamic>) -> {
@@ -155,28 +169,31 @@ class NetworkManager {
 		});
 	}
 
-	function joinQueue() {
-		client.joinOrCreate(queueRoom, new Map<String, Dynamic>(), Schema, (err, queueRoom) -> {
+	public function joinQueue(onCharSelect:Room<CharSelectState>->Void, onFail:HttpException->Void) {
+		client.joinOrCreate(queueRoom, new Map<String, Dynamic>(), Schema, (err, queue) -> {
 			if (err != null) {
 				trace('NetworkManager: failed to join room — $err');
+				onFail(err);
 				return;
 			}
 
-			queueRoom.onMessage("clients", function(count:Int) {
+			queue.onMessage("clients", function(count:Int) {
 				trace("Players in your group: " + Std.string(count));
 			});
 
-			queueRoom.onMessage("seat", function(reservation:Dynamic) {
+			queue.onMessage("seat", function(reservation:Dynamic) {
 				// Optionally confirm the reservation to the queue
 				// lobby.send("confirm");
 
 				// Join the match room with the reservation
 				client.consumeSeatReservation(reservation, CharSelectState, function(err, match:Room<CharSelectState>) {
 					if (err != null) {
-						trace("join error: " + err);
+						trace("error joining character select: " + err);
+						onFail(err);
 						return;
 					}
 					trace('Joined match ${match.roomId} as ${match.sessionId}');
+					onCharSelect(match);
 					setupCharSelect(match);
 				});
 			});
@@ -216,8 +233,18 @@ class NetworkManager {
 			onPlayersReady.dispatch();
 		});
 
-		room.onMessage("move_to_game", (message) -> {
-			trace('game starting');
+		room.onMessage("move_to_game", (reservation) -> {
+			trace('game starting at session: ${reservation.sessionId}');
+
+			// Join the match room with the reservation
+			client.consumeSeatReservation(reservation, GameState, function(err, match:Room<GameState>) {
+				if (err != null) {
+					trace("join error: " + err);
+					return;
+				}
+				trace('Joined game ${match.roomId} as ${match.sessionId}');
+				setupGameRoom(match);
+			});
 		});
 	}
 
@@ -227,6 +254,8 @@ class NetworkManager {
 		mySessionId = room.sessionId;
 		trace('NetworkManager: joined room ${roomName} (id: ${room.roomId}) as $mySessionId');
 		onJoined.dispatch(mySessionId);
+
+		onPlayersReady.dispatch();
 
 		room.onStateChange += (newState:GameState) -> {
 			trace("NetMan: received state change:");
@@ -279,6 +308,11 @@ class NetworkManager {
 				return;
 			}
 			onPlayerAdded.dispatch(sessionId, {state: player});
+
+			cb.onChange(player, () -> {
+				playerDebugTrace('NetMan: got onChange for player');
+				onPlayerChanged.dispatch(sessionId, {state: player});
+			});
 
 			cb.listen(player, "x", (_, prevX:Float) -> {
 				playerDebugTrace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');

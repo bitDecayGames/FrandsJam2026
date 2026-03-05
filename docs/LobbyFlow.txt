@@ -1,0 +1,36 @@
+title General Lobby Flow
+
+bottomparticipants
+
+participant Server
+participant LobbyRoom
+participant GameRoom
+
+activate Server
+group Flixel "LobbyState"
+Client A->Server:Request new LobbyRoom
+Server->LobbyRoom:Create
+activate LobbyRoom
+Server->Client A:Room(Lobby)
+Client B->LobbyRoom:Join
+Client A->LobbyRoom:Set Name("Alice")
+LobbyRoom->Client B:NameChange(A,"Alice")
+Client A->LobbyRoom:Pick Skin(c)
+LobbyRoom->Client B:SkinChange(A,c)
+Client B->LobbyRoom:Set Name("Betty")
+LobbyRoom->Client A:NameChange(B,"Betty")
+Client B->LobbyRoom:Ready
+Client A->LobbyRoom:Ready
+Server->GameRoom:Create
+activate GameRoom
+Server->GameRoom:CreateReservations
+Server->Client A:Send Reservation(GameRoom)
+Server->Client B:Send Reservation(GameRoom)
+end
+group Flixel "GameState"
+Client A->GameRoom:Join(ConsumeReservation)
+Client B->GameRoom:Join(ConsumeReservation)
+Server->LobbyRoom:Close
+deactivate LobbyRoom
+note over GameRoom,Client B:Game Simulation
+end

@@ -11,11 +11,28 @@ import haxe.extern.EitherType;
 import js.lib.Promise;
 
 class GameRoom extends RoomOf<GameState, Dynamic> {
+	static var fixedTimeStep:Float = 1 / 20;
+
+	var elapsedTime:Float;
+	var tick:Int;
+
+	public function new() {
+		super();
+		elapsedTime = 0;
+		tick = 0;
+	}
+
 	override public function onCreate(options:Dynamic):Void {
 		maxClients = 6;
 		setState(new GameState());
 
 		trace('start room: ${roomId}:${roomName}');
+
+		this.setSimulationInterval(this.update);
+
+		// this.clock.setInterval(() => {
+		//   this.game.check_fish(this.state);
+		// }, 3000);
 
 		// sent when a player moves
 		onMessage("move", (client:Client, data:{
@@ -335,5 +352,18 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		}
 
 		return null;
+	}
+
+	function update(delta:Float) {
+		elapsedTime += delta;
+
+		while (elapsedTime >= fixedTimeStep) {
+			elapsedTime -= fixedTimeStep;
+			this.fixedTick(fixedTimeStep);
+		}
+	}
+
+	function fixedTick(t:Float) {
+		tick++;
 	}
 }
