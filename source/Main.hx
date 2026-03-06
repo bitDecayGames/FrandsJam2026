@@ -37,7 +37,7 @@ import openfl.utils.Assets;
 import states.MainMenuState;
 import states.SplashScreenState;
 #if play
-import states.LobbyState;
+import states.CharacterSelectState;
 #end
 #if credits
 import states.CreditsState;
@@ -59,11 +59,11 @@ class Main extends Sprite {
 
 		FlxG.save.bind("Fishin Willys", "BitDecayGames");
 
-		new GameManager();
+		// new GameManager();
 
 		var startingState:Class<FlxState> = SplashScreenState;
 		#if play
-		startingState = LobbyState;
+		startingState = CharacterSelectState;
 		#elseif credits
 		startingState = CreditsState;
 		#else

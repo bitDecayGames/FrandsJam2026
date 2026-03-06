@@ -1,56 +1,61 @@
 package states;
 
-import bitdecay.flixel.spacial.Align;
-import flixel.text.FlxInputText;
-import goals.PersonalFishCountGoal;
-import goals.TimedGoal;
-import rounds.Round;
-import config.Configure;
-import flixel.util.FlxTimer;
-import schema.RoundState;
-import managers.GameManager;
+import states.CharacterSelectState;
 import net.NetworkManager;
+import schema.meta.CharSelectState;
+import io.colyseus.serializer.schema.Schema;
+import io.colyseus.Room;
+import io.colyseus.error.HttpException;
+import managers.GameManager;
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.FlxG;
-import flixel.FlxSprite;
+import flixel.text.FlxInputText;
 import flixel.text.FlxText;
 import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
-import entities.Player;
-import todo.TODO;
 import ui.MenuBuilder;
 
 using states.FlxStateExt;
 
+/**
+ * Room browser — joins the Colyseus LobbyRoom and shows available game rooms
+ * in a simple table. The player can click a row to join that room, create a
+ * public or private room, or type a room ID and join directly. On success,
+ * transitions to CharacterSelectState for skin selection / ready-up.
+ */
 class NewLobbyState extends FlxTransitionableState {
-	var _btnDone:FlxButton;
-	var _txtReady:FlxText;
-	var _txtRoomID:FlxText;
+	// These are fixed messages that colyseus sends for the built-in LobbyRoom
+	static inline var MSG_ROOMS = "rooms";
+	static inline var MSG_ROOM_ADDED = "+";
+	static inline var MSG_ROOM_REMOVED = "-";
 
-	var _txtTitle:FlxText;
-	var _inputField:FlxInputText;
-	var _txtOtherHeader:FlxText;
-	var _kickRows:Array<{label:FlxText, btn:FlxButton, sessionId:String}> = [];
-
-	// Skin selection
-	var _skinSprites:Array<FlxSprite> = [];
-	var _skinBorders:Array<FlxSprite> = [];
-	var _skinNameLabels:Array<FlxText> = [];
-	var _selectedSkinIndex:Int = -1; // -1 means no skin selected
-	var _localReady:Bool = false;
-
-	// Layout constants
-	static inline var SKIN_ICON_NATIVE:Int = 32; // native pixel size of icons.png frames
-	static inline var SKIN_SIZE:Int = 64; // displayed size (2x scale)
-	static inline var SKIN_PADDING:Int = 12;
-	static inline var BORDER_THICKNESS:Int = 2;
-	static inline var MAX_REMOTE_PLAYERS:Int = 5;
-	static inline var KICK_BTN_W:Int = 80;
-	static inline var ROW_H:Int = 22;
-
-	// Title screen colors
 	static var BG_COLOR:FlxColor = 0xff73efe8; // turquoise
 	static var TEXT_COLOR:FlxColor = 0xff2b4e95; // dark navy
+
+	static inline var MAX_ROWS:Int = 8;
+	static inline var ROW_H:Int = 32;
+	static inline var TABLE_LEFT:Int = 40;
+	static inline var TABLE_TOP:Int = 118;
+	static inline var LABEL_W:Int = 430;
+	static inline var BTN_W:Int = 80;
+	static inline var BTN_H:Int = 24;
+
+	var _txtTitle:FlxText;
+	var _txtStatus:FlxText;
+	var _txtColHeader:FlxText;
+	var _btnCreatePublic:FlxButton;
+	var _btnCreatePrivate:FlxButton;
+	var _inputRoomId:FlxInputText;
+	var _btnJoinById:FlxButton;
+
+	var _roomRows:Array<{label:FlxText, btn:FlxButton, roomId:String}> = [];
+
+	// the colyseus lobby
+	var lobbyRoom:Room<Schema> = null;
+
+	var _rooms:Array<Dynamic> = [];
+	var _connected:Bool = false;
+	var _joining:Bool = false;
 
 	public function new() {
 		super();
@@ -58,377 +63,211 @@ class NewLobbyState extends FlxTransitionableState {
 
 	override public function create():Void {
 		super.create();
-		TODO.sfx("lobby_music");
 		bgColor = BG_COLOR;
 
-		_txtTitle = new FlxText();
-		_txtTitle.setPosition(FlxG.width / 2, 20);
+		_txtTitle = new FlxText(0, 20, FlxG.width, "Game Rooms", 40);
 		_txtTitle.setFormat(Main.menuFont, 40, TEXT_COLOR, FlxTextAlign.CENTER);
-		_txtTitle.text = "Lobby";
 		add(_txtTitle);
 
-		_txtRoomID = new FlxText();
-		_txtRoomID.setPosition(10, 10);
-		_txtRoomID.setFormat(Main.menuFont, 12, TEXT_COLOR);
-		_txtRoomID.text = "Room ID: ";
-		add(_txtRoomID);
+		_txtStatus = new FlxText(0, 72, FlxG.width, "Connecting...", 16);
+		_txtStatus.setFormat(Main.menuFont, 16, TEXT_COLOR, FlxTextAlign.CENTER);
+		add(_txtStatus);
 
-		// Ready button at the bottom center — starts disabled
-		_btnDone = MenuBuilder.createTextButton("Ready", clickReady);
-		_btnDone.setPosition(FlxG.width / 2 - _btnDone.width / 2, FlxG.height - _btnDone.height - 40);
-		_btnDone.updateHitbox();
-		_btnDone.active = false;
-		_btnDone.alpha = 0.3;
-		add(_btnDone);
+		// Column headers — hidden until rooms arrive
+		_txtColHeader = new FlxText(TABLE_LEFT, TABLE_TOP - 18, LABEL_W, "Room ID         Players", 12);
+		_txtColHeader.setFormat(Main.menuFont, 12, TEXT_COLOR);
+		_txtColHeader.visible = false;
+		add(_txtColHeader);
 
-		// Large green "READY" text — hidden until the player clicks Ready
-		_txtReady = new FlxText();
-		_txtReady.setFormat(Main.menuFont, 24, TEXT_COLOR, FlxTextAlign.CENTER);
-		_txtReady.text = "READY";
-		_txtReady.setPosition(FlxG.width / 2 - _txtReady.width / 2, _btnDone.y);
-		_txtReady.visible = false;
-		add(_txtReady);
+		// Pre-create MAX_ROWS table rows
+		for (i in 0...MAX_ROWS) {
+			var rowY = TABLE_TOP + i * ROW_H;
 
-		// Input field centered directly above the Ready button
-		_inputField = new FlxInputText(0, 0, 200, FlxG.save.data.name, 20, TEXT_COLOR, FlxColor.WHITE);
-		_inputField.maxChars = 20;
-		_inputField.setPosition(FlxG.width / 2 - _inputField.width / 2, _btnDone.y - _inputField.height - 8);
-		_inputField.onTextChange.add(updatePlayerName);
-		add(_inputField);
-
-		var _txtNameLabel = new FlxText();
-		_txtNameLabel.setFormat(Main.menuFont, 12, TEXT_COLOR);
-		_txtNameLabel.text = "Enter your name:";
-		_txtNameLabel.setPosition(FlxG.width / 2 - _txtNameLabel.width / 2, _inputField.y - _txtNameLabel.height - 4);
-		add(_txtNameLabel);
-
-		// Header label for the other players section
-		_txtOtherHeader = new FlxText(0, 0, 0, "Other Players:", 16);
-		_txtOtherHeader.setFormat(Main.menuFont, 16, TEXT_COLOR);
-		_txtOtherHeader.visible = false;
-		add(_txtOtherHeader);
-
-		// Pre-create kick rows (up to MAX_REMOTE_PLAYERS)
-		for (i in 0...MAX_REMOTE_PLAYERS) {
-			var label = new FlxText(0, 0, 150, "", 12);
-			label.setFormat(Main.menuFont, 12, TEXT_COLOR);
+			var label = new FlxText(TABLE_LEFT, rowY + 6, LABEL_W, "", 14);
+			label.setFormat(Main.menuFont, 14, TEXT_COLOR);
 			label.visible = false;
 			add(label);
 
 			var capturedI = i;
-			var btn = new FlxButton(0, 0, "Kick");
-			btn.onUp.callback = () -> kickPlayer(capturedI);
+			var btn = new FlxButton(TABLE_LEFT + LABEL_W + 20, rowY + (ROW_H - BTN_H) / 2, "Join");
+			btn.makeGraphic(BTN_W, BTN_H, FlxColor.WHITE);
+			btn.label.setFormat(Main.menuFont, 12, 0x333333, "center");
+			btn.label.fieldWidth = BTN_W;
+			btn.updateHitbox();
+			btn.onUp.callback = () -> clickJoin(capturedI);
 			btn.onOver.callback = () -> btn.color = FlxColor.GRAY;
 			btn.onOut.callback = () -> btn.color = FlxColor.WHITE;
 			btn.visible = false;
 			add(btn);
 
-			_kickRows.push({label: label, btn: btn, sessionId: ""});
+			_roomRows.push({label: label, btn: btn, roomId: ""});
 		}
 
-		GameManager.ME.net.onKicked.addOnce(handleKicked);
-		GameManager.ME.net.onPlayerRemoved.add(onRemotePlayerRemoved);
+		// Row 1 (y=382): Create Public Room | Create Private Room
+		_btnCreatePublic = MenuBuilder.createTextButton("Create Public Room", clickCreatePublic);
+		_btnCreatePublic.setPosition(150, 382);
+		add(_btnCreatePublic);
 
-		// Create skin selection sprites
-		createSkinSelection();
+		_btnCreatePrivate = MenuBuilder.createTextButton("Create Private Room", clickCreatePrivate);
+		_btnCreatePrivate.setPosition(330, 382);
+		add(_btnCreatePrivate);
 
-		#if !local
-		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		#end
-		FlxTimer.wait(2, () -> {
-			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
-			if (_inputField.text != null && _inputField.text != "") {
-				GameManager.ME.net.sendMessage("player_name_changed", {name: _inputField.text});
+		// Row 2 (y=432): [Room ID input] [Join Room btn]
+		_inputRoomId = new FlxInputText(150, 432, 220, "", 14, TEXT_COLOR, FlxColor.WHITE);
+		_inputRoomId.maxChars = 9;
+		add(_inputRoomId);
+
+		_btnJoinById = new FlxButton(380, 432, "Join Room");
+		_btnJoinById.makeGraphic(110, 40, FlxColor.WHITE);
+		_btnJoinById.label.setFormat(Main.menuFont, 16, 0x333333, "center");
+		_btnJoinById.label.fieldWidth = 110;
+		_btnJoinById.updateHitbox();
+		_btnJoinById.onUp.callback = clickJoinById;
+		_btnJoinById.onOver.callback = () -> _btnJoinById.color = FlxColor.GRAY;
+		_btnJoinById.onOut.callback = () -> _btnJoinById.color = FlxColor.WHITE;
+		add(_btnJoinById);
+
+		NetworkManager.ME.joinLobby(setupLobby, (err) -> {});
+	}
+
+	private function setupLobby(lobby:Room<Schema>) {
+		lobbyRoom = lobby;
+		_connected = true;
+		_rooms = [];
+
+		lobby.onMessage(MSG_ROOMS, (rooms:Array<Dynamic>) -> {
+			QLog.notice('Lobby: received ${rooms.length} room(s)');
+			_rooms = rooms;
+		});
+
+		lobby.onMessage(MSG_ROOM_ADDED, (message:Dynamic) -> {
+			var roomId:String = message[0];
+			var roomData:Dynamic = message[1];
+			var found = false;
+			for (i in 0..._rooms.length) {
+				if (_rooms[i].roomId == roomId) {
+					_rooms[i] = roomData;
+					found = true;
+					break;
+				}
 			}
-
-			_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
-			if (_selectedSkinIndex > -1) {
-				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+			if (!found) {
+				_rooms.push(roomData);
 			}
 		});
-	}
 
-	private function createSkinSelection():Void {
-		var numSkins = Player.SKINS.length;
-		var cols = 4;
-		var nameHeight = 12; // vertical space reserved above each icon for name labels
-		var rowGap = nameHeight + SKIN_PADDING; // extra gap between rows so row-2 names don't overlap row-1 icons
-		var totalWidth = cols * SKIN_SIZE + (cols - 1) * SKIN_PADDING;
-		var startX = Std.int((FlxG.width - totalWidth) / 2);
-		// vertically center the two rows (each row = nameHeight + SKIN_SIZE) in the screen
-		var totalHeight = SKIN_SIZE + rowGap + nameHeight + SKIN_SIZE;
-		var gridStartY = Std.int(FlxG.height / 2 - totalHeight / 2);
-		var borderedSize = SKIN_SIZE + BORDER_THICKNESS * 2;
-
-		for (i in 0...numSkins) {
-			var col = i % cols;
-			var row = Std.int(i / cols);
-			var slotX = startX + col * (SKIN_SIZE + SKIN_PADDING);
-			var skinY = gridStartY + row * (SKIN_SIZE + rowGap + nameHeight);
-
-			// Border sprite (initially transparent)
-			var border = new FlxSprite();
-			border.makeGraphic(borderedSize, borderedSize, FlxColor.TRANSPARENT);
-			border.setPosition(slotX - BORDER_THICKNESS, skinY - BORDER_THICKNESS);
-			add(border);
-			_skinBorders.push(border);
-
-			// Black background behind each skin icon
-			var skinBg = new FlxSprite();
-			skinBg.makeGraphic(SKIN_SIZE, SKIN_SIZE, FlxColor.BLACK);
-			skinBg.setPosition(slotX, skinY);
-			add(skinBg);
-
-			// Skin preview sprite — use the icons sheet (frame i = skin i), scaled 2x
-			var skinSprite = new FlxSprite();
-			skinSprite.loadGraphic(AssetPaths.icons__png, true, SKIN_ICON_NATIVE, SKIN_ICON_NATIVE);
-			skinSprite.animation.add("icon", [i]);
-			skinSprite.animation.play("icon");
-			skinSprite.scale.set(SKIN_SIZE / SKIN_ICON_NATIVE, SKIN_SIZE / SKIN_ICON_NATIVE);
-			skinSprite.updateHitbox();
-			skinSprite.setPosition(slotX, skinY);
-			add(skinSprite);
-			_skinSprites.push(skinSprite);
-
-			// Name label above each skin
-			var nameLabel = new FlxText();
-			nameLabel.setFormat(Main.menuFont, 12, TEXT_COLOR, FlxTextAlign.CENTER);
-			nameLabel.text = "";
-			nameLabel.setPosition(slotX + SKIN_SIZE / 2, skinY - nameHeight);
-			Align.center(nameLabel, skinSprite, X);
-			Align.stack(nameLabel, skinSprite, UP, 2);
-			add(nameLabel);
-			_skinNameLabels.push(nameLabel);
-		}
-
-		// No skin selected by default — all borders start transparent
-		refreshBorders();
-	}
-
-	private function selectSkin(index:Int):Void {
-		// Can't change skin after readying up
-		if (_localReady) {
-			return;
-		}
-
-		// Don't allow selecting a skin that another player already has
-		if (isSkinTakenByOther(index)) {
-			return;
-		}
-
-		// Toggle off if clicking the already-selected skin
-		if (_selectedSkinIndex == index) {
-			_selectedSkinIndex = -1;
-		} else {
-			_selectedSkinIndex = index;
-		}
-
-		// Send skin selection to server
-		GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
-
-		// Enable/disable Ready button based on skin selection
-		if (_selectedSkinIndex >= 0) {
-			_btnDone.active = true;
-			_btnDone.alpha = 1.0;
-		} else {
-			_btnDone.active = false;
-			_btnDone.alpha = 0.3;
-		}
-
-		refreshBorders();
-	}
-
-	private function isSkinTakenByOther(index:Int):Bool {
-		var gm = GameManager.ME;
-		for (sessionId => skinIdx in gm.skins) {
-			if (sessionId != gm.mySessionId && skinIdx == index) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private function refreshBorders():Void {
-		var borderedSize = SKIN_SIZE + BORDER_THICKNESS * 2;
-
-		for (i in 0..._skinBorders.length) {
-			if (i == _selectedSkinIndex) {
-				// Bright green border for the local player's selection
-				_skinBorders[i].makeGraphic(borderedSize, borderedSize, TEXT_COLOR);
-				// Cut out the interior to make it a border frame
-				var pixels = _skinBorders[i].pixels;
-				for (py in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-					for (px in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-						pixels.setPixel32(px, py, FlxColor.TRANSPARENT);
-					}
-				}
-				_skinBorders[i].dirty = true;
-			} else if (isSkinTakenByOther(i)) {
-				// Dim border for skins taken by other players
-				_skinBorders[i].makeGraphic(borderedSize, borderedSize, FlxColor.fromRGB(80, 80, 80));
-				var pixels = _skinBorders[i].pixels;
-				for (py in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-					for (px in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-						pixels.setPixel32(px, py, FlxColor.TRANSPARENT);
-					}
-				}
-				_skinBorders[i].dirty = true;
-			} else {
-				_skinBorders[i].makeGraphic(borderedSize, borderedSize, FlxColor.TRANSPARENT);
-			}
-		}
-	}
-
-	private function updatePlayerName(text:String, change:FlxInputTextChange) {
-		GameManager.ME.net.sendMessage("player_name_changed", {name: text});
+		lobby.onMessage(MSG_ROOM_REMOVED, (roomId:String) -> {
+			_rooms = _rooms.filter((r) -> r.roomId != roomId);
+		});
 	}
 
 	override public function update(elapsed:Float):Void {
 		super.update(elapsed);
-		_txtTitle.x = FlxG.width / 2 - _txtTitle.width / 2;
-
-		// Check for clicks on skin sprites
-		if (FlxG.mouse.justPressed) {
-			for (i in 0..._skinSprites.length) {
-				var sprite = _skinSprites[i];
-				if (FlxG.mouse.x >= sprite.x && FlxG.mouse.x < sprite.x + SKIN_SIZE && FlxG.mouse.y >= sprite.y && FlxG.mouse.y < sprite.y + SKIN_SIZE) {
-					selectSkin(i);
-					break;
-				}
-			}
-		}
-
-		updateNameLabels();
-
-		@:privateAccess(NetworkManager)
-		{
-			if (GameManager.ME.net.room != null) {
-				_txtRoomID.text = 'Room ID: ${GameManager.ME.net.room.roomId}';
-			}
-		}
+		refreshTable();
 	}
 
-	private function updateNameLabels():Void {
-		var gm = GameManager.ME;
+	private function refreshTable():Void {
+		var hasRooms = _rooms.length > 0;
+		_txtColHeader.visible = hasRooms && !_joining;
 
-		// Clear all name labels first
-		for (label in _skinNameLabels) {
-			label.text = "";
+		// Status line logic
+		if (!_connected) {
+			_txtStatus.text = "Connecting...";
+			_txtStatus.visible = true;
+		}
+		if (_joining) {
+			_txtStatus.text = "Joining...";
+			_txtStatus.visible = true;
+		} else if (!hasRooms) {
+			_txtStatus.text = "No open rooms — create one to get started!";
+			_txtStatus.visible = true;
+		} else {
+			_txtStatus.visible = false;
 		}
 
-		// Place the local player's name above their selected skin
-		if (_selectedSkinIndex >= 0) {
-			var localName = (_inputField.text != null && _inputField.text != "") ? _inputField.text : "You";
-			_skinNameLabels[_selectedSkinIndex].text = localName;
-			_skinNameLabels[_selectedSkinIndex].x = _skinSprites[_selectedSkinIndex].x + SKIN_SIZE / 2 - _skinNameLabels[_selectedSkinIndex].width / 2;
-		}
+		// Update room rows
+		for (i in 0...MAX_ROWS) {
+			var row = _roomRows[i];
+			if (i < _rooms.length) {
+				var r:Dynamic = _rooms[i];
+				var roomIdStr:String = Std.string(r.roomId);
+				var clients:Int = r.clients != null ? Std.int(r.clients) : 0;
+				var maxClients:Int = r.maxClients != null ? Std.int(r.maxClients) : 0;
 
-		// Place other players' names above their selected skins
-		for (sessionId => skinIdx in gm.skins) {
-			if (sessionId == gm.mySessionId) {
-				continue;
-			}
-			if (skinIdx >= 0 && skinIdx < _skinNameLabels.length) {
-				var name = gm.names.get(sessionId);
-				if (name == null || name == "") {
-					name = "???";
-				}
-				if (_skinNameLabels[skinIdx].text != "") {
-					_skinNameLabels[skinIdx].text = _skinNameLabels[skinIdx].text + "\n" + name;
-				} else {
-					_skinNameLabels[skinIdx].text = name;
-				}
-				_skinNameLabels[skinIdx].x = _skinSprites[skinIdx].x + SKIN_SIZE / 2 - _skinNameLabels[skinIdx].width / 2;
-			}
-		}
-
-		// Refresh borders since other players' skins may have changed
-		refreshBorders();
-
-		// Build the kick rows for all other players
-		var others:Array<String> = [];
-		for (sessionId in gm.sessions) {
-			if (sessionId != gm.mySessionId) {
-				others.push(sessionId);
-			}
-		}
-
-		var sectionRight = FlxG.width - 10;
-		var sectionBottom = FlxG.height - 10;
-		var headerH = 28;
-		var sectionH = others.length > 0 ? (others.length * ROW_H + headerH) : 0;
-
-		_txtOtherHeader.visible = others.length > 0;
-		if (others.length > 0) {
-			_txtOtherHeader.x = sectionRight - _txtOtherHeader.width;
-			_txtOtherHeader.y = sectionBottom - sectionH;
-		}
-
-		for (i in 0...MAX_REMOTE_PLAYERS) {
-			var row = _kickRows[i];
-			if (i < others.length) {
-				var sessionId = others[i];
-				var name = gm.names.get(sessionId);
-				if (name == null || name == "") {
-					name = "???";
-				}
-				var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
-
-				row.sessionId = sessionId;
-				row.label.text = name + (isReady ? " (READY)" : "");
-
-				var rowY = sectionBottom - sectionH + headerH + i * ROW_H;
-				row.btn.x = sectionRight - KICK_BTN_W;
-				row.btn.y = rowY;
-				row.btn.visible = true;
-
-				row.label.x = row.btn.x - row.label.width - 4;
-				row.label.y = rowY + 6; // vertically center the text in the row
+				row.roomId = roomIdStr;
+				row.label.text = '${roomIdStr}          ${clients} / ${maxClients} players';
 				row.label.visible = true;
+
+				row.btn.active = !_joining;
+				row.btn.visible = !_joining;
+				row.btn.alpha = _joining ? 0.4 : 1.0;
 			} else {
 				row.label.visible = false;
 				row.btn.visible = false;
-				row.sessionId = "";
+				row.roomId = "";
 			}
 		}
+
+		// Dim all bottom controls while a join is in progress
+		_btnCreatePublic.active = !_joining;
+		_btnCreatePublic.alpha = _joining ? 0.4 : 1.0;
+		_btnCreatePrivate.active = !_joining;
+		_btnCreatePrivate.alpha = _joining ? 0.4 : 1.0;
+		_btnJoinById.active = !_joining;
+		_btnJoinById.alpha = _joining ? 0.4 : 1.0;
+		_inputRoomId.active = !_joining;
+		_inputRoomId.alpha = _joining ? 0.4 : 1.0;
 	}
 
-	private function onRemotePlayerRemoved(sessionId:String):Void {
-		updateNameLabels();
-	}
-
-	private function kickPlayer(rowIndex:Int):Void {
-		var row = _kickRows[rowIndex];
-		if (row.sessionId != "") {
-			GameManager.ME.net.sendKick(row.sessionId);
-		}
-	}
-
-	private function handleKicked():Void {
-		FlxG.switchState(() -> new MainMenuState());
-	}
-
-	function clickReady():Void {
-		if (_selectedSkinIndex < 0) {
+	private function clickJoin(rowIndex:Int):Void {
+		if (_joining) {
 			return;
 		}
-
-		FlxG.save.data.name = _inputField.text;
-		FlxG.save.flush();
-		GameManager.ME.mySkinIndex = _selectedSkinIndex;
-		GameManager.ME.net.sendMessage("player_ready", true);
-
-		// Hide button, show green READY text
-		_localReady = true;
-		_btnDone.visible = false;
-		_btnDone.active = false;
-		_txtReady.visible = true;
-		_txtReady.x = FlxG.width / 2 - _txtReady.width / 2;
+		var row = _roomRows[rowIndex];
+		if (row.roomId == "") {
+			return;
+		}
+		_joining = true;
+		NetworkManager.ME.joinSpecificRoom(row.roomId, onJoinSuccess, onJoinFail);
 	}
 
-	override public function destroy():Void {
-		GameManager.ME.net.onPlayerRemoved.remove(onRemotePlayerRemoved);
-		super.destroy();
+	private function clickCreatePublic():Void {
+		if (_joining) {
+			return;
+		}
+		_joining = true;
+		NetworkManager.ME.joinQueue(onJoinSuccess, onJoinFail);
+	}
+
+	private function clickCreatePrivate():Void {
+		if (_joining) {
+			return;
+		}
+		_joining = true;
+		NetworkManager.ME.createPrivateRoom(onJoinSuccess, onJoinFail);
+	}
+
+	private function clickJoinById():Void {
+		if (_joining) {
+			return;
+		}
+		var id = StringTools.trim(_inputRoomId.text);
+		if (id == "") {
+			return;
+		}
+		_joining = true;
+		NetworkManager.ME.joinSpecificRoom(id, onJoinSuccess, onJoinFail);
+	}
+
+	private function onJoinSuccess(room:Room<CharSelectState>):Void {
+		lobbyRoom.leave(true);
+		FlxG.switchState(() -> new CharacterSelectState(room));
+	}
+
+	private function onJoinFail(err:HttpException):Void {
+		_joining = false;
+		_txtStatus.text = 'Failed to join — ${err.message}';
+		_txtStatus.visible = true;
 	}
 
 	override public function onFocusLost() {

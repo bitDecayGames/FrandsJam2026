@@ -106,28 +106,28 @@ class Shop extends FlxSprite {
 			count++;
 
 			// Record locally for PostRoundState display
-			GameManager.ME.recordSoldFish(GameManager.ME.mySessionId, {
-				fishType: fishData.typeIndex,
-				lengthCm: fishData.lengthCm,
-				value: value
-			});
+			// GameManager.ME.recordSoldFish(GameManager.ME.mySessionId, {
+			// 	fishType: fishData.typeIndex,
+			// 	lengthCm: fishData.lengthCm,
+			// 	value: value
+			// });
 
 			// Broadcast to other clients
-			GameManager.ME.net.sendMessage("fish_sold", {
-				fishType: fishData.typeIndex,
-				lengthCm: fishData.lengthCm,
-				value: value
-			});
+			// GameManager.ME.net.sendMessage("fish_sold", {
+			// 	fishType: fishData.typeIndex,
+			// 	lengthCm: fishData.lengthCm,
+			// 	value: value
+			// });
 
 			fishData = player.inventory.removeAnyFishFull();
 		}
 		if (count > 0) {
 			TODO.sfx("fish_sold");
 			player.score += totalValue;
-			GameManager.ME.scores.set(GameManager.ME.mySessionId, player.score);
+			// GameManager.ME.scores.set(GameManager.ME.mySessionId, player.score);
 			QLog.notice('Sold $count fish for ' + "$" + '$totalValue. Total score: ${player.score}');
 			TextPop.pop(Std.int(x), Std.int(y), "+" + "$" + Std.string(totalValue), new FloatAway(100, 3));
-			GameManager.ME.net.sendMessage("score_update", {score: player.score});
+			// GameManager.ME.net.sendMessage("score_update", {score: player.score});
 		}
 	}
 }

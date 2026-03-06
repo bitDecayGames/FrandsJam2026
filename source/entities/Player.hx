@@ -79,7 +79,7 @@ class Player extends FlxSprite {
 				hotModeActive = false;
 				#if !local
 				if (!isRemote) {
-					GameManager.ME.net.sendHotPepper(false);
+					// GameManager.ME.net.sendHotPepper(false);
 				}
 				#end
 			}
@@ -107,7 +107,6 @@ class Player extends FlxSprite {
 
 	public var castBobber(default, null):FlxSprite;
 
-	
 	// Holder variable to track fishing rod charge sound
 	var fishingRodChargeSound:String = "";
 
@@ -359,7 +358,7 @@ class Player extends FlxSprite {
 		sessionId = session;
 		remoteTargetX = x;
 		remoteTargetY = y;
-		GameManager.ME.net.onPlayerChanged.add(handleChange);
+		// GameManager.ME.net.onPlayerChanged.add(handleChange);
 	}
 
 	private function handleChange(sesId:String, data:{state:PlayerState, ?prevX:Float, ?prevY:Float}):Void {
@@ -466,7 +465,7 @@ class Player extends FlxSprite {
 				hotModeActive = false;
 				#if !local
 				if (!isRemote) {
-					GameManager.ME.net.sendHotPepper(false);
+					// GameManager.ME.net.sendHotPepper(false);
 				}
 				#end
 			} else {
@@ -573,19 +572,19 @@ class Player extends FlxSprite {
 			var bounds = FlxG.worldBounds;
 			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
 			dir.put();
-			GameManager.ME.net.sendMessage("throw_rock", {
-				targetX: rockTarget.x,
-				targetY: rockTarget.y,
-				big: throwingBigRock,
-				dir: getDirSuffix()
-			});
+			// GameManager.ME.net.sendMessage("throw_rock", {
+			// 	targetX: rockTarget.x,
+			// 	targetY: rockTarget.y,
+			// 	big: throwingBigRock,
+			// 	dir: getDirSuffix()
+			// });
 		}
 
 		updateReticle();
 
 		clampToWorldBounds();
 
-		GameManager.ME.net.sendMove(x, y, velocity.x, velocity.y);
+		// GameManager.ME.net.sendMove(x, y, velocity.x, velocity.y);
 	}
 
 	function clampToWorldBounds() {
@@ -824,7 +823,7 @@ class Player extends FlxSprite {
 		var targetY = y + reticleDir.y * castDist - 8;
 		reticleDir.put();
 		castTarget = FlxPoint.get(targetX, targetY);
-		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
+		// GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
 		FmodManager.PlaySoundOneShot(FmodSFX.FishingRodCast);
 		spawnBobberArc();
 	}
@@ -879,6 +878,7 @@ class Player extends FlxSprite {
 		castState = CAST_ANIM;
 		sendAnimUpdate("cast_" + castDirSuffix, true);
 	}
+
 	function updateCast(elapsed:Float) {
 		if (!isRemote) {
 			switch (castState) {
@@ -1038,7 +1038,7 @@ class Player extends FlxSprite {
 	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null, fishType:Int = 0) {
 		if (castState == LANDED || castState == CASTING) {
 			if (!isRemote && !hasFish) {
-				GameManager.ME.net.sendLinePulled();
+				// GameManager.ME.net.sendLinePulled();
 			}
 			if (hasFish) {
 				TODO.sfx("fish_caught");
@@ -1127,7 +1127,7 @@ class Player extends FlxSprite {
 			TODO.sfx("hot_mode_activate");
 			#if !local
 			if (!isRemote) {
-				GameManager.ME.net.sendHotPepper(true);
+				// GameManager.ME.net.sendHotPepper(true);
 			}
 			#end
 		}
@@ -1181,7 +1181,7 @@ class Player extends FlxSprite {
 	}
 
 	private function cleanupNetwork() {
-		GameManager.ME.net.onPlayerChanged.remove(handleChange);
+		// GameManager.ME.net.onPlayerChanged.remove(handleChange);
 	}
 }
 

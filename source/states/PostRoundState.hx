@@ -77,177 +77,177 @@ class PostRoundState extends FlxTransitionableState {
 		_txtOtherPlayers.text = "";
 		add(_txtOtherPlayers);
 
-		GameManager.ME.setStatus(RoundState.STATUS_POST_ROUND);
+		// GameManager.ME.setStatus(RoundState.STATUS_POST_ROUND);
 	}
 
 	private function buildScoreboard():Void {
-		var gm = GameManager.ME;
-		var roundNum = gm.getCurrentRoundNumber();
+		// var gm = GameManager.ME;
+		// var roundNum = gm.getCurrentRoundNumber();
 
-		// Gather all player scores (local + remote)
-		var entries:Array<{sessionId:String, name:String, score:Int}> = [];
+		// // Gather all player scores (local + remote)
+		// var entries:Array<{sessionId:String, name:String, score:Int}> = [];
 
-		// Local player
-		var localName = gm.names.get(gm.mySessionId);
-		if (localName == null || localName == "") {
-			localName = "You";
-		}
-		var localScore = gm.scores.exists(gm.mySessionId) ? gm.scores.get(gm.mySessionId) : 0;
-		entries.push({sessionId: gm.mySessionId, name: localName, score: localScore});
+		// // Local player
+		// var localName = gm.names.get(gm.mySessionId);
+		// if (localName == null || localName == "") {
+		// 	localName = "You";
+		// }
+		// var localScore = gm.scores.exists(gm.mySessionId) ? gm.scores.get(gm.mySessionId) : 0;
+		// entries.push({sessionId: gm.mySessionId, name: localName, score: localScore});
 
-		// Remote players
-		for (sessionId in gm.sessions) {
-			if (sessionId == gm.mySessionId) {
-				continue;
-			}
-			var name = gm.names.get(sessionId);
-			if (name == null || name == "") {
-				name = "???";
-			}
-			var score = gm.scores.exists(sessionId) ? gm.scores.get(sessionId) : 0;
-			entries.push({sessionId: sessionId, name: name, score: score});
-		}
+		// // Remote players
+		// for (sessionId in gm.sessions) {
+		// 	if (sessionId == gm.mySessionId) {
+		// 		continue;
+		// 	}
+		// 	var name = gm.names.get(sessionId);
+		// 	if (name == null || name == "") {
+		// 		name = "???";
+		// 	}
+		// 	var score = gm.scores.exists(sessionId) ? gm.scores.get(sessionId) : 0;
+		// 	entries.push({sessionId: sessionId, name: name, score: score});
+		// }
 
 		// Sort descending by score (highest first)
-		entries.sort((a, b) -> b.score - a.score);
+		// entries.sort((a, b) -> b.score - a.score);
 
 		// Determine the top score for first-place sizing
-		var topScore = if (entries.length > 0) entries[0].score else 0;
+		// var topScore = if (entries.length > 0) entries[0].score else 0;
 
 		// Assign place labels (handling ties) and render rows + fish details
-		var currentPlace = 1;
-		var currentY = SCORE_START_Y;
-		for (i in 0...entries.length) {
-			if (i > 0 && entries[i].score < entries[i - 1].score) {
-				currentPlace = i + 1;
-			}
+		// var currentPlace = 1;
+		// var currentY = SCORE_START_Y;
+		// for (i in 0...entries.length) {
+		// 	if (i > 0 && entries[i].score < entries[i - 1].score) {
+		// 		currentPlace = i + 1;
+		// 	}
 
-			var isFirst = entries[i].score == topScore;
-			var fontSize = isFirst ? FIRST_PLACE_SIZE : OTHER_PLACE_SIZE;
+		// 	var isFirst = entries[i].score == topScore;
+		// 	var fontSize = isFirst ? FIRST_PLACE_SIZE : OTHER_PLACE_SIZE;
 
-			var textColor = isFirst ? FlxColor.RED : 0xff2b4e95;
+		// 	var textColor = isFirst ? FlxColor.RED : 0xff2b4e95;
 
-			// Place label (1st, 2nd, 3rd, etc.) — left side
-			var placeText = new FlxText();
-			placeText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.LEFT);
-			placeText.text = ordinal(currentPlace);
-			placeText.setPosition(SCORE_LEFT_MARGIN, currentY);
-			add(placeText);
-			_scorePlaceTexts.push(placeText);
+		// 	// Place label (1st, 2nd, 3rd, etc.) — left side
+		// 	var placeText = new FlxText();
+		// 	placeText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.LEFT);
+		// 	placeText.text = ordinal(currentPlace);
+		// 	placeText.setPosition(SCORE_LEFT_MARGIN, currentY);
+		// 	add(placeText);
+		// 	_scorePlaceTexts.push(placeText);
 
-			// Name — next to the place label
-			var nameText = new FlxText();
-			nameText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.LEFT);
-			nameText.text = entries[i].name;
-			nameText.setPosition(SCORE_LEFT_MARGIN + 50, currentY);
-			add(nameText);
-			_scoreNameTexts.push(nameText);
+		// 	// Name — next to the place label
+		// 	var nameText = new FlxText();
+		// 	nameText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.LEFT);
+		// 	nameText.text = entries[i].name;
+		// 	nameText.setPosition(SCORE_LEFT_MARGIN + 50, currentY);
+		// 	add(nameText);
+		// 	_scoreNameTexts.push(nameText);
 
-			// Score — right side
-			var scoreText = new FlxText();
-			scoreText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.RIGHT);
-			scoreText.text = formatMoney(entries[i].score);
-			scoreText.setPosition(FlxG.width - SCORE_RIGHT_MARGIN - scoreText.width, currentY);
-			add(scoreText);
-			_scoreValueTexts.push(scoreText);
+		// 	// Score — right side
+		// 	var scoreText = new FlxText();
+		// 	scoreText.setFormat(Main.menuFont, fontSize, textColor, FlxTextAlign.RIGHT);
+		// 	scoreText.text = formatMoney(entries[i].score);
+		// 	scoreText.setPosition(FlxG.width - SCORE_RIGHT_MARGIN - scoreText.width, currentY);
+		// 	add(scoreText);
+		// 	_scoreValueTexts.push(scoreText);
 
-			currentY += SCORE_ROW_HEIGHT;
+		// 	currentY += SCORE_ROW_HEIGHT;
 
-			// Fish icons for this player — left to right, overlapping, labels above icon
-			var fishEntries = gm.getSoldFish(roundNum, entries[i].sessionId);
-			if (fishEntries.length > 0) {
-				var fishX = SCORE_LEFT_MARGIN + 50;
-				var iconY = currentY + FISH_LABEL_LINE_HEIGHT * 2; // icon sits below the two label rows
-				for (fish in fishEntries) {
-					// Length label above icon
-					var lenText = new FlxText();
-					lenText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
-					lenText.text = Std.string(fish.lengthCm) + "cm";
-					lenText.setPosition(fishX + FISH_ICON_SIZE / 2 - lenText.width / 2, currentY);
-					add(lenText);
+		// Fish icons for this player — left to right, overlapping, labels above icon
+		// var fishEntries = gm.getSoldFish(roundNum, entries[i].sessionId);
+		// if (fishEntries.length > 0) {
+		// 	var fishX = SCORE_LEFT_MARGIN + 50;
+		// 	var iconY = currentY + FISH_LABEL_LINE_HEIGHT * 2; // icon sits below the two label rows
+		// 	for (fish in fishEntries) {
+		// 		// Length label above icon
+		// 		var lenText = new FlxText();
+		// 		lenText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
+		// 		lenText.text = Std.string(fish.lengthCm) + "cm";
+		// 		lenText.setPosition(fishX + FISH_ICON_SIZE / 2 - lenText.width / 2, currentY);
+		// 		add(lenText);
 
-					// Value label between length and icon
-					var valText = new FlxText();
-					valText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
-					valText.text = formatMoney(fish.value);
-					valText.setPosition(fishX + FISH_ICON_SIZE / 2 - valText.width / 2, currentY + FISH_LABEL_LINE_HEIGHT);
-					add(valText);
+		// 		// Value label between length and icon
+		// 		var valText = new FlxText();
+		// 		valText.setFormat(Main.menuFont, FISH_LABEL_SIZE, 0xff2b4e95);
+		// 		valText.text = formatMoney(fish.value);
+		// 		valText.setPosition(fishX + FISH_ICON_SIZE / 2 - valText.width / 2, currentY + FISH_LABEL_LINE_HEIGHT);
+		// 		add(valText);
 
-					// Fish sprite below the labels
-					var fishSprite = new FlxSprite();
-					fishSprite.loadGraphic(AssetPaths.fish__png, true, FISH_ICON_NATIVE, FISH_ICON_NATIVE);
-					fishSprite.animation.add("show", [fish.fishType]);
-					fishSprite.animation.play("show");
-					fishSprite.scale.set(FISH_ICON_SIZE / FISH_ICON_NATIVE, FISH_ICON_SIZE / FISH_ICON_NATIVE);
-					fishSprite.updateHitbox();
-					fishSprite.setPosition(fishX + FISH_ICON_SIZE / 2, iconY);
-					add(fishSprite);
+		// 		// Fish sprite below the labels
+		// 		var fishSprite = new FlxSprite();
+		// 		fishSprite.loadGraphic(AssetPaths.fish__png, true, FISH_ICON_NATIVE, FISH_ICON_NATIVE);
+		// 		fishSprite.animation.add("show", [fish.fishType]);
+		// 		fishSprite.animation.play("show");
+		// 		fishSprite.scale.set(FISH_ICON_SIZE / FISH_ICON_NATIVE, FISH_ICON_SIZE / FISH_ICON_NATIVE);
+		// 		fishSprite.updateHitbox();
+		// 		fishSprite.setPosition(fishX + FISH_ICON_SIZE / 2, iconY);
+		// 		add(fishSprite);
 
-					fishX += FISH_ICON_STEP;
-				}
-				currentY += FISH_BLOCK_HEIGHT;
-			}
-		}
+		// 		fishX += FISH_ICON_STEP;
+		// 	}
+		// 	currentY += FISH_BLOCK_HEIGHT;
+		// }
+		// }
 	}
 
 	private function buildKillStats():Void {
-		var gm = GameManager.ME;
-		var roundNum = gm.getCurrentRoundNumber();
+		// var gm = GameManager.ME;
+		// var roundNum = gm.getCurrentRoundNumber();
 
-		// Gather all session IDs
-		var allSessions = [gm.mySessionId];
-		for (sessionId in gm.sessions) {
-			if (sessionId != gm.mySessionId) {
-				allSessions.push(sessionId);
-			}
-		}
+		// // Gather all session IDs
+		// var allSessions = [gm.mySessionId];
+		// for (sessionId in gm.sessions) {
+		// 	if (sessionId != gm.mySessionId) {
+		// 		allSessions.push(sessionId);
+		// 	}
+		// }
 
 		var statY = 10;
 
 		// Most Weeds
 		var bestWeedId:String = null;
 		var bestWeedCount = 0;
-		for (sid in allSessions) {
-			var count = gm.getWeedKills(roundNum, sid);
-			if (count > bestWeedCount) {
-				bestWeedCount = count;
-				bestWeedId = sid;
-			}
-		}
-		if (bestWeedId != null) {
-			var name = gm.names.get(bestWeedId);
-			if (name == null || name == "") {
-				name = bestWeedId == gm.mySessionId ? "You" : "???";
-			}
-			var weedText = new FlxText();
-			weedText.setFormat(Main.menuFont, 12, 0xff2b4e95);
-			weedText.text = 'Weed crusher: $name ($bestWeedCount)';
-			weedText.setPosition(10, statY);
-			add(weedText);
-			statY += 14;
-		}
+		// for (sid in allSessions) {
+		// 	var count = gm.getWeedKills(roundNum, sid);
+		// 	if (count > bestWeedCount) {
+		// 		bestWeedCount = count;
+		// 		bestWeedId = sid;
+		// 	}
+		// }
+		// if (bestWeedId != null) {
+		// 	var name = gm.names.get(bestWeedId);
+		// 	if (name == null || name == "") {
+		// 		name = bestWeedId == gm.mySessionId ? "You" : "???";
+		// 	}
+		// 	var weedText = new FlxText();
+		// 	weedText.setFormat(Main.menuFont, 12, 0xff2b4e95);
+		// 	weedText.text = 'Weed crusher: $name ($bestWeedCount)';
+		// 	weedText.setPosition(10, statY);
+		// 	add(weedText);
+		// 	statY += 14;
+		// }
 
 		// Most Worms
 		var bestWormId:String = null;
 		var bestWormCount = 0;
-		for (sid in allSessions) {
-			var count = gm.getWormKills(roundNum, sid);
-			if (count > bestWormCount) {
-				bestWormCount = count;
-				bestWormId = sid;
-			}
-		}
-		if (bestWormId != null) {
-			var name = gm.names.get(bestWormId);
-			if (name == null || name == "") {
-				name = bestWormId == gm.mySessionId ? "You" : "???";
-			}
-			var wormText = new FlxText();
-			wormText.setFormat(Main.menuFont, 12, 0xff2b4e95);
-			wormText.text = 'Worm murderer: $name ($bestWormCount)';
-			wormText.setPosition(10, statY);
-			add(wormText);
-		}
+		// for (sid in allSessions) {
+		// 	var count = gm.getWormKills(roundNum, sid);
+		// 	if (count > bestWormCount) {
+		// 		bestWormCount = count;
+		// 		bestWormId = sid;
+		// 	}
+		// }
+		// if (bestWormId != null) {
+		// 	var name = gm.names.get(bestWormId);
+		// 	if (name == null || name == "") {
+		// 		name = bestWormId == gm.mySessionId ? "You" : "???";
+		// 	}
+		// 	var wormText = new FlxText();
+		// 	wormText.setFormat(Main.menuFont, 12, 0xff2b4e95);
+		// 	wormText.text = 'Worm murderer: $name ($bestWormCount)';
+		// 	wormText.setPosition(10, statY);
+		// 	add(wormText);
+		// }
 	}
 
 	/** Format an integer as $X,XXX */
@@ -291,33 +291,33 @@ class PostRoundState extends FlxTransitionableState {
 	}
 
 	private function updateOtherPlayers():Void {
-		var gm = GameManager.ME;
-		var playerLines = new Array<String>();
-		for (sessionId in gm.sessions) {
-			if (sessionId == gm.mySessionId) {
-				continue;
-			}
-			var name = gm.names.get(sessionId);
-			if (name == null || name == "") {
-				name = "???";
-			}
-			var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
-			if (isReady) {
-				playerLines.push(name + " (READY)");
-			} else {
-				playerLines.push(name);
-			}
-		}
+		// var gm = GameManager.ME;
+		// var playerLines = new Array<String>();
+		// for (sessionId in gm.sessions) {
+		// 	if (sessionId == gm.mySessionId) {
+		// 		continue;
+		// 	}
+		// 	var name = gm.names.get(sessionId);
+		// 	if (name == null || name == "") {
+		// 		name = "???";
+		// 	}
+		// 	var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
+		// 	if (isReady) {
+		// 		playerLines.push(name + " (READY)");
+		// 	} else {
+		// 		playerLines.push(name);
+		// 	}
+		// }
 
-		var newText = if (playerLines.length > 0) {
-			"Other Players:\n" + playerLines.join("\n");
-		} else {
-			"";
-		};
+		// var newText = if (playerLines.length > 0) {
+		// 	"Other Players:\n" + playerLines.join("\n");
+		// } else {
+		// 	"";
+		// };
 
-		if (_txtOtherPlayers.text != newText) {
-			_txtOtherPlayers.text = newText;
-		}
+		// if (_txtOtherPlayers.text != newText) {
+		// 	_txtOtherPlayers.text = newText;
+		// }
 		_txtOtherPlayers.x = FlxG.width - _txtOtherPlayers.width - 10;
 		_txtOtherPlayers.y = FlxG.height - _txtOtherPlayers.height - 10;
 	}
@@ -327,7 +327,7 @@ class PostRoundState extends FlxTransitionableState {
 			return;
 		}
 		_localReady = true;
-		GameManager.ME.net.sendMessage("player_ready", true);
+		// GameManager.ME.net.sendMessage("player_ready", true);
 
 		_btnDone.visible = false;
 		_btnDone.active = false;

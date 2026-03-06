@@ -14,7 +14,7 @@ class PersonalFishSoldGoal extends Goal {
 
 	override function initialize(state:PlayState) {
 		super.initialize(state);
-		GameManager.ME.onFishSoldLocal.add(onFishSold);
+		// GameManager.ME.onFishSoldLocal.add(onFishSold);
 	}
 
 	private function onFishSold(sessionId:String, entry:SoldFishEntry) {

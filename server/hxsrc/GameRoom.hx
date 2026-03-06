@@ -1,3 +1,5 @@
+import js.lib.Error;
+import transition.PlayerInitData;
 import schema.GameState;
 import schema.BushState;
 import schema.FishState;
@@ -16,6 +18,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	var elapsedTime:Float;
 	var tick:Int;
 
+	var pendingReservations:Map<String, PlayerState>;
+
 	public function new() {
 		super();
 		elapsedTime = 0;
@@ -23,10 +27,21 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	}
 
 	override public function onCreate(options:Dynamic):Void {
+		trace('start room: ${roomId}:${roomName}');
 		maxClients = 6;
 		setState(new GameState());
 
-		trace('start room: ${roomId}:${roomName}');
+		pendingReservations = new Map<String, PlayerState>();
+
+		trace('expected players:');
+		var pData:Array<PlayerInitData> = options.players;
+		for (p in pData) {
+			var pState = new PlayerState();
+			pState.name = p.name;
+			pState.skinIndex = p.skin;
+			trace('  - ${p.sessionID}');
+			pendingReservations.set(p.sessionID, pState);
+		}
 
 		this.setSimulationInterval(this.update);
 
@@ -34,6 +49,10 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		//   this.game.check_fish(this.state);
 		// }, 3000);
 
+		configureMessages();
+	}
+
+	private function configureMessages() {
 		// sent when a player moves
 		onMessage("move", (client:Client, data:{
 			x:Float,
@@ -47,15 +66,6 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				player.y = data.y;
 				player.velocityX = data.velocityX;
 				player.velocityY = data.velocityY;
-			}
-		});
-
-		onMessage("player_name_changed", (client:Client, data:{
-			name:String,
-		}) -> {
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.name = data.name;
 			}
 		});
 
@@ -96,15 +106,6 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		onMessage("fish_despawn", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "fish_despawn": id=${data.id} respawnTime=${data.respawnTime}');
 			broadcast("fish_despawn", {id: data.id, respawnTime: data.respawnTime}, {except: client});
-		});
-
-		// sent when a player changes their skin selection in the lobby
-		onMessage("skin_changed", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "skin_changed" message: skinIndex=${data.skinIndex}');
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.skinIndex = data.skinIndex;
-			}
 		});
 
 		// sent when a player's score changes
@@ -231,7 +232,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 					trace('update round status: ${state.round.status} -> ${data.status}');
 					newData.status = data.status;
 
-					for (sId => pp in state.players) {
+					for (_ => pp in state.players) {
 						pp.ready = false;
 					}
 				}
@@ -244,84 +245,24 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				state.round = newData;
 			}
 		});
-
-		onMessage("kick", (client:Client, data:{targetSessionId:String}) -> {
-			trace('${client.sessionId}: wants to kick ${data.targetSessionId}');
-			var target = clients.getById(data.targetSessionId);
-			if (target == null) {
-				return;
-			}
-
-			// Remove the player from state immediately so other clients see it right away.
-			// onLeave will also fire after the WebSocket closes but will safely no-op.
-			state.players.delete(data.targetSessionId);
-
-			// Rotate host if the kicked player was the host
-			if (data.targetSessionId == state.hostSessionId) {
-				var remaining = [];
-				for (sId => _ in state.players) {
-					remaining.push(sId);
-				}
-				if (remaining.length > 0) {
-					state.hostSessionId = remaining[Std.random(remaining.length)];
-					trace('host changed ${data.targetSessionId} -> ${state.hostSessionId}');
-				} else {
-					disconnect();
-					return;
-				}
-			}
-
-			// Tell all remaining clients explicitly so they can update their player lists
-			// without relying on the schema patch cycle or background-thread schema callbacks
-			broadcast("player_kicked", {sessionId: data.targetSessionId}, {except: target});
-
-			// Notify the kicked client and disconnect them via standard Colyseus method
-			target.send("kicked", {});
-			target.leave(CloseCode.CONSENTED);
-		});
-
-		onMessage("player_ready", (client:Client, _) -> {
-			if (state.round.status != RoundState.STATUS_LOBBY
-				&& state.round.status != RoundState.STATUS_PRE_ROUND
-				&& state.round.status != RoundState.STATUS_POST_ROUND) {
-				return;
-			}
-
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.ready = true;
-			}
-
-			var ready = true;
-			for (sId => pp in state.players) {
-				if (!pp.ready) {
-					ready = false;
-					break;
-				}
-			}
-			if (ready) {
-				broadcast("players_ready", true);
-				for (sId => pp in state.players) {
-					pp.ready = false;
-				}
-
-				if (state.round.status == RoundState.STATUS_LOBBY) {
-					// after we all ready up in the lobby, lock the room so no one can join
-					lock();
-				}
-			}
-		});
 	}
 
 	override public function onJoin(client:Client, ?options:Dynamic):EitherType<Void, Promise<Dynamic>> {
-		trace('player joined: ${client.sessionId}');
-		state.players.set(client.sessionId, new PlayerState());
+		// client.sessionId is a fresh ID for this room — look up the player by the
+		// char select session ID that was passed as options when reserving the seat
+		var charSelectId:String = options != null ? options.sessionId : null;
+		var playerState = charSelectId != null ? pendingReservations.get(charSelectId) : null;
 
-		// Set host
-		if (state.hostSessionId == null || state.hostSessionId == "") {
-			state.hostSessionId = client.sessionId;
-			trace('host set ${client.sessionId}');
+		if (playerState == null) {
+			trace('unknown player attempted to join, rejecting: ${client.sessionId} (charSelectId=${charSelectId})');
+			throw new Error("client ID not allowed in this room");
 		}
+
+		// Re-key under the new game room session ID so all subsequent messages work
+		pendingReservations.remove(charSelectId);
+		state.players.set(client.sessionId, playerState);
+
+		trace('player joined: ${client.sessionId} (was ${charSelectId} in char select)');
 
 		return null;
 	}
@@ -330,25 +271,10 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		trace('player left: ${client.sessionId}');
 		trace('successful clear: ${state.players.delete(client.sessionId)}');
 
-		// Clear/rotate host
-		if (client.sessionId == state.hostSessionId) {
-			if (state.players.size <= 0) {
-				state.hostSessionId = null;
-			} else {
-				var sIds = [];
-				for (sId => _ in state.players) {
-					sIds.push(sId);
-				}
-				var sIdx = Std.random(state.players.size);
-				state.hostSessionId = sIds[sIdx];
-			};
-
-			trace('host changed ${client.sessionId} -> ${state.hostSessionId}');
-			if (state.hostSessionId == null) {
-				// after the last person leaves a room, just close it down
-				trace('disconnect room: ${roomId}:${roomName}');
-				disconnect();
-			}
+		if (state.players.size == 0) {
+			// after the last person leaves a room, just close it down
+			trace('disconnect room: ${roomId}:${roomName}');
+			disconnect();
 		}
 
 		return null;

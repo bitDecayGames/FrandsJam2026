@@ -50,7 +50,7 @@ class PreRoundState extends FlxTransitionableState {
 		_txtOtherPlayers.text = "";
 		add(_txtOtherPlayers);
 
-		GameManager.ME.setStatus(RoundState.STATUS_PRE_ROUND);
+		// GameManager.ME.setStatus(RoundState.STATUS_PRE_ROUND);
 	}
 
 	override public function update(elapsed:Float):Void {
@@ -60,33 +60,33 @@ class PreRoundState extends FlxTransitionableState {
 	}
 
 	private function updateOtherPlayers():Void {
-		var gm = GameManager.ME;
-		var playerLines = new Array<String>();
-		for (sessionId in gm.sessions) {
-			if (sessionId == gm.mySessionId) {
-				continue;
-			}
-			var name = gm.names.get(sessionId);
-			if (name == null || name == "") {
-				name = "???";
-			}
-			var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
-			if (isReady) {
-				playerLines.push(name + " (READY)");
-			} else {
-				playerLines.push(name);
-			}
-		}
+		// var gm = GameManager.ME;
+		// var playerLines = new Array<String>();
+		// for (sessionId in gm.sessions) {
+		// 	if (sessionId == gm.mySessionId) {
+		// 		continue;
+		// 	}
+		// 	var name = gm.names.get(sessionId);
+		// 	if (name == null || name == "") {
+		// 		name = "???";
+		// 	}
+		// 	var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
+		// 	if (isReady) {
+		// 		playerLines.push(name + " (READY)");
+		// 	} else {
+		// 		playerLines.push(name);
+		// 	}
+		// }
 
-		var newText = if (playerLines.length > 0) {
-			"Other Players:\n" + playerLines.join("\n");
-		} else {
-			"";
-		};
+		// var newText = if (playerLines.length > 0) {
+		// 	"Other Players:\n" + playerLines.join("\n");
+		// } else {
+		// 	"";
+		// };
 
-		if (_txtOtherPlayers.text != newText) {
-			_txtOtherPlayers.text = newText;
-		}
+		// if (_txtOtherPlayers.text != newText) {
+		// 	_txtOtherPlayers.text = newText;
+		// }
 		_txtOtherPlayers.x = FlxG.width - _txtOtherPlayers.width - 10;
 		_txtOtherPlayers.y = FlxG.height - _txtOtherPlayers.height - 10;
 	}
@@ -96,7 +96,7 @@ class PreRoundState extends FlxTransitionableState {
 			return;
 		}
 		_localReady = true;
-		GameManager.ME.net.sendMessage("player_ready", true);
+		// GameManager.ME.net.sendMessage("player_ready", true);
 
 		_btnDone.visible = false;
 		_btnDone.active = false;

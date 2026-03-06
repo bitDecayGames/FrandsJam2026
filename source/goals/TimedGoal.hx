@@ -36,8 +36,8 @@ class TimedGoal extends Goal {
 		syncCooldown -= delta;
 		if (syncCooldown <= 0) {
 			syncCooldown = SYNC_INTERVAL;
-			GameManager.ME.net.sendTimerSync(runTimeSec, secondsToFinish);
-			GameManager.ME.net.onTimerSync.dispatch(runTimeSec, secondsToFinish);
+			// GameManager.ME.net.sendTimerSync(runTimeSec, secondsToFinish);
+			// GameManager.ME.net.onTimerSync.dispatch(runTimeSec, secondsToFinish);
 		}
 
 		if (runTimeSec > secondsToFinish) {

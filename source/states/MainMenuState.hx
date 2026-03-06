@@ -87,7 +87,7 @@ class MainMenuState extends FlxTransitionableState {
 
 	function clickPlay():Void {
 		FmodManager.StopSong();
-		FlxG.switchState(() -> new LobbyState());
+		FlxG.switchState(() -> new NewLobbyState());
 	}
 
 	// If we want to add a way to go to credits from main menu, call this

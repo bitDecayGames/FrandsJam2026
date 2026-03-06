@@ -1,5 +1,7 @@
 package states;
 
+import schema.GameState;
+import io.colyseus.Room;
 import flixel.math.FlxPoint;
 import schema.RoundState;
 import flixel.util.FlxColor;
@@ -56,6 +58,7 @@ class PlayState extends FlxTransitionableState {
 	var player:Player;
 
 	// Network things
+	var colyRoom:Room<GameState> = null;
 	var remotePlayers:Map<String, Player> = new Map();
 	var remoteFish:Map<String, WaterFish> = new Map();
 
@@ -133,7 +136,7 @@ class PlayState extends FlxTransitionableState {
 		#if !local
 		setupNetwork();
 		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		fishSpawner.setNet(GameManager.ME.net);
+		// fishSpawner.setNet(GameManager.ME.net);
 		#end
 
 		loadLevel("Level_0");
@@ -153,48 +156,48 @@ class PlayState extends FlxTransitionableState {
 		add(timerHUD);
 
 		if (NetworkManager.IS_HOST) {
-			GameManager.ME.net.sendMessage("round_update", {
-				status: RoundState.STATUS_ACTIVE,
-			});
+			// GameManager.ME.net.sendMessage("round_update", {
+			// 	status: RoundState.STATUS_ACTIVE,
+			// });
 		}
 	}
 
 	override function destroy() {
 		super.destroy();
-		GameManager.ME.net.onPlayerRemoved.remove(onPlayerRemoved);
-		GameManager.ME.net.onFishAdded.remove(onFishAdded);
-		GameManager.ME.net.onCastLine.remove(onRemoteCastLine);
-		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
-		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
-		GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
-		GameManager.ME.net.onThrowRock.remove(onRemoteThrowRock);
-		GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
-		GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
-		GameManager.ME.net.onWorldItems.remove(onRemoteWorldItems);
-		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
-		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
-		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
-		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
-		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
-		GameManager.ME.net.onTimerSync.remove(onTimerSync);
+		// GameManager.ME.net.onPlayerRemoved.remove(onPlayerRemoved);
+		// GameManager.ME.net.onFishAdded.remove(onFishAdded);
+		// GameManager.ME.net.onCastLine.remove(onRemoteCastLine);
+		// GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
+		// GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
+		// GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
+		// GameManager.ME.net.onThrowRock.remove(onRemoteThrowRock);
+		// GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
+		// GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
+		// GameManager.ME.net.onWorldItems.remove(onRemoteWorldItems);
+		// GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
+		// GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
+		// GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
+		// GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
+		// GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
+		// GameManager.ME.net.onTimerSync.remove(onTimerSync);
 	}
 
 	function setupNetwork() {
-		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
-		GameManager.ME.net.onFishAdded.add(onFishAdded);
-		GameManager.ME.net.onCastLine.add(onRemoteCastLine);
-		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
-		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
-		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
-		GameManager.ME.net.onThrowRock.add(onRemoteThrowRock);
-		GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
-		GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
-		GameManager.ME.net.onWorldItems.add(onRemoteWorldItems);
-		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
-		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
-		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
-		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
-		GameManager.ME.net.onTimerSync.add(onTimerSync);
+		// GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
+		// GameManager.ME.net.onFishAdded.add(onFishAdded);
+		// GameManager.ME.net.onCastLine.add(onRemoteCastLine);
+		// GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
+		// GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
+		// GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
+		// GameManager.ME.net.onThrowRock.add(onRemoteThrowRock);
+		// GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
+		// GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
+		// GameManager.ME.net.onWorldItems.add(onRemoteWorldItems);
+		// GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
+		// GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
+		// GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
+		// GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
+		// GameManager.ME.net.onTimerSync.add(onTimerSync);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -236,71 +239,76 @@ class PlayState extends FlxTransitionableState {
 		midGroundGroup.add(shallowColliders);
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
-		// pick random spawn points for all players
-		var allSessionIds = [GameManager.ME.net.mySessionId];
-		for (_ => seshID in GameManager.ME.sessions) {
-			allSessionIds.push(seshID);
-		}
-		var spawnPoints = level.getRandomSpawnPoints(allSessionIds.length);
+		// TODO: Spawns should be set by the server
+		// // pick random spawn points for all players
+		// var allSessionIds = [GameManager.ME.net.mySessionId];
+		// for (_ => seshID in GameManager.ME.sessions) {
+		// 	allSessionIds.push(seshID);
+		// }
+		// var spawnPoints = level.getRandomSpawnPoints(allSessionIds.length);
 
 		// build a map of sessionId -> {x, y} before we consume the points
-		var spawnMap = new Map<String, {x:Float, y:Float}>();
-		for (i in 0...allSessionIds.length) {
-			if (i < spawnPoints.length) {
-				spawnMap.set(allSessionIds[i], {x: spawnPoints[i].x, y: spawnPoints[i].y});
-			}
-		}
-		// return pooled points
-		for (pt in spawnPoints) {
-			pt.put();
-		}
+		// var spawnMap = new Map<String, {x:Float, y:Float}>();
+		// for (i in 0...allSessionIds.length) {
+		// 	if (i < spawnPoints.length) {
+		// 		spawnMap.set(allSessionIds[i], {x: spawnPoints[i].x, y: spawnPoints[i].y});
+		// 	}
+		// }
+		// // return pooled points
+		// for (pt in spawnPoints) {
+		// 	pt.put();
+		// }
 
-		var localPos = spawnMap.get(GameManager.ME.net.mySessionId);
-		var lx = localPos != null ? localPos.x : level.spawnPoint.x;
-		var ly = localPos != null ? localPos.y : level.spawnPoint.y;
-		player = new Player(lx, ly, this);
-		if (GameManager.ME.mySkinIndex >= 0) {
-			player.skinIndex = GameManager.ME.mySkinIndex;
-			player.swapSkin();
-		}
-		player.sessionId = GameManager.ME.net.mySessionId;
+		// var localPos = spawnMap.get(GameManager.ME.net.mySessionId);
+		// var lx = localPos != null ? localPos.x : level.spawnPoint.x;
+		// var ly = localPos != null ? localPos.y : level.spawnPoint.y;
+		// player = new Player(lx, ly, this);
+
+		// standin until we get everything sent down from the server
+		player = new Player(0, 0, this);
+
+		// if (GameManager.ME.mySkinIndex >= 0) {
+		// 	player.skinIndex = GameManager.ME.mySkinIndex;
+		// 	player.swapSkin();
+		// }
+		// player.sessionId = GameManager.ME.net.mySessionId;
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
 		camera.follow(player);
 		ySortGroup.add(player);
 
-		for (_ => seshID in GameManager.ME.sessions) {
-			var remotePos = spawnMap.get(seshID);
-			var rx = remotePos != null ? remotePos.x : level.spawnPoint.x;
-			var ry = remotePos != null ? remotePos.y : level.spawnPoint.y;
-			var remote = new Player(rx, ry, this);
-			remote.isRemote = true;
-			remote.terrainLayer = terrainLayer;
-			remote.groundEffectsGroup = midGroundGroup;
-			if (GameManager.ME.skins.exists(seshID)) {
-				var remoteSkin = GameManager.ME.skins.get(seshID);
-				if (remoteSkin >= 0) {
-					remote.skinIndex = remoteSkin;
-					remote.swapSkin();
-				}
-			}
-			remote.setNetwork(seshID);
-			remotePlayers.set(seshID, remote);
-			ySortGroup.add(remote);
-		}
+		// for (_ => seshID in GameManager.ME.sessions) {
+		// 	var remotePos = spawnMap.get(seshID);
+		// 	var rx = remotePos != null ? remotePos.x : level.spawnPoint.x;
+		// 	var ry = remotePos != null ? remotePos.y : level.spawnPoint.y;
+		// 	var remote = new Player(rx, ry, this);
+		// 	remote.isRemote = true;
+		// 	remote.terrainLayer = terrainLayer;
+		// 	remote.groundEffectsGroup = midGroundGroup;
+		// 	if (GameManager.ME.skins.exists(seshID)) {
+		// 		var remoteSkin = GameManager.ME.skins.get(seshID);
+		// 		if (remoteSkin >= 0) {
+		// 			remote.skinIndex = remoteSkin;
+		// 			remote.swapSkin();
+		// 		}
+		// 	}
+		// 	remote.setNetwork(seshID);
+		// 	remotePlayers.set(seshID, remote);
+		// 	ySortGroup.add(remote);
+		// }
 
 		// host sends spawn locations to clients
 		#if !local
-		if (NetworkManager.IS_HOST) {
-			var spawnData:Dynamic = {};
-			for (sid => pos in spawnMap) {
-				Reflect.setField(spawnData, sid, {x: pos.x, y: pos.y});
-			}
-			GameManager.ME.net.sendSpawnLocations(spawnData);
-		}
+		// if (NetworkManager.IS_HOST) {
+		// 	var spawnData:Dynamic = {};
+		// 	for (sid => pos in spawnMap) {
+		// 		Reflect.setField(spawnData, sid, {x: pos.x, y: pos.y});
+		// 	}
+		// 	GameManager.ME.net.sendSpawnLocations(spawnData);
+		// }
 
 		// clients listen for host-assigned spawn locations
-		GameManager.ME.net.onSpawnLocations.add(onSpawnLocations);
+		// GameManager.ME.net.onSpawnLocations.add(onSpawnLocations);
 		#end
 
 		#if local
@@ -333,15 +341,15 @@ class PlayState extends FlxTransitionableState {
 		#end
 
 		// wire up pickup callbacks for network broadcast
-		rockGroup.onPickup = (type, idx) -> {
-			GameManager.ME.net.sendItemPickup(type, idx);
-		};
-		wadersPickup.onPickup = () -> {
-			GameManager.ME.net.sendItemPickup("waders", 0);
-		};
-		pepperPickup.onPickup = () -> {
-			GameManager.ME.net.sendItemPickup("pepper", 0);
-		};
+		// rockGroup.onPickup = (type, idx) -> {
+		// 	GameManager.ME.net.sendItemPickup(type, idx);
+		// };
+		// wadersPickup.onPickup = () -> {
+		// 	GameManager.ME.net.sendItemPickup("waders", 0);
+		// };
+		// pepperPickup.onPickup = () -> {
+		// 	GameManager.ME.net.sendItemPickup("pepper", 0);
+		// };
 
 		player.onBobberLanded = (bx, by) -> {
 			if (classifyGround(terrainLayer.sampleColorAt(bx, by)) == "water") {
@@ -370,16 +378,16 @@ class PlayState extends FlxTransitionableState {
 			shop = new Shop();
 			shop.spawnRandom(level, terrainLayer);
 			ySortGroup.add(shop);
-			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
+			// GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
 		} else {
 			// Check if world state already arrived (e.g. late joiner)
-			var state = GameManager.ME.net.getState();
-			if (state != null && state.shopReady) {
-				placeShopAt(state.shopX, state.shopY);
-				for (_ => bush in state.bushes) {
-					placeBushAt(bush.x, bush.y);
-				}
-			}
+			// var state = GameManager.ME.net.getState();
+			// if (state != null && state.shopReady) {
+			// 	placeShopAt(state.shopX, state.shopY);
+			// 	for (_ => bush in state.bushes) {
+			// 		placeBushAt(bush.x, bush.y);
+			// 	}
+			// }
 		}
 		#end
 
@@ -492,7 +500,7 @@ class PlayState extends FlxTransitionableState {
 			data.pepperY = pepperPickup.y;
 		}
 
-		GameManager.ME.net.sendWorldItems(data);
+		// GameManager.ME.net.sendWorldItems(data);
 	}
 
 	function onRemoteWorldItems(data:Dynamic) {
@@ -549,7 +557,7 @@ class PlayState extends FlxTransitionableState {
 				weed.burst();
 			}
 		}
-		GameManager.ME.recordWeedKill(sessionId);
+		// GameManager.ME.recordWeedKill(sessionId);
 	}
 
 	function onRemoteBushRustle(index:Int, dirX:Float, dirY:Float) {
@@ -591,7 +599,7 @@ class PlayState extends FlxTransitionableState {
 
 	function onFishCaught(fishId:String, catcherSessionId:String, fishType:Int) {
 		#if !local
-		GameManager.ME.net.sendFishCaught(fishId, catcherSessionId, fishType);
+		// GameManager.ME.net.sendFishCaught(fishId, catcherSessionId, fishType);
 		#end
 
 		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
@@ -642,17 +650,17 @@ class PlayState extends FlxTransitionableState {
 			return;
 		}
 		// reposition local player and remotes based on host-assigned locations
-		var myId = GameManager.ME.net.mySessionId;
-		var myPos:Dynamic = Reflect.field(message, myId);
-		if (myPos != null) {
-			player.setPosition(myPos.x, myPos.y);
-		}
-		for (seshID => remote in remotePlayers) {
-			var pos:Dynamic = Reflect.field(message, seshID);
-			if (pos != null) {
-				remote.setPosition(pos.x, pos.y);
-			}
-		}
+		// var myId = GameManager.ME.net.mySessionId;
+		// var myPos:Dynamic = Reflect.field(message, myId);
+		// if (myPos != null) {
+		// 	player.setPosition(myPos.x, myPos.y);
+		// }
+		// for (seshID => remote in remotePlayers) {
+		// 	var pos:Dynamic = Reflect.field(message, seshID);
+		// 	if (pos != null) {
+		// 		remote.setPosition(pos.x, pos.y);
+		// 	}
+		// }
 	}
 
 	function onRemoteCastLine(sessionId:String, x:Float, y:Float, dir:String) {
@@ -762,20 +770,20 @@ class PlayState extends FlxTransitionableState {
 			var dirY = dist > 0 ? dy / dist : 0.0;
 			bush.rustleFrom(dirX, dirY);
 			var index = bushGroup.members.indexOf(bush);
-			GameManager.ME.net.sendBushRustle(index, dirX, dirY);
+			// GameManager.ME.net.sendBushRustle(index, dirX, dirY);
 		});
 		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
 			var index = weedGroup.members.indexOf(weed);
 			weed.burst();
-			GameManager.ME.net.sendWeedBurst(index);
-			GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
+			// GameManager.ME.net.sendWeedBurst(index);
+			// GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
 		});
 		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
 			TODO.sfx("worm_squish");
 			midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
 			worm.kill();
-			GameManager.ME.net.sendMessage("worm_killed", {});
-			GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
+			// GameManager.ME.net.sendMessage("worm_killed", {});
+			// GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
 		});
 		if (shop != null) {
 			FlxG.collide(shop, player, Shop.onCollide);

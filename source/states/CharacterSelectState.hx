@@ -1,5 +1,9 @@
 package states;
 
+import schema.GameState;
+import io.colyseus.serializer.schema.Callbacks;
+import schema.meta.CharSelectState;
+import io.colyseus.Room;
 import bitdecay.flixel.spacial.Align;
 import flixel.text.FlxInputText;
 import goals.PersonalFishCountGoal;
@@ -22,7 +26,7 @@ import ui.MenuBuilder;
 
 using states.FlxStateExt;
 
-class LobbyState extends FlxTransitionableState {
+class CharacterSelectState extends FlxTransitionableState {
 	var _btnDone:FlxButton;
 	var _txtReady:FlxText;
 	var _txtRoomID:FlxText;
@@ -32,7 +36,11 @@ class LobbyState extends FlxTransitionableState {
 	var _txtOtherHeader:FlxText;
 	var _kickRows:Array<{label:FlxText, btn:FlxButton, sessionId:String}> = [];
 
+	var playerNames = new Map<String, String>();
+	var playerReadiness = new Map<String, Bool>();
+
 	// Skin selection
+	var playerSkins = new Map<String, Int>(); // sessionId -> skinIndex
 	var _skinSprites:Array<FlxSprite> = [];
 	var _skinBorders:Array<FlxSprite> = [];
 	var _skinNameLabels:Array<FlxText> = [];
@@ -52,8 +60,12 @@ class LobbyState extends FlxTransitionableState {
 	static var BG_COLOR:FlxColor = 0xff73efe8; // turquoise
 	static var TEXT_COLOR:FlxColor = 0xff2b4e95; // dark navy
 
-	public function new() {
+	var colySessionId:String = "";
+	var colyRoom:Room<CharSelectState> = null;
+
+	public function new(room:Room<CharSelectState>) {
 		super();
+		setupCharSelect(room);
 	}
 
 	override public function create():Void {
@@ -126,22 +138,74 @@ class LobbyState extends FlxTransitionableState {
 			_kickRows.push({label: label, btn: btn, sessionId: ""});
 		}
 
-		GameManager.ME.net.onKicked.addOnce(handleKicked);
-		GameManager.ME.net.onPlayerRemoved.add(onRemotePlayerRemoved);
+		// GameManager.ME.net.onKicked.addOnce(handleKicked);
+		// GameManager.ME.net.onPlayerRemoved.add(onRemotePlayerRemoved);
 
 		// Create skin selection sprites
 		createSkinSelection();
 
 		FlxTimer.wait(2, () -> {
-			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
 			if (_inputField.text != null && _inputField.text != "") {
-				GameManager.ME.net.sendMessage("player_name_changed", {name: _inputField.text});
+				colyRoom.send(CharSelectState.MSG_NAME_CHANGED, {name: _inputField.text});
 			}
 
-			_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
+			// just send the skin request message to the server
+			// _selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
 			if (_selectedSkinIndex > -1) {
-				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+				colyRoom.send(CharSelectState.MSG_NAME_CHANGED, {skinIndex: _selectedSkinIndex});
 			}
+		});
+	}
+
+	function setupCharSelect(room:Room<CharSelectState>) {
+		this.colyRoom = room;
+
+		colySessionId = room.sessionId;
+
+		var cb = Callbacks.get(room);
+		cb.onAdd(room.state, "players", (player:PlayerLobbyState, sessionId:String) -> {
+			trace('Player added: $sessionId');
+			playerNames.set(sessionId, player.name);
+
+			cb.listen(player, "name", (_, _) -> {
+				trace('NetMan: sesh: ${sessionId} changed name to: ${player.name}');
+				playerNames.set(sessionId, player.name);
+			});
+
+			cb.listen(player, "ready", (_, _) -> {
+				trace('NetMan: sesh: ${sessionId} set ready: ${player.ready}');
+				playerReadiness.set(sessionId, player.ready);
+			});
+		});
+
+		room.onMessage(CharSelectState.SERVER_MSG_PLAYER_KICKED, (message:{sessionId:String}) -> {
+			if (message.sessionId == colySessionId) {
+				trace('[NetMan] we got kicked!');
+				room.leave(true);
+				room = null;
+				FlxG.switchState(MainMenuState.new);
+				return;
+			}
+
+			trace('[NetMan] player_kicked => ${message.sessionId}');
+			playerNames.remove(message.sessionId);
+			playerSkins.remove(message.sessionId);
+		});
+
+		room.onMessage(CharSelectState.SERVER_MSG_MOVE_TO_GAME, (reservation) -> {
+			trace('received game reservation for session: ${reservation.sessionId}');
+
+			// Join the match room with the reservation
+			NetworkManager.ME.client.consumeSeatReservation(reservation, GameState, function(err, match:Room<GameState>) {
+				if (err != null) {
+					trace("join error: " + err);
+					FlxG.switchState(MainMenuState.new);
+					return;
+				}
+				trace('Joined game ${match.roomId} as ${match.sessionId}');
+				// GameManager.ME.init(match);
+				// FlxG.switchState(() -> new PlayState(match));
+			});
 		});
 	}
 
@@ -221,7 +285,7 @@ class LobbyState extends FlxTransitionableState {
 		}
 
 		// Send skin selection to server
-		GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+		colyRoom.send(CharSelectState.MSG_SKIN_CHANGED, {skinIndex: _selectedSkinIndex});
 
 		// Enable/disable Ready button based on skin selection
 		if (_selectedSkinIndex >= 0) {
@@ -236,9 +300,9 @@ class LobbyState extends FlxTransitionableState {
 	}
 
 	private function isSkinTakenByOther(index:Int):Bool {
-		var gm = GameManager.ME;
-		for (sessionId => skinIdx in gm.skins) {
-			if (sessionId != gm.mySessionId && skinIdx == index) {
+		// TODO: We can replace all of this with a request to the server to change skin and it will tell us what we get
+		for (sessionId => skinIdx in playerSkins) {
+			if (sessionId != colySessionId && skinIdx == index) {
 				return true;
 			}
 		}
@@ -277,7 +341,7 @@ class LobbyState extends FlxTransitionableState {
 	}
 
 	private function updatePlayerName(text:String, change:FlxInputTextChange) {
-		GameManager.ME.net.sendMessage("player_name_changed", {name: text});
+		colyRoom.send(CharSelectState.MSG_NAME_CHANGED, {name: text});
 	}
 
 	override public function update(elapsed:Float):Void {
@@ -297,17 +361,14 @@ class LobbyState extends FlxTransitionableState {
 
 		updateNameLabels();
 
-		@:privateAccess(NetworkManager)
-		{
-			if (GameManager.ME.net.room != null) {
-				_txtRoomID.text = 'Room ID: ${GameManager.ME.net.room.roomId}';
-			}
+		if (colyRoom != null) {
+			_txtRoomID.text = 'Room ID: ${colyRoom.roomId}';
+		} else {
+			_txtRoomID.text = '';
 		}
 	}
 
 	private function updateNameLabels():Void {
-		var gm = GameManager.ME;
-
 		// Clear all name labels first
 		for (label in _skinNameLabels) {
 			label.text = "";
@@ -321,12 +382,12 @@ class LobbyState extends FlxTransitionableState {
 		}
 
 		// Place other players' names above their selected skins
-		for (sessionId => skinIdx in gm.skins) {
-			if (sessionId == gm.mySessionId) {
+		for (sessionId => skinIdx in playerSkins) {
+			if (sessionId == colySessionId) {
 				continue;
 			}
 			if (skinIdx >= 0 && skinIdx < _skinNameLabels.length) {
-				var name = gm.names.get(sessionId);
+				var name = playerNames.get(sessionId);
 				if (name == null || name == "") {
 					name = "???";
 				}
@@ -344,8 +405,8 @@ class LobbyState extends FlxTransitionableState {
 
 		// Build the kick rows for all other players
 		var others:Array<String> = [];
-		for (sessionId in gm.sessions) {
-			if (sessionId != gm.mySessionId) {
+		for (sessionId => _ in playerSkins) {
+			if (sessionId != colySessionId) {
 				others.push(sessionId);
 			}
 		}
@@ -365,11 +426,11 @@ class LobbyState extends FlxTransitionableState {
 			var row = _kickRows[i];
 			if (i < others.length) {
 				var sessionId = others[i];
-				var name = gm.names.get(sessionId);
+				var name = playerNames.get(sessionId);
 				if (name == null || name == "") {
 					name = "???";
 				}
-				var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
+				var isReady = playerReadiness.exists(sessionId) && playerReadiness.get(sessionId);
 
 				row.sessionId = sessionId;
 				row.label.text = name + (isReady ? " (READY)" : "");
@@ -397,7 +458,7 @@ class LobbyState extends FlxTransitionableState {
 	private function kickPlayer(rowIndex:Int):Void {
 		var row = _kickRows[rowIndex];
 		if (row.sessionId != "") {
-			GameManager.ME.net.sendKick(row.sessionId);
+			colyRoom.send(CharSelectState.MSG_KICK, row.sessionId);
 		}
 	}
 
@@ -412,8 +473,8 @@ class LobbyState extends FlxTransitionableState {
 
 		FlxG.save.data.name = _inputField.text;
 		FlxG.save.flush();
-		GameManager.ME.mySkinIndex = _selectedSkinIndex;
-		GameManager.ME.net.sendMessage("player_ready", true);
+		// GameManager.ME.mySkinIndex = _selectedSkinIndex;
+		colyRoom.send(CharSelectState.MSG_READY, true);
 
 		// Hide button, show green READY text
 		_localReady = true;
@@ -421,11 +482,6 @@ class LobbyState extends FlxTransitionableState {
 		_btnDone.active = false;
 		_txtReady.visible = true;
 		_txtReady.x = FlxG.width / 2 - _txtReady.width / 2;
-	}
-
-	override public function destroy():Void {
-		GameManager.ME.net.onPlayerRemoved.remove(onRemotePlayerRemoved);
-		super.destroy();
 	}
 
 	override public function onFocusLost() {

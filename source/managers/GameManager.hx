@@ -1,5 +1,10 @@
 package managers;
 
+import schema.BushState;
+import schema.FishState;
+import io.colyseus.serializer.schema.Callbacks;
+import schema.GameState;
+import io.colyseus.Room;
 import schema.PlayerState;
 import goals.PersonalFishCountGoal;
 import goals.PersonalFishSoldGoal;
@@ -16,7 +21,7 @@ import states.VictoryState;
 import states.PlayState;
 import states.PostRoundState;
 import states.PreRoundState;
-import states.LobbyState;
+import states.CharacterSelectState;
 import flixel.FlxG;
 
 typedef SoldFishEntry = {
@@ -26,9 +31,10 @@ typedef SoldFishEntry = {
 };
 
 class GameManager {
-	public static var ME:GameManager;
-
 	public var fish:FishManager;
+
+	var colyRoom:Room<GameState>;
+
 	public var net:NetworkManager;
 
 	private var round:RoundManager;
@@ -55,24 +61,214 @@ class GameManager {
 	/** Fires whenever any player sells a fish (local or remote): sessionId, entry */
 	public var onFishSoldLocal = new FlxTypedSignal<String->SoldFishEntry->Void>();
 
-	public function new() {
-		ME = this;
+	public function new(room:Room<GameState>) {
+		setupCallbacks(room);
+		init([
+			new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+			new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+			new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+		]);
+
 		fish = new FishManager(new FishDb());
-		net = new NetworkManager();
-		net.onJoined.add(onPlayerJoined);
-		net.onPlayerJoinLobby.add(onPlayerJoinLobby);
-		net.onPlayerAdded.add(onPlayerAdded);
-		net.onPlayerRemoved.add(onPlayerRemoved);
-		net.onRoundUpdate.add(sync);
-		net.onPlayersReady.add(playersReady);
-		net.onPlayerNameChanged.add(playerNameChanged);
-		net.onSkinChanged.add(onSkinChanged);
-		net.onPlayerReadyChanged.add(onPlayerReadyChanged);
-		net.onScoreChanged.add(onScoreChanged);
-		net.onFishSold.add(onFishSold);
-		net.onWormKilled.add(recordWormKill);
-		net.onHostChanged.add(onHostChange);
-		net.onKicked.add(handleKicked);
+	}
+
+	private function setupCallbacks(room:Room<GameState>) {
+		mySessionId = room.sessionId;
+		// onJoined.dispatch(mySessionId);
+
+		// onPlayersReady.dispatch();
+
+		room.onStateChange += (newState:GameState) -> {
+			trace("NetMan: received state change:");
+			trace('  - FishCount: ${newState.fish.length}');
+		};
+
+		var cb = Callbacks.get(room);
+
+		// cb.listen("hostSessionId", (val:String, prev:String) -> {
+		// 	var prevIsHost = IS_HOST;
+		// 	IS_HOST = val == mySessionId;
+		// 	trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
+		// 	onHostChanged.dispatch(IS_HOST, prevIsHost);
+		// });
+
+		// cb.listen("round", (round:RoundState) -> {
+		// 	trace('RoundState: ${round}');
+		// 	onRoundUpdate.dispatch(round);
+		// });
+
+		// cb.onAdd(room.state, "fish", (fish:FishState, id:String) -> {
+		// 	trace('NetworkManager: fish added ${id}');
+		// 	onFishAdded.dispatch(id, fish);
+
+		// 	cb.listen(fish, "x", (_, _) -> {
+		// 		// trace('NetMan: (fish: ${id} x update');
+		// 		onFishMove.dispatch(id, fish);
+		// 	});
+		// 	cb.listen(fish, "y", (_, _) -> {
+		// 		// trace('NetMan: (fish: ${id} y update');
+		// 		onFishMove.dispatch(id, fish);
+		// 	});
+		// });
+
+		// cb.onAdd(room.state, "bushes", (bush:BushState, id:String) -> {
+		// 	trace('NetworkManager: bush added ${id} at ${bush.x}, ${bush.y}');
+		// 	onBushAdded.dispatch(bush.x, bush.y);
+		// });
+
+		// cb.listen("shopReady", (val:Bool, _:Bool) -> {
+		// 	if (val) {
+		// 		trace('NetworkManager: shop placed at ${room.state.shopX}, ${room.state.shopY}');
+		// 		onShopPlaced.dispatch(room.state.shopX, room.state.shopY);
+		// 	}
+		// });
+
+		// cb.onAdd(room.state, "players", (player:PlayerState, sessionId:String) -> {
+		// 	playerDebugTrace('NetworkManager: player added $sessionId');
+		// 	if (sessionId == mySessionId) {
+		// 		return;
+		// 	}
+		// 	onPlayerAdded.dispatch(sessionId, {state: player});
+
+		// 	cb.onChange(player, () -> {
+		// 		playerDebugTrace('NetMan: got onChange for player');
+		// 		onPlayerChanged.dispatch(sessionId, {state: player});
+		// 	});
+
+		// 	cb.listen(player, "x", (_, prevX:Float) -> {
+		// 		playerDebugTrace('NetMan: (sesh: ${sessionId} x: ${prevX} -> ${player.x}');
+		// 		onPlayerChanged.dispatch(sessionId, {state: player, prevX: prevX});
+		// 	});
+		// 	cb.listen(player, "y", (_, prevY:Float) -> {
+		// 		playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+		// 		onPlayerChanged.dispatch(sessionId, {state: player, prevY: prevY});
+		// 	});
+		// 	cb.listen(player, "velocityX", (_, prevY:Float) -> {
+		// 		playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+		// 		onPlayerChanged.dispatch(sessionId, {state: player});
+		// 	});
+		// 	cb.listen(player, "velocitY", (_, prevY:Float) -> {
+		// 		playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
+		// 		onPlayerChanged.dispatch(sessionId, {state: player});
+		// 	});
+		// 	cb.listen(player, "skinIndex", (_, _) -> {
+		// 		playerDebugTrace('NetMan: sesh: ${sessionId} skinIndex: ${player.skinIndex}');
+		// 		onSkinChanged.dispatch(sessionId, player.skinIndex);
+		// 	});
+		// 	cb.listen(player, "ready", (_, _) -> {
+		// 		playerDebugTrace('NetMan: sesh: ${sessionId} ready: ${player.ready}');
+		// 		onPlayerReadyChanged.dispatch(sessionId, player.ready);
+		// 	});
+		// 	cb.listen(player, "score", (_, _) -> {
+		// 		playerDebugTrace('NetMan: sesh: ${sessionId} score: ${player.score}');
+		// 		onScoreChanged.dispatch(sessionId, player.score);
+		// 	});
+		// });
+
+		// cb.onRemove(room.state, "players", (player:PlayerState, sessionId:String) -> {
+		// 	playerDebugTrace('NetworkManager: player removed $sessionId');
+		// 	if (sessionId == mySessionId) {
+		// 		return;
+		// 	}
+		// 	onPlayerRemoved.dispatch(sessionId);
+		// });
+
+		// room.onMessage("cast_line", (message:{
+		// 	sessionId:String,
+		// 	x:Float,
+		// 	y:Float,
+		// 	dir:String
+		// }) -> {
+		// 	trace('[NetMan] cast_line => ${message.sessionId} ${message.x},${message.y} dir:${message.dir}');
+		// 	// var x:Float = message.x;
+		// 	// var y:Float = message.y;
+		// 	onCastLine.dispatch(message.sessionId, message.x, message.y, message.dir);
+		// });
+
+		// room.onMessage("fish_caught", (message:Dynamic) -> {
+		// 	trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId} fishType:${message.fishType}');
+		// 	var ft:Int = message.fishType != null ? Std.int(message.fishType) : 0;
+		// 	onFishCaught.dispatch(message.sessionId, message.fishId, ft);
+		// });
+		// room.onMessage("fish_pocketed", (message) -> {
+		// 	trace('[NetMan] fish_pocketed => sessionId:${message.sessionId} fishId:${message.fishId}');
+		// 	onFishPocketed.dispatch(message.sessionId, message.fishId);
+		// });
+		// room.onMessage("fish_banked", (message) -> {
+		// 	trace('[NetMan] fish_banked => sessionId:${message.sessionId} fishId:${message.fishId}');
+		// 	onFishBanked.dispatch(message.sessionId, message.fishId);
+		// });
+
+		// room.onMessage("line_pulled", (message) -> {
+		// 	trace('[NetMan] line_pulled => sessionId:${message.sessionId}');
+		// 	onLinePulled.dispatch(message.sessionId);
+		// });
+
+		// room.onMessage("fish_despawn", (message:{id:String, respawnTime:Float}) -> {
+		// 	trace('[NetMan] fish_despawn => fishId:${message.id} respawnTime:${message.respawnTime}');
+		// 	onFishDespawn.dispatch(message.id, message.respawnTime);
+		// });
+
+		// room.onMessage("rock_splash", (message:Dynamic) -> {
+		// 	var sx:Float = message.x;
+		// 	var sy:Float = message.y;
+		// 	var sbig:Bool = message.big;
+		// 	trace('[NetMan] rock_splash => $sx, $sy big=$sbig');
+		// 	onRockSplash.dispatch(sx, sy, sbig);
+		// });
+
+		// room.onMessage("throw_rock", (message:Dynamic) -> {
+		// 	trace('[NetMan] throw_rock => sessionId:${message.sessionId} target:(${message.targetX},${message.targetY}) big:${message.big} dir:${message.dir}');
+
+		// 	var dest = FlxPoint.get(message.targetX, message.targetY);
+		// 	onThrowRock.dispatch(message.sessionId, dest, message.big, message.dir);
+		// 	dest.put();
+		// });
+
+		// room.onMessage("fish_sold", (message:Dynamic) -> {
+		// 	trace('[NetMan] fish_sold => sessionId:${message.sessionId} fishType:${message.fishType} lengthCm:${message.lengthCm} value:${message.value}');
+		// 	onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
+		// });
+
+		// room.onMessage("weed_burst", (message:Dynamic) -> {
+		// 	trace('[NetMan] weed_burst => sessionId:${message.sessionId} index:${message.index}');
+		// 	onWeedBurst.dispatch(message.sessionId, Std.int(message.index));
+		// });
+
+		// room.onMessage("world_items", (message:Dynamic) -> {
+		// 	trace('[NetMan] world_items received');
+		// 	onWorldItems.dispatch(message);
+		// });
+
+		// room.onMessage("item_pickup", (message:Dynamic) -> {
+		// 	trace('[NetMan] item_pickup => sessionId:${message.sessionId} itemType:${message.itemType} index:${message.index}');
+		// 	onItemPickup.dispatch(message.sessionId, message.itemType, Std.int(message.index));
+		// });
+
+		// room.onMessage("bush_rustle", (message:Dynamic) -> {
+		// 	trace('[NetMan] bush_rustle => index:${message.index} dir:(${message.dirX},${message.dirY})');
+		// 	onBushRustle.dispatch(Std.int(message.index), message.dirX, message.dirY);
+		// });
+
+		// room.onMessage("worm_killed", (message:Dynamic) -> {
+		// 	trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
+		// 	onWormKilled.dispatch(message.sessionId);
+		// });
+
+		// room.onMessage("hot_pepper", (message:Dynamic) -> {
+		// 	trace('[NetMan] hot_pepper => sessionId:${message.sessionId} isStart:${message.isStart}');
+		// 	onHotPepper.dispatch(message.sessionId, message.isStart == true);
+		// });
+
+		// room.onMessage("spawn_locations", (message:Dynamic) -> {
+		// 	trace('[NetMan] spawn_locations received');
+		// 	onSpawnLocations.dispatch(message);
+		// });
+
+		// room.onMessage("timer_sync", (message:Dynamic) -> {
+		// 	trace('[NetMan] timer_sync received: runTimeSec=${message.runTimeSec} totalSec=${message.totalSec}');
+		// 	onTimerSync.dispatch(message.runTimeSec, message.totalSec);
+		// });
 	}
 
 	private function init(rounds:Array<Round>) {
@@ -93,7 +289,7 @@ class GameManager {
 		totalRounds = rounds.length;
 		currentRoundNumber = 0;
 		setCurrentRound(new RoundManager(rounds[0]));
-		GameManager.ME.net.sendMessage("round_update", {
+		colyRoom.send("round_update", {
 			status: roundStatus,
 			currentRound: currentRoundNumber,
 			totalRounds: totalRounds,
@@ -279,22 +475,12 @@ class GameManager {
 		if (round == null && rounds != null && rounds.length > 0) {
 			setCurrentRound(new RoundManager(rounds[0]));
 		}
-		var nextStatus:String;
+		// var nextStatus:String;
 		var nextRoundNumber:Int = currentRoundNumber;
 		switch (roundStatus) {
 			case RoundState.STATUS_LOBBY:
-				if (NetworkManager.IS_HOST) {
-					init([
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
-					]);
-					// needs to force this back to 0
-					nextRoundNumber = currentRoundNumber;
-				}
-				nextStatus = RoundState.STATUS_ACTIVE;
 			case RoundState.STATUS_ACTIVE:
-				nextStatus = RoundState.STATUS_POST_ROUND;
+				// nextStatus = RoundState.STATUS_POST_ROUND;
 			case RoundState.STATUS_POST_ROUND:
 				nextRoundNumber = currentRoundNumber + 1;
 				if (nextRoundNumber >= totalRounds) {
@@ -302,17 +488,17 @@ class GameManager {
 					endGame();
 					return;
 				}
-				nextStatus = RoundState.STATUS_ACTIVE;
+			// nextStatus = RoundState.STATUS_ACTIVE;
 			case RoundState.STATUS_END_GAME:
-				nextStatus = RoundState.STATUS_LOBBY;
+				// nextStatus = RoundState.STATUS_LOBBY;
 			case RoundState.STATUS_INACTIVE:
-				nextStatus = RoundState.STATUS_LOBBY;
+				// nextStatus = RoundState.STATUS_LOBBY;
 			default:
 				throw 'invalid round status: ${roundStatus}';
 		}
-		trace('players ready: ${roundStatus} -> ${nextStatus}');
+		// trace('players ready: ${roundStatus} -> ${nextStatus}');
 		var wasLobby = roundStatus == RoundState.STATUS_LOBBY;
-		setStatus(nextStatus, nextRoundNumber);
+		// setStatus(nextStatus, nextRoundNumber);
 		if (rounds != null && rounds.length > 0) {
 			setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
 		}
@@ -359,13 +545,13 @@ class GameManager {
 			if (currentRound >= 0 && currentRound != currentRoundNumber) {
 				trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRoundNumber}');
 				currentRoundNumber = currentRound;
-				GameManager.ME.net.sendMessage("round_update", {
+				colyRoom.send("round_update", {
 					status: roundStatus,
 					currentRound: currentRound,
 				});
 			} else {
 				trace('set status: ${roundStatus} -> ${status}');
-				GameManager.ME.net.sendMessage("round_update", {
+				colyRoom.send("round_update", {
 					status: roundStatus,
 				});
 			}
@@ -395,7 +581,7 @@ class GameManager {
 		trace('switch state based on status ${roundStatus}');
 		switch (roundStatus) {
 			case RoundState.STATUS_LOBBY:
-				FlxG.switchState(() -> new LobbyState());
+				// FlxG.switchState(() -> new CharacterSelectState());
 			case RoundState.STATUS_ACTIVE:
 				FlxG.switchState(() -> new PlayState(round));
 			case RoundState.STATUS_POST_ROUND:

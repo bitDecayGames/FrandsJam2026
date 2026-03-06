@@ -26,9 +26,9 @@ class ScoreHUD extends FlxSpriteGroup {
 
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
-		var gm = GameManager.ME;
-		var score = gm.scores.exists(gm.mySessionId) ? gm.scores.get(gm.mySessionId) : 0;
-		text.text = formatMoney(score);
+		// var gm = GameManager.ME;
+		// var score = gm.scores.exists(gm.mySessionId) ? gm.scores.get(gm.mySessionId) : 0;
+		// text.text = formatMoney(score);
 		// Right-align to match inventory
 		text.x = FlxG.width - MARGIN - text.width;
 	}

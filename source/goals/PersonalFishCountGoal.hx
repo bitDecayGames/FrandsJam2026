@@ -27,7 +27,7 @@ class PersonalFishCountGoal extends Goal {
 		state.add(text);
 
 		// TODO: MW need to change this to FishCollected probably
-		GameManager.ME.net.onFishCaught.add(onFishCaught);
+		// GameManager.ME.net.onFishCaught.add(onFishCaught);
 	}
 
 	private function onFishCaught(playerId:String, fishId:String, fishType:Int) {
