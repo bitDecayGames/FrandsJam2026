@@ -1,5 +1,7 @@
 package schema;
 
+import Ldtk;
+import Ldtk.LdtkProject;
 #if server
 import colyseus.server.schema.Schema;
 import colyseus.server.schema.Schema.ArraySchema;
@@ -11,6 +13,8 @@ import io.colyseus.serializer.schema.types.MapSchema;
 #end
 
 class GameState extends Schema {
+	public static var project = new Ldtk.LdtkProject();
+
 	#if server
 	// Maps and direct references seem to need slightly different type hits to compile properly
 	@:type({map: PlayerState}) public var players:MapSchema<PlayerState>;
@@ -29,7 +33,9 @@ class GameState extends Schema {
 	@:type("float32") public var shopY:Float;
 	@:type("boolean") public var shopReady:Bool;
 
-	public function new() {
+	public var raw:Ldtk.Ldtk_Level;
+
+	public function new(levelID:String) {
 		super();
 		players = new MapSchema<PlayerState>();
 		fish = new MapSchema<FishState>();
@@ -38,5 +44,7 @@ class GameState extends Schema {
 		shopX = 0;
 		shopY = 0;
 		shopReady = false;
+
+		raw = project.getLevel(levelID);
 	}
 }

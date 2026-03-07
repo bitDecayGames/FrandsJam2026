@@ -1,7 +1,7 @@
 package levels.ldtk;
 
 import flixel.util.FlxColor;
-import levels.ldtk.Ldtk.Enum_TileTags;
+import Ldtk.Enum_TileTags;
 import levels.ldtk.LdtkTilemap.LdtkTile;
 
 /**

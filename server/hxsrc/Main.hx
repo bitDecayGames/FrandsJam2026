@@ -2,6 +2,7 @@ import colyseus.server.Colyseus;
 import colyseus.server.LobbyRoom;
 import colyseus.server.QueueRoom;
 import colyseus.server.Colyseus.Server;
+import rooms.GameRoom;
 import rooms.CharacterSelectRoom;
 import schema.Constants;
 

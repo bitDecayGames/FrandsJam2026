@@ -459,13 +459,13 @@
 			{ "id": "SWIMMABLE", "tileRect": null, "color": 4073265 }
 		], "iconTilesetUid": null, "externalRelPath": null, "externalFileChecksum": null, "tags": [] }
 	], "externalEnums": [
-		{ "identifier": "FmodSongE", "uid": 233, "values": [{ "id": "LetsGo", "tileRect": null, "color": 12470831 }], "iconTilesetUid": null, "externalRelPath": "../source/FmodEnums.hx", "externalFileChecksum": "332f7361cf7e3833fadb50fdccedf08d", "tags": [] },
-		{ "identifier": "FmodSFXE", "uid": 234, "values": [ { "id": "MenuHover", "tileRect": null, "color": 12470831 }, { "id": "MenuSelect", "tileRect": null, "color": 14120515 } ], "iconTilesetUid": null, "externalRelPath": "../source/FmodEnums.hx", "externalFileChecksum": "332f7361cf7e3833fadb50fdccedf08d", "tags": [] },
+		{ "identifier": "FmodSongE", "uid": 233, "values": [{ "id": "LetsGo", "tileRect": null, "color": 12470831 }], "iconTilesetUid": null, "externalRelPath": "../shared/FmodEnums.hx", "externalFileChecksum": "332f7361cf7e3833fadb50fdccedf08d", "tags": [] },
+		{ "identifier": "FmodSFXE", "uid": 234, "values": [ { "id": "MenuHover", "tileRect": null, "color": 12470831 }, { "id": "MenuSelect", "tileRect": null, "color": 14120515 } ], "iconTilesetUid": null, "externalRelPath": "../shared/FmodEnums.hx", "externalFileChecksum": "332f7361cf7e3833fadb50fdccedf08d", "tags": [] },
 		{ "identifier": "FmodBusE", "uid": 235, "values": [
 			{ "id": "Master", "tileRect": null, "color": 12470831 },
 			{ "id": "Music", "tileRect": null, "color": 14120515 },
 			{ "id": "SFX", "tileRect": null, "color": 15389866 }
-		], "iconTilesetUid": null, "externalRelPath": "../source/FmodEnums.hx", "externalFileChecksum": "332f7361cf7e3833fadb50fdccedf08d", "tags": [] }
+		], "iconTilesetUid": null, "externalRelPath": "../shared/FmodEnums.hx", "externalFileChecksum": "332f7361cf7e3833fadb50fdccedf08d", "tags": [] }
 	], "levelFields": [
 		{
 			"identifier": "Song",

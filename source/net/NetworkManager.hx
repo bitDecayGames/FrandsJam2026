@@ -206,6 +206,25 @@ class NetworkManager {
 		});
 	}
 
+	public function createPublicRoom(onSuccess:Room<CharSelectState>->Void, onFail:HttpException->Void) {
+		#if local
+		onSuccess(null);
+		return;
+		#end
+		if (lobbyRoomConn != null) {
+			lobbyRoomConn.leave(true);
+			lobbyRoomConn = null;
+		}
+		client.create(RoomName.CHAR_SELECT, new Map<String, Dynamic>(), CharSelectState, (err, match:Room<CharSelectState>) -> {
+			if (err != null) {
+				QLog.error('createPublicRoom failed — $err');
+				onFail(err);
+				return;
+			}
+			onSuccess(match);
+		});
+	}
+
 	public function createPrivateRoom(onSuccess:Room<CharSelectState>->Void, onFail:HttpException->Void) {
 		#if local
 		onSuccess(null);

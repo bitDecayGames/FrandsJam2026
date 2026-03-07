@@ -1,3 +1,5 @@
+package rooms;
+
 import js.lib.Error;
 import transition.PlayerInitData;
 import schema.GameState;
@@ -20,16 +22,21 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 	var pendingReservations:Map<String, PlayerState>;
 
+	var currentLevel:String;
+
 	public function new() {
 		super();
 		elapsedTime = 0;
 		tick = 0;
+		currentLevel = "unknown";
 	}
 
 	override public function onCreate(options:Dynamic):Void {
 		trace('start room: ${roomId}:${roomName}');
 		maxClients = 6;
-		setState(new GameState());
+		setState(new GameState(options.levelID));
+
+		currentLevel = options.levelID;
 
 		pendingReservations = new Map<String, PlayerState>();
 

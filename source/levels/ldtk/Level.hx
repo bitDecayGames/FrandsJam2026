@@ -6,7 +6,8 @@ import flixel.FlxSprite;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.math.FlxRect;
 import flixel.math.FlxPoint;
-import levels.ldtk.Ldtk.LdtkProject;
+import Ldtk;
+import Ldtk.LdtkProject;
 
 using levels.ldtk.LdtkUtils;
 using FmodEnums;

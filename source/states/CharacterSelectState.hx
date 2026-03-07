@@ -166,16 +166,7 @@ class CharacterSelectState extends FlxTransitionableState {
 		cb.onAdd(room.state, "players", (player:PlayerLobbyState, sessionId:String) -> {
 			trace('Player added: $sessionId');
 			playerNames.set(sessionId, player.name);
-
-			cb.listen(player, "name", (_, _) -> {
-				trace('NetMan: sesh: ${sessionId} changed name to: ${player.name}');
-				playerNames.set(sessionId, player.name);
-			});
-
-			cb.listen(player, "ready", (_, _) -> {
-				trace('NetMan: sesh: ${sessionId} set ready: ${player.ready}');
-				playerReadiness.set(sessionId, player.ready);
-			});
+			cb.onChange(player, () -> {});
 		});
 
 		room.onMessage(CharSelectState.SERVER_MSG_PLAYER_KICKED, (message:{sessionId:String}) -> {
@@ -207,6 +198,12 @@ class CharacterSelectState extends FlxTransitionableState {
 				// FlxG.switchState(() -> new PlayState(match));
 			});
 		});
+	}
+
+	private function updateRemotePlayer(p:PlayerLobbyState) {
+		playerSkins.set(p.sessionId, p.skinIndex);
+		playerNames.set(p.sessionId, p.name);
+		playerReadiness.set(p.sessionId, p.ready);
 	}
 
 	private function createSkinSelection():Void {

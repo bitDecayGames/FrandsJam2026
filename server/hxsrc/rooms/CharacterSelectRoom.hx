@@ -48,20 +48,20 @@ class CharacterSelectRoom extends RoomOf<CharSelectState, Dynamic> {
 			}
 		});
 
-		onMessage(CharSelectState.MSG_KICK, (client:Client, data:{targetSessionId:String}) -> {
-			trace('${client.sessionId}: wants to kick ${data.targetSessionId}');
-			var target = clients.getById(data.targetSessionId);
+		onMessage(CharSelectState.MSG_KICK, (client:Client, data:String) -> {
+			trace('${client.sessionId}: wants to kick $data');
+			var target = clients.getById(data);
 			if (target == null) {
 				return;
 			}
 
 			// Remove the player from state immediately so other clients see it right away.
 			// onLeave will also fire after the WebSocket closes but will safely no-op.
-			state.players.delete(data.targetSessionId);
+			state.players.delete(data);
 
 			// Tell all clients explicitly so they can update their player lists without relying on the schema patch
 			// cycle or background-thread schema callbacks
-			broadcast(CharSelectState.SERVER_MSG_PLAYER_KICKED, {sessionId: data.targetSessionId});
+			broadcast(CharSelectState.SERVER_MSG_PLAYER_KICKED, {sessionId: data});
 
 			// Notify the kicked client and disconnect them via standard Colyseus method
 			target.leave(CloseCode.CONSENTED);
@@ -107,7 +107,8 @@ class CharacterSelectRoom extends RoomOf<CharSelectState, Dynamic> {
 			});
 		}
 		return {
-			players: playerSeedData
+			players: playerSeedData,
+			levelID: "Level_0"
 			// TODO: We should also seed the game mode data here
 		};
 	}

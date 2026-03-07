@@ -1,7 +1,9 @@
 -cp hxsrc
 -cp ..
+-cp ../shared
 -lib colyseus-hxjs
 -lib hxnodejs
+-lib ldtk-haxe-api
 -main Main
 -js dist/server.js
 -D js-es=6

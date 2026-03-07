@@ -43,8 +43,9 @@ class NewLobbyState extends FlxTransitionableState {
 	var _txtTitle:FlxText;
 	var _txtStatus:FlxText;
 	var _txtColHeader:FlxText;
-	var _btnCreatePublic:FlxButton;
-	var _btnCreatePrivate:FlxButton;
+	var _btnRandom:FlxButton;
+	var _btnPublic:FlxButton;
+	var _btnPrivate:FlxButton;
 	var _inputRoomId:FlxInputText;
 	var _btnJoinById:FlxButton;
 
@@ -103,28 +104,28 @@ class NewLobbyState extends FlxTransitionableState {
 			_roomRows.push({label: label, btn: btn, roomId: ""});
 		}
 
-		// Row 1 (y=382): Create Public Room | Create Private Room
-		_btnCreatePublic = MenuBuilder.createTextButton("Create Public Room", clickCreatePublic);
-		_btnCreatePublic.setPosition(150, 382);
-		add(_btnCreatePublic);
+		// Row 1 (y=382): Random | Public | Private — evenly spaced across the screen
+		// 3 × 160px buttons + 2 × 20px gaps = 520px, start at (640-520)/2 = 60
+		_btnRandom = MenuBuilder.createTextButton("Random", clickRandom);
+		_btnRandom.setPosition(60, 382);
+		add(_btnRandom);
 
-		_btnCreatePrivate = MenuBuilder.createTextButton("Create Private Room", clickCreatePrivate);
-		_btnCreatePrivate.setPosition(330, 382);
-		add(_btnCreatePrivate);
+		_btnPublic = MenuBuilder.createTextButton("Public", clickPublic);
+		_btnPublic.setPosition(240, 382);
+		add(_btnPublic);
 
-		// Row 2 (y=432): [Room ID input] [Join Room btn]
-		_inputRoomId = new FlxInputText(150, 432, 220, "", 14, TEXT_COLOR, FlxColor.WHITE);
+		_btnPrivate = MenuBuilder.createTextButton("Private", clickPrivate);
+		_btnPrivate.setPosition(420, 382);
+		add(_btnPrivate);
+
+		// Row 2 (y=432): [Room ID input] [Join by ID btn] — centered
+		// 200px input + 10px gap + 160px btn = 370px, start at (640-370)/2 = 135
+		_inputRoomId = new FlxInputText(135, 432, 200, "", 14, TEXT_COLOR, FlxColor.WHITE);
 		_inputRoomId.maxChars = 9;
 		add(_inputRoomId);
 
-		_btnJoinById = new FlxButton(380, 432, "Join Room");
-		_btnJoinById.makeGraphic(110, 40, FlxColor.WHITE);
-		_btnJoinById.label.setFormat(Main.menuFont, 16, 0x333333, "center");
-		_btnJoinById.label.fieldWidth = 110;
-		_btnJoinById.updateHitbox();
-		_btnJoinById.onUp.callback = clickJoinById;
-		_btnJoinById.onOver.callback = () -> _btnJoinById.color = FlxColor.GRAY;
-		_btnJoinById.onOut.callback = () -> _btnJoinById.color = FlxColor.WHITE;
+		_btnJoinById = MenuBuilder.createTextButton("Join by ID", clickJoinById);
+		_btnJoinById.setPosition(345, 432);
 		add(_btnJoinById);
 
 		NetworkManager.ME.joinLobby(setupLobby, (err) -> {});
@@ -209,10 +210,12 @@ class NewLobbyState extends FlxTransitionableState {
 		}
 
 		// Dim all bottom controls while a join is in progress
-		_btnCreatePublic.active = !_joining;
-		_btnCreatePublic.alpha = _joining ? 0.4 : 1.0;
-		_btnCreatePrivate.active = !_joining;
-		_btnCreatePrivate.alpha = _joining ? 0.4 : 1.0;
+		_btnRandom.active = !_joining;
+		_btnRandom.alpha = _joining ? 0.4 : 1.0;
+		_btnPublic.active = !_joining;
+		_btnPublic.alpha = _joining ? 0.4 : 1.0;
+		_btnPrivate.active = !_joining;
+		_btnPrivate.alpha = _joining ? 0.4 : 1.0;
 		_btnJoinById.active = !_joining;
 		_btnJoinById.alpha = _joining ? 0.4 : 1.0;
 		_inputRoomId.active = !_joining;
@@ -231,7 +234,7 @@ class NewLobbyState extends FlxTransitionableState {
 		NetworkManager.ME.joinSpecificRoom(row.roomId, onJoinSuccess, onJoinFail);
 	}
 
-	private function clickCreatePublic():Void {
+	private function clickRandom():Void {
 		if (_joining) {
 			return;
 		}
@@ -239,7 +242,15 @@ class NewLobbyState extends FlxTransitionableState {
 		NetworkManager.ME.joinQueue(onJoinSuccess, onJoinFail);
 	}
 
-	private function clickCreatePrivate():Void {
+	private function clickPublic():Void {
+		if (_joining) {
+			return;
+		}
+		_joining = true;
+		NetworkManager.ME.createPublicRoom(onJoinSuccess, onJoinFail);
+	}
+
+	private function clickPrivate():Void {
 		if (_joining) {
 			return;
 		}

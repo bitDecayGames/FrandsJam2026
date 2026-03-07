@@ -1,4 +1,4 @@
-package shared;
+package;
 
 import schema.GameState;
 
@@ -7,7 +7,8 @@ class Simulation {
 	// - fixed timesteps
 	// - Have game 'ticks' so that we can correlate inputs well
 	public var state:GameState;
-	public var options:GameOptions;
+
+	// public var options:GameOptions;
 
 	public function init(state:GameState, options:Dynamic) {
 		this.state = state;
