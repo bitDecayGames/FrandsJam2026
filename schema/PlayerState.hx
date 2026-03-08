@@ -23,12 +23,16 @@ class PlayerState extends Schema {
 	public static final FACING_LEFT = 4;
 
 	@:type("string") public var actionState:String;
+
+	@:type("float32") public var speed:Float;
 	@:type("float32") public var x:Float;
 	@:type("float32") public var y:Float;
-	@:type("uint8") public var facing:Int;
+	@:type("float32") public var width:Float;
+	@:type("float32") public var height:Float;
 	@:type("float32") public var velocityX:Float;
 	@:type("float32") public var velocityY:Float;
-	@:type("boolean") public var ready:Bool;
+
+	@:type("uint8") public var facing:Int;
 	@:type("string") public var name:String;
 	@:type("int8") public var skinIndex:Int;
 	@:type("int32") public var score:Int;
@@ -38,10 +42,11 @@ class PlayerState extends Schema {
 		actionState = ACTION_IDLE;
 		x = 0;
 		y = 0;
+		width = 16;
+		height = 8;
 		facing = FACING_DOWN;
 		velocityX = 0;
 		velocityY = 0;
-		ready = false;
 		name = "";
 		skinIndex = -1;
 		score = 0;

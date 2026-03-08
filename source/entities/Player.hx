@@ -541,6 +541,7 @@ class Player extends FlxSprite {
 				}
 			} else {
 				if (inputDir != NONE) {
+					// This needs to change, as we can't set just our local - we need to send the intent to the server
 					inputDir.asVector(velocity).normalize().scale(moveSpeed);
 				} else {
 					velocity.set();
@@ -1118,31 +1119,6 @@ class Player extends FlxSprite {
 		if (animName != null) {
 			animation.play(animName, false, false, animFrame);
 		}
-	}
-
-	public function activateHotMode() {
-		if (!hotModeActive) {
-			hotModeActive = true;
-			hotModeTimer = 3.0;
-			TODO.sfx("hot_mode_activate");
-			#if !local
-			if (!isRemote) {
-				// GameManager.ME.net.sendHotPepper(true);
-			}
-			#end
-		}
-	}
-
-	public function deactivateHotMode() {
-		hotModeActive = false;
-	}
-
-	public function pickupItem(item:InventoryItem):Bool {
-		var added = inventory.add(item);
-		if (added) {
-			FmodManager.PlaySoundOneShot(FmodSFX.ItemCollect);
-		}
-		return added;
 	}
 
 	function getDirSuffix():String {
