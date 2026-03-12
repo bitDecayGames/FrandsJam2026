@@ -194,8 +194,7 @@ class CharacterSelectState extends FlxTransitionableState {
 					return;
 				}
 				trace('Joined game ${match.roomId} as ${match.sessionId}');
-				// GameManager.ME.init(match);
-				// FlxG.switchState(() -> new PlayState(match));
+				FlxG.switchState(() -> new PlayState(match));
 			});
 		});
 	}

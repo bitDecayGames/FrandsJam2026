@@ -22,6 +22,8 @@ class GameState extends Schema {
 
 	public static var project = new Ldtk.LdtkProject();
 
+	@:type("string") public var levelID:String;
+
 	#if server
 	// Maps and direct references seem to need slightly different type hits to compile properly
 	@:type({map: PlayerState}) public var players:MapSchema<PlayerState>;
@@ -45,24 +47,25 @@ class GameState extends Schema {
 	// --- NON-Synced Fields
 	// server and client each build this locally from the level data
 	public var collision:CollisionMap;
-	public var inputQueue:Map<String, Array<P_Input>;
-		public function new(levelID:String) {
-			super
-			();
-			players = new MapSchema<PlayerState>();
-			fish = new MapSchema<FishState>();
-			round = new RoundState();
-			bushes = new MapSchema<BushState>();
-			shopX = 0;
-			shopY = 0;
-			shopReady = false;
-			inputQueue = [];
-			raw = project.getLevel(levelID);
-			#if server
-			var hitboxJson = sys.io.File.getContent("assets/data/tile-hitboxes.json");
-			#else
-			var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
-			#end
-			collision = CollisionMap.fromLevel(raw, hitboxJson);
-		}
+	public var inputQueue:Map<String, Array<P_Input>>;
+
+	public function new(levelID:String = "Level_0") {
+		super();
+		players = new MapSchema<PlayerState>();
+		fish = new MapSchema<FishState>();
+		round = new RoundState();
+		bushes = new MapSchema<BushState>();
+		shopX = 0;
+		shopY = 0;
+		shopReady = false;
+		inputQueue = new Map();
+		this.levelID = levelID;
+		raw = project.getLevel(levelID);
+		#if server
+		var hitboxJson = sys.io.File.getContent("../assets/data/tile-hitboxes.json");
+		#else
+		var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
+		#end
+		collision = CollisionMap.fromLevel(raw, hitboxJson);
 	}
+}

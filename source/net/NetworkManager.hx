@@ -149,7 +149,7 @@ class NetworkManager {
 	/** Join an existing room by its ID (e.g. from the lobby room listing). */
 	public function joinSpecificRoom(roomId:String, onSuccess:Room<CharSelectState>->Void, onFail:HttpException->Void) {
 		#if local
-		onSuccess();
+		onSuccess(null);
 		return;
 		#end
 		if (lobbyRoomConn != null) {
@@ -316,6 +316,11 @@ class NetworkManager {
 			velocityX: velocityX,
 			velocityY: velocityY
 		}, true);
+	}
+
+	public function sendInputs(inputs:Array<schema.GameState.P_Input>) {
+		#if local return; #end
+		sendMessage(schema.GameState.MSG_P_INPUT, inputs, true);
 	}
 
 	public function sendMessage(topic:String, msg:Dynamic, mute:Bool = false) {

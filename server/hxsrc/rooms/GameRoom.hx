@@ -12,13 +12,14 @@ import colyseus.server.Room.RoomOf;
 import colyseus.server.Room.CloseCode;
 import haxe.extern.EitherType;
 import js.lib.Promise;
-import shared.math.Vector;
 
 class GameRoom extends RoomOf<GameState, Dynamic> {
 	static var fixedTimeStep:Float = 1 / 20;
 
 	var elapsedTime:Float;
 	var tick:Int;
+
+	var simulation:Simulation;
 
 	var pendingReservations:Map<String, PlayerState>;
 
@@ -35,6 +36,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		trace('start room: ${roomId}:${roomName}');
 		maxClients = 6;
 		setState(new GameState(options.levelID));
+		simulation = new Simulation(state.collision);
 
 		currentLevel = options.levelID;
 
@@ -66,13 +68,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				trace('input received from unknown player ${client.sessionId}, dropping.');
 				return;
 			}
-
-			// TODO: Validate data payload validity
-
 			if (!state.inputQueue.exists(client.sessionId)) {
 				state.inputQueue.set(client.sessionId, []);
 			}
-			state.inputQueue.get(client.sessionId).push(data);
+			for (input in (data : Array<P_Input>)) {
+				state.inputQueue.get(client.sessionId).push(input);
+			}
 		});
 
 		// // sent when a client spawns a fish
@@ -293,27 +294,13 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 	function fixedTick(t:Float) {
 		tick++;
-
-		var res:CollisionMap.Result;
-
-		// TODO: Check for inputs, play any needed ones
-		// These inputs will have some delta/timestamp on them, and we want to make sure we play
-		// them in the correct order
-
-		var up:Vector = {
-			x: 0,
-			y: 1
-		};
-
 		for (id => p in state.players) {
-			for (i in state.inputQueue.get(id)) {
-				i.dir
+			var queue = state.inputQueue.get(id);
+			if (queue == null || queue.length == 0) {
+				continue;
 			}
-			res = state.collision.resolveAABB(p.x, p.y, p.width, p.height, p.velocityX, p.velocityY);
-			if (res.hitX || res.hitY) {
-				p.x = res.x;
-				p.y = res.y;
-			}
+			simulation.tickPlayer(p, queue);
+			queue.splice(0, queue.length);
 		}
 	}
 }

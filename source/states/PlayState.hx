@@ -1,7 +1,12 @@
 package states;
 
 import schema.GameState;
+import schema.GameState.P_Input;
+import schema.PlayerState;
+import input.InputCalculator;
+import bitdecay.flixel.spacial.Cardinal;
 import io.colyseus.Room;
+import io.colyseus.serializer.schema.Callbacks;
 import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
 import flixel.FlxSprite;
@@ -51,6 +56,12 @@ class PlayState extends FlxTransitionableState {
 	var remotePlayers:Map<String, Player> = new Map();
 	var remoteFish:Map<String, WaterFish> = new Map();
 
+	// Client-side prediction
+	var simulation:Simulation;
+	var clientPlayerState:PlayerState;
+	var pendingInputs:Array<P_Input> = [];
+	var inputSeq:Int = 0;
+
 	var midGroundGroup = new FlxGroup();
 	var ySortGroup = new FlxGroup();
 	var bushGroup = new FlxTypedGroup<Bush>();
@@ -87,13 +98,20 @@ class PlayState extends FlxTransitionableState {
 	var timerTotalSec:Float = 0;
 	var timerSynced:Bool = false;
 
-	public function new(round:RoundManager) {
-		this.round = round;
+	public function new(game:Room<GameState>) {
 		super();
+		colyRoom = game;
+		QLog.notice(colyRoom.state.levelID);
 	}
 
 	override public function create() {
 		super.create();
+
+		// TODO: We need to create all of our entities now based on what is in the game state
+		// Then connect the entities on our side to their IDs in the game state so we can link
+		// them and keep them synced together
+		var cb = Callbacks.get(colyRoom);
+		cb.listen(colyRoom.state, "level", () -> {});
 
 		FlxG.camera.pixelPerfectRender = true;
 
@@ -114,7 +132,7 @@ class PlayState extends FlxTransitionableState {
 		add(ySortGroup);
 		add(transitions);
 
-		loadLevel("Level_0");
+		loadLevel(colyRoom.state.levelID);
 
 		hotText = new FlashingText("HOT", 0.15, 3.0);
 		add(hotText);
@@ -129,6 +147,34 @@ class PlayState extends FlxTransitionableState {
 		timerHUD.color = FlxColor.WHITE;
 		timerHUD.scrollFactor.set(0, 0);
 		add(timerHUD);
+
+		// Wire server-reconciliation: when the server acks our inputs, replay any un-acked ones
+		#if !local
+		NetworkManager.ME.onPlayerChanged.add((sesId, data) -> {
+			if (sesId != NetworkManager.ME.mySessionId) {
+				return;
+			}
+			var ack = data.state.lastProcessedSeq;
+			// Prune inputs the server has already processed
+			while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
+				pendingInputs.shift();
+			}
+			// Reset to server-authoritative position and replay remaining inputs
+			clientPlayerState.x = data.state.x;
+			clientPlayerState.y = data.state.y;
+			clientPlayerState.velocityX = data.state.velocityX;
+			clientPlayerState.velocityY = data.state.velocityY;
+			for (inp in pendingInputs) {
+				simulation.tickPlayer(clientPlayerState, [inp]);
+			}
+			// Only snap the visual if the error is large (>4px)
+			var ex = clientPlayerState.x - player.x;
+			var ey = clientPlayerState.y - player.y;
+			if (ex * ex + ey * ey > 16) {
+				player.setPosition(clientPlayerState.x, clientPlayerState.y);
+			}
+		});
+		#end
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -158,6 +204,24 @@ class PlayState extends FlxTransitionableState {
 	function loadLevel(level:String) {
 		unload();
 
+		// Build collision map for client-side prediction simulation
+		var col:CollisionMap;
+		#if local
+		var hitboxJson = openfl.Assets.getText("../assets/data/tile-hitboxes.json");
+		col = CollisionMap.fromLevel(ldtk.getLevel(level), hitboxJson);
+		#else
+		var gs = NetworkManager.ME.getState();
+		if (gs != null) {
+			col = gs.collision;
+		} else {
+			var hitboxJson = AssetPaths.tile_hitboxes__json;
+			col = CollisionMap.fromLevel(ldtk.getLevel(level), hitboxJson);
+		}
+		#end
+		simulation = new Simulation(col);
+		pendingInputs = [];
+		inputSeq = 0;
+
 		var level = new Level(level);
 		if (level.songEvent != "") {
 			TODO.sfx("Play song");
@@ -171,6 +235,13 @@ class PlayState extends FlxTransitionableState {
 
 		// standin until we get everything sent down from the server
 		player = new Player(0, 0, this);
+
+		clientPlayerState = new PlayerState();
+		clientPlayerState.x = player.x;
+		clientPlayerState.y = player.y;
+		clientPlayerState.speed = 100;
+		clientPlayerState.width = 16;
+		clientPlayerState.height = 8;
 
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
@@ -311,9 +382,30 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	override public function update(elapsed:Float) {
-		super.update(elapsed);
+		// Run client-side prediction before super.update() so player.update()
+		// sees the correct lastInputDir and isMoving before calling playMovementAnim()
+		if (!player.frozen) {
+			var inputDir = InputCalculator.getInputCardinal(0);
+			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
+				player.lastInputDir = inputDir;
+			}
+			var dir:Int = switch (inputDir) {
+				case N: 1;
+				case E: 2;
+				case S: 3;
+				case W: 4;
+				default: 0;
+			};
+			player.isMoving = (dir != 0);
+			var inp:P_Input = {seq: ++inputSeq, dir: dir};
+			pendingInputs.push(inp);
+			NetworkManager.ME.sendInputs([inp]);
+			simulation.tickPlayer(clientPlayerState, [inp]);
+			player.setPosition(clientPlayerState.x, clientPlayerState.y);
+			player.velocity.set(0, 0);
+		}
 
-		updateTimerHUD(elapsed);
+		super.update(elapsed);
 
 		// FlxG.collide(midGroundGroup, player);
 

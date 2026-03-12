@@ -583,7 +583,7 @@ class GameManager {
 			case RoundState.STATUS_LOBBY:
 				// FlxG.switchState(() -> new CharacterSelectState());
 			case RoundState.STATUS_ACTIVE:
-				FlxG.switchState(() -> new PlayState(round));
+				FlxG.switchState(() -> new PlayState(null));
 			case RoundState.STATUS_POST_ROUND:
 				FlxG.switchState(() -> new PostRoundState());
 			case RoundState.STATUS_END_GAME:

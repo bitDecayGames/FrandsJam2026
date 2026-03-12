@@ -36,6 +36,7 @@ class PlayerState extends Schema {
 	@:type("string") public var name:String;
 	@:type("int8") public var skinIndex:Int;
 	@:type("int32") public var score:Int;
+	@:type("int32") public var lastProcessedSeq:Int;
 
 	public function new() {
 		super();
@@ -50,5 +51,6 @@ class PlayerState extends Schema {
 		name = "";
 		skinIndex = -1;
 		score = 0;
+		lastProcessedSeq = 0;
 	}
 }

@@ -95,7 +95,7 @@ class Player extends FlxSprite {
 		return value;
 	}
 
-	var frozen:Bool = false;
+	public var frozen:Bool = false;
 
 	public var sessionId:String = "";
 
@@ -164,6 +164,8 @@ class Player extends FlxSprite {
 	var rockElapsed:Float = 0;
 
 	// Animation state tracking
+	public var isMoving:Bool = false;
+
 	var lastMoving:Bool = false;
 	var lastAnimDir:Cardinal = E;
 
@@ -336,7 +338,7 @@ class Player extends FlxSprite {
 	}
 
 	function playMovementAnim(force:Bool = false) {
-		var moving = velocity.x != 0 || velocity.y != 0;
+		var moving = isRemote ? (velocity.x != 0 || velocity.y != 0) : isMoving;
 		if (!force && moving == lastMoving && lastInputDir == lastAnimDir && !inShallowWater)
 			return;
 
@@ -350,6 +352,15 @@ class Player extends FlxSprite {
 
 	function sendAnimUpdate(animName:String, forceRestart:Bool = false) {
 		onAnimUpdate.dispatch(animName, forceRestart);
+	}
+
+	public function pickupItem(item:InventoryItem) {
+		inventory.add(item);
+	}
+
+	public function activateHotMode() {
+		hotModeActive = true;
+		hotModeTimer = 30.0;
 	}
 
 	public function setNetwork(session:String) {
@@ -524,30 +535,9 @@ class Player extends FlxSprite {
 			swapSkin();
 		}
 
-		if (frozen) {
-			velocity.set();
-		} else {
-			var inputDir = InputCalculator.getInputCardinal(playerNum);
-			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
-				lastInputDir = inputDir;
-			}
-
-			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
-			// Timer already ticked in the shared hot mode block above; just apply the velocity boost
-			if (hotModeActive) {
-				var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
-				if (moveDir != NONE) {
-					moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
-				}
-			} else {
-				if (inputDir != NONE) {
-					// This needs to change, as we can't set just our local - we need to send the intent to the server
-					inputDir.asVector(velocity).normalize().scale(moveSpeed);
-				} else {
-					velocity.set();
-				}
-			}
-		}
+		// Position is driven by PlayState via Simulation; always zero FlxSprite velocity
+		// so the built-in physics integration doesn't fight our manual setPosition calls
+		velocity.set(0, 0);
 
 		// Only update movement animations when fully idle (not casting, catching, or throwing)
 		if (castState == IDLE && !throwing) {
