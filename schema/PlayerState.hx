@@ -45,6 +45,7 @@ class PlayerState extends Schema {
 		y = 0;
 		width = 16;
 		height = 8;
+		speed = 100;
 		facing = FACING_DOWN;
 		velocityX = 0;
 		velocityY = 0;

@@ -100,8 +100,10 @@ class PlayState extends FlxTransitionableState {
 
 	public function new(game:Room<GameState>) {
 		super();
+		#if !local
 		colyRoom = game;
 		QLog.notice(colyRoom.state.levelID);
+		#end
 	}
 
 	override public function create() {
@@ -110,8 +112,22 @@ class PlayState extends FlxTransitionableState {
 		// TODO: We need to create all of our entities now based on what is in the game state
 		// Then connect the entities on our side to their IDs in the game state so we can link
 		// them and keep them synced together
+
+		#if !local
+		var startingState = colyRoom.state;
+		trace(startingState);
 		var cb = Callbacks.get(colyRoom);
-		cb.listen(colyRoom.state, "level", () -> {});
+		cb.listen(colyRoom.state, "levelID", (old, now) -> {
+			trace(old);
+			trace(now);
+		});
+
+		colyRoom.onStateChange += (newState:GameState) -> {
+			trace('level: ${newState.levelID}');
+			trace("NetMan: received state change:");
+			trace('  - FishCount: ${newState.fish.length}');
+		};
+		#end
 
 		FlxG.camera.pixelPerfectRender = true;
 
@@ -132,7 +148,11 @@ class PlayState extends FlxTransitionableState {
 		add(ySortGroup);
 		add(transitions);
 
+		#if local
+		loadLevel("Level_0");
+		#else
 		loadLevel(colyRoom.state.levelID);
+		#end
 
 		hotText = new FlashingText("HOT", 0.15, 3.0);
 		add(hotText);
@@ -206,8 +226,9 @@ class PlayState extends FlxTransitionableState {
 
 		// Build collision map for client-side prediction simulation
 		var col:CollisionMap;
+
 		#if local
-		var hitboxJson = openfl.Assets.getText("../assets/data/tile-hitboxes.json");
+		var hitboxJson = AssetPaths.tile_hitboxes__json;
 		col = CollisionMap.fromLevel(ldtk.getLevel(level), hitboxJson);
 		#else
 		var gs = NetworkManager.ME.getState();
@@ -233,20 +254,26 @@ class PlayState extends FlxTransitionableState {
 		midGroundGroup.add(shallowColliders);
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
-		// standin until we get everything sent down from the server
-		player = new Player(0, 0, this);
-
+		#if local
 		clientPlayerState = new PlayerState();
-		clientPlayerState.x = player.x;
-		clientPlayerState.y = player.y;
-		clientPlayerState.speed = 100;
-		clientPlayerState.width = 16;
-		clientPlayerState.height = 8;
+		player = Player.fromState(clientPlayerState, this);
+		ySortGroup.add(player);
+		#else
+		// standin until we get everything sent down from the server
+		// player = new Player(0, 0, this);
+		for (id => p in colyRoom.state.players) {
+			var loadedPlayer = Player.fromState(p, this);
+			ySortGroup.add(loadedPlayer);
+			if (id == colyRoom.sessionId) {
+				player = loadedPlayer;
+				clientPlayerState = p;
+			}
+		}
+		#end
 
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
 		camera.follow(player);
-		ySortGroup.add(player);
 
 		waterLayer = level.waterGrid;
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
@@ -399,8 +426,10 @@ class PlayState extends FlxTransitionableState {
 			player.isMoving = (dir != 0);
 			var inp:P_Input = {seq: ++inputSeq, dir: dir};
 			pendingInputs.push(inp);
-			NetworkManager.ME.sendInputs([inp]);
-			simulation.tickPlayer(clientPlayerState, [inp]);
+			#if !local
+			colyRoom.send(schema.GameState.MSG_P_INPUT, [inp]);
+			#end
+			simulation.tickPlayer(clientPlayerState, [inp], elapsed);
 			player.setPosition(clientPlayerState.x, clientPlayerState.y);
 			player.velocity.set(0, 0);
 		}

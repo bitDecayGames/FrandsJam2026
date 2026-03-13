@@ -14,7 +14,7 @@ import haxe.extern.EitherType;
 import js.lib.Promise;
 
 class GameRoom extends RoomOf<GameState, Dynamic> {
-	static var fixedTimeStep:Float = 1 / 20;
+	static var fixedTimeStep:Float = 1 / 20.0;
 
 	var elapsedTime:Float;
 	var tick:Int;
@@ -44,12 +44,18 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 		trace('expected players:');
 		var pData:Array<PlayerInitData> = options.players;
-		for (p in pData) {
+		var spawnPoints = simulation.getRandomSpawnPoints(pData.length);
+
+		for (i in 0...pData.length) {
+			var data = pData[i];
+			var spawn = spawnPoints[i];
 			var pState = new PlayerState();
-			pState.name = p.name;
-			pState.skinIndex = p.skin;
-			trace('  - ${p.sessionID}');
-			pendingReservations.set(p.sessionID, pState);
+			pState.x = spawn.x;
+			pState.y = spawn.y;
+			pState.name = data.name;
+			pState.skinIndex = data.skin;
+			trace('  - ${data.sessionID}');
+			pendingReservations.set(data.sessionID, pState);
 		}
 
 		this.setSimulationInterval(this.update);
@@ -71,6 +77,11 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			if (!state.inputQueue.exists(client.sessionId)) {
 				state.inputQueue.set(client.sessionId, []);
 			}
+
+			if (data == null) {
+				return;
+			}
+
 			for (input in (data : Array<P_Input>)) {
 				state.inputQueue.get(client.sessionId).push(input);
 			}
@@ -290,16 +301,20 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			elapsedTime -= fixedTimeStep;
 			this.fixedTick(fixedTimeStep);
 		}
+		// for (id => p in state.players) {
+		// 	trace('pPos: )${p.x}, ${p.y})');
+		// }
 	}
 
 	function fixedTick(t:Float) {
 		tick++;
+
 		for (id => p in state.players) {
 			var queue = state.inputQueue.get(id);
 			if (queue == null || queue.length == 0) {
 				continue;
 			}
-			simulation.tickPlayer(p, queue);
+			simulation.tickPlayer(p, queue, t);
 			queue.splice(0, queue.length);
 		}
 	}

@@ -173,6 +173,13 @@ class Player extends FlxSprite {
 
 	var state:FlxState;
 
+	public static function fromState(p:PlayerState, state:FlxState):Player {
+		var p = new Player(p.x, p.y, state);
+		p.skinIndex = p.skinIndex;
+		p.swapSkin();
+		return p;
+	}
+
 	public function new(X:Float, Y:Float, state:FlxState) {
 		super(X, Y);
 		this.state = state;
