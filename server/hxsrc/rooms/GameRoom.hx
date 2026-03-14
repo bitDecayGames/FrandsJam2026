@@ -314,7 +314,20 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			if (queue == null || queue.length == 0) {
 				continue;
 			}
-			simulation.tickPlayer(p, queue, t);
+			// Process each input with its original frame delta so the server
+			// takes the same small steps as the client — keeps SAT penetration
+			// shallow and prevents axis-flip on polygon corner tiles.
+			//
+			// Budget prevents cheaters from sending many inputs to move farther
+			// than one server tick allows. Once budget is exhausted, remaining
+			// inputs are called with dt=0 so they still advance lastProcessedSeq
+			// — keeps the client's pendingInputs from growing unboundedly.
+			var budget = t;
+			for (inp in queue) {
+				var dt = Math.max(0.0, Math.min(inp.elapsed, budget));
+				simulation.tickPlayer(p, [inp], dt);
+				budget -= dt;
+			}
 			queue.splice(0, queue.length);
 		}
 	}

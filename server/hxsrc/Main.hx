@@ -15,6 +15,7 @@ class Main {
 			},
 			// devMode: true, // This setting will cache servers on shutdown so we can persist state between restarts for faster iteration
 		});
+
 		gameServer.define(RoomName.LOBBY, LobbyRoom); // This would be for private games / playing with friends
 		gameServer.define(RoomName.QUEUE, QueueRoom, {
 			matchRoomName: RoomName.CHAR_SELECT,
@@ -28,6 +29,12 @@ class Main {
 
 		gameServer.listen(port, "0.0.0.0").then((_) -> {
 			trace('Listening on ws://localhost:$port');
+			#if simlag
+			var lag = 200;
+			trace('simulating ${lag}ms of latency');
+			gameServer.simulateLatency(lag);
+			#end
+			return null;
 		});
 	}
 }
