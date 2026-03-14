@@ -243,14 +243,14 @@ class PlayState extends FlxTransitionableState {
 		var col:CollisionMap;
 
 		#if local
-		var hitboxJson = AssetPaths.tile_hitboxes__json;
+		var hitboxJson = openfl.Assets.getText(AssetPaths.tile_hitboxes__json);
 		col = CollisionMap.fromLevel(ldtk.getLevel(level), hitboxJson);
 		#else
 		var gs = NetworkManager.ME.getState();
 		if (gs != null) {
 			col = gs.collision;
 		} else {
-			var hitboxJson = AssetPaths.tile_hitboxes__json;
+			var hitboxJson = openfl.Assets.getText(AssetPaths.tile_hitboxes__json);
 			col = CollisionMap.fromLevel(ldtk.getLevel(level), hitboxJson);
 		}
 		#end
