@@ -22,6 +22,7 @@ class PlayerState extends Schema {
 	public static final FACING_DOWN = 3;
 	public static final FACING_LEFT = 4;
 
+	@:type("string") public var actionIntent:String;
 	@:type("string") public var actionState:String;
 
 	@:type("float32") public var speed:Float;

@@ -29,20 +29,17 @@ class Simulation {
 		var vx:Float = 0;
 		var vy:Float = 0;
 		var lastSeq = p.lastProcessedSeq;
+		p.actionIntent = PlayerState.ACTION_IDLE;
 		for (input in inputs) {
 			lastSeq = input.seq;
-			var inDir = Vector.fromAngle(input.dir);
-			switch (input.dir) {
-				case 1: // N
-					vy = -p.speed;
-				case 2: // E
-					vx = p.speed;
-				case 3: // S
-					vy = p.speed;
-				case 4: // W
-					vx = -p.speed;
-				default:
+			if (input.dir == -1) {
+				// no input direction provided
+				continue;
 			}
+			var inDir = Vector.fromAngle(input.dir);
+			vx = inDir.x * p.speed;
+			vy = inDir.y * p.speed;
+			p.actionIntent = PlayerState.ACTION_RUN;
 		}
 		var res = collision.resolveAABB(p.x, p.y, p.width, p.height, vx * elapsed, vy * elapsed);
 		p.x = res.x;
@@ -50,6 +47,20 @@ class Simulation {
 		p.velocityX = if (res.hitX) 0 else vx;
 		p.velocityY = if (res.hitY) 0 else vy;
 		p.lastProcessedSeq = lastSeq;
+
+		updatePlayerState(p);
+	}
+
+	function updatePlayerState(p:PlayerState) {
+		if (p.actionIntent == PlayerState.ACTION_RUN) {
+			if (p.velocityX != 0 && p.velocityY != 0) {
+				p.actionState = PlayerState.ACTION_RUN;
+			} else {
+				p.actionState = PlayerState.ACTION_IDLE;
+			}
+		} else {
+			p.actionState = PlayerState.ACTION_IDLE;
+		}
 	}
 
 	/**

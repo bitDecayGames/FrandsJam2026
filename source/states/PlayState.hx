@@ -190,6 +190,12 @@ class PlayState extends FlxTransitionableState {
 	function bindPlayer(p:Player, client:PlayerState, serverState:PlayerState) {
 		var cb = Callbacks.get(colyRoom);
 		cb.onChange(serverState, () -> {
+			if (client == null) {
+				// fully remote player. just set and forget
+				p.setPosition(serverState.x, serverState.y);
+				return;
+			}
+
 			var ack = serverState.lastProcessedSeq;
 			// Prune inputs the server has already processed
 			while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
@@ -278,17 +284,20 @@ class PlayState extends FlxTransitionableState {
 		// player = new Player(0, 0, this);
 		for (id => p in colyRoom.state.players) {
 			var loadedPlayer = Player.fromState(p, this);
-			ySortGroup.add(loadedPlayer);
+			var clientState:PlayerState = null;
+
 			if (id == colyRoom.sessionId) {
 				player = loadedPlayer;
-				clientPlayerState = new PlayerState();
-				clientPlayerState.x = p.x;
-				clientPlayerState.y = p.y;
+				clientState = new PlayerState();
+				clientState.x = p.x;
+				clientState.y = p.y;
+				clientPlayerState = clientState;
 				FlxG.watch.add(loadedPlayer, "x", "pX: ");
 				FlxG.watch.add(loadedPlayer, "y", "pY: ");
 			}
 
-			bindPlayer(loadedPlayer, clientPlayerState, p);
+			bindPlayer(loadedPlayer, clientState, p);
+			ySortGroup.add(loadedPlayer);
 		}
 		#end
 
@@ -402,11 +411,11 @@ class PlayState extends FlxTransitionableState {
 				}
 				player.onFishDelivered = null;
 			};
-			player.catchFish(true, catcherSessionId, fishId, fishType);
+			// player.catchFish(true, catcherSessionId, fishId, fishType);
 		} else {
-			var remote = remotePlayers.get(catcherSessionId);
-			if (remote != null)
-				remote.catchFish(true, catcherSessionId, fishId, fishType);
+			// var remote = remotePlayers.get(catcherSessionId);
+			// if (remote != null)
+			// remote.catchFish(true, catcherSessionId, fishId, fishType);
 		}
 	}
 
@@ -434,18 +443,18 @@ class PlayState extends FlxTransitionableState {
 		// sees the correct lastInputDir and isMoving before calling playMovementAnim()
 		if (!player.frozen) {
 			var inputDir = InputCalculator.getInputCardinal(0);
-			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
-				player.lastInputDir = inputDir;
-			}
-			var dir:Int = switch (inputDir) {
-				case N: 1;
-				case E: 2;
-				case S: 3;
-				case W: 4;
-				default: 0;
-			};
-			player.isMoving = (dir != 0);
-			var inp:P_Input = {seq: ++inputSeq, dir: dir, elapsed: elapsed};
+			// if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
+			// 	player.lastInputDir = inputDir;
+			// }
+			// var dir:Int = switch (inputDir) {
+			// 	case N: 1;
+			// 	case E: 2;
+			// 	case S: 3;
+			// 	case W: 4;
+			// 	default: 0;
+			// };
+			player.isMoving = (inputDir != NONE);
+			var inp:P_Input = {seq: ++inputSeq, dir: inputDir, elapsed: elapsed};
 			pendingInputs.push(inp);
 			#if !local
 			colyRoom.send(schema.GameState.MSG_P_INPUT, [inp]);
