@@ -295,7 +295,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	}
 
 	function update(delta:Float) {
-		elapsedTime += delta;
+		elapsedTime += delta / 1000;
 
 		while (elapsedTime >= fixedTimeStep) {
 			elapsedTime -= fixedTimeStep;

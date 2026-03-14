@@ -1,5 +1,6 @@
 package states;
 
+import bitdecay.flixel.debug.DebugSuite;
 import schema.GameState;
 import schema.GameState.P_Input;
 import schema.PlayerState;
@@ -59,6 +60,8 @@ class PlayState extends FlxTransitionableState {
 	// Client-side prediction
 	var simulation:Simulation;
 	var clientPlayerState:PlayerState;
+	var serverPlayerState:PlayerState;
+	var lastServerPos = FlxRect.get();
 	var pendingInputs:Array<P_Input> = [];
 	var inputSeq:Int = 0;
 
@@ -170,30 +173,7 @@ class PlayState extends FlxTransitionableState {
 
 		// Wire server-reconciliation: when the server acks our inputs, replay any un-acked ones
 		#if !local
-		NetworkManager.ME.onPlayerChanged.add((sesId, data) -> {
-			if (sesId != NetworkManager.ME.mySessionId) {
-				return;
-			}
-			var ack = data.state.lastProcessedSeq;
-			// Prune inputs the server has already processed
-			while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
-				pendingInputs.shift();
-			}
-			// Reset to server-authoritative position and replay remaining inputs
-			clientPlayerState.x = data.state.x;
-			clientPlayerState.y = data.state.y;
-			clientPlayerState.velocityX = data.state.velocityX;
-			clientPlayerState.velocityY = data.state.velocityY;
-			for (inp in pendingInputs) {
-				simulation.tickPlayer(clientPlayerState, [inp]);
-			}
-			// Only snap the visual if the error is large (>4px)
-			var ex = clientPlayerState.x - player.x;
-			var ey = clientPlayerState.y - player.y;
-			if (ex * ex + ey * ey > 16) {
-				player.setPosition(clientPlayerState.x, clientPlayerState.y);
-			}
-		});
+		NetworkManager.ME.onPlayerChanged.add((sesId, data) -> {});
 		#end
 	}
 
@@ -205,6 +185,41 @@ class PlayState extends FlxTransitionableState {
 			remote.destroy();
 			remotePlayers.remove(sessionId);
 		}
+	}
+
+	function bindPlayer(p:Player, client:PlayerState, serverState:PlayerState) {
+		var cb = Callbacks.get(colyRoom);
+		cb.onChange(serverState, () -> {
+			var ack = serverState.lastProcessedSeq;
+			// Prune inputs the server has already processed
+			while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
+				pendingInputs.shift();
+			}
+
+			// Remember where client predicted it would be
+			var oldX = client.x;
+			var oldY = client.y;
+
+			// Always snap to server-confirmed position, then replay unacked inputs
+			client.x = serverState.x;
+			client.y = serverState.y;
+			client.velocityX = serverState.velocityX;
+			client.velocityY = serverState.velocityY;
+			lastServerPos.set(serverState.x, serverState.y, serverState.width, serverState.height);
+
+			for (inp in pendingInputs) {
+				simulation.tickPlayer(client, [inp], inp.elapsed);
+			}
+
+			// Only log if replay diverged from what client predicted (real server correction)
+			var ex = client.x - oldX;
+			var ey = client.y - oldY;
+			if (ex * ex + ey * ey > 16) {
+				QLog.notice('server corrected position by (${ex}, ${ey})');
+			}
+
+			p.setPosition(client.x, client.y);
+		});
 	}
 
 	function onFishAdded(fishId:String, fishState:FishState) {
@@ -266,8 +281,14 @@ class PlayState extends FlxTransitionableState {
 			ySortGroup.add(loadedPlayer);
 			if (id == colyRoom.sessionId) {
 				player = loadedPlayer;
-				clientPlayerState = p;
+				clientPlayerState = new PlayerState();
+				clientPlayerState.x = p.x;
+				clientPlayerState.y = p.y;
+				FlxG.watch.add(loadedPlayer, "x", "pX: ");
+				FlxG.watch.add(loadedPlayer, "y", "pY: ");
 			}
+
+			bindPlayer(loadedPlayer, clientPlayerState, p);
 		}
 		#end
 
@@ -424,7 +445,7 @@ class PlayState extends FlxTransitionableState {
 				default: 0;
 			};
 			player.isMoving = (dir != 0);
-			var inp:P_Input = {seq: ++inputSeq, dir: dir};
+			var inp:P_Input = {seq: ++inputSeq, dir: dir, elapsed: elapsed};
 			pendingInputs.push(inp);
 			#if !local
 			colyRoom.send(schema.GameState.MSG_P_INPUT, [inp]);
@@ -446,6 +467,7 @@ class PlayState extends FlxTransitionableState {
 
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
+		DS.get(DebugDraw).drawWorldRect(lastServerPos.x, lastServerPos.y, lastServerPos.width, lastServerPos.height);
 	}
 
 	function handleCameraBounds() {

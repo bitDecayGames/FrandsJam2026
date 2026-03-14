@@ -14,7 +14,8 @@ import io.colyseus.serializer.schema.types.MapSchema;
 
 typedef P_Input = {
 	seq:Int, // sequence number
-	dir:Int // 0-359 cardinal
+	dir:Int, // 0-359 cardinal
+	elapsed:Float // frame delta used to replay at the same speed
 };
 
 class GameState extends Schema {

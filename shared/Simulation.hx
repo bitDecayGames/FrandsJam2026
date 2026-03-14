@@ -9,7 +9,7 @@ import schema.PlayerState;
  * tickPlayer() mutates the PlayerState in place.
 **/
 class Simulation {
-	public static inline var FIXED_STEP:Float = 1 / 20; // must match GameRoom.fixedTimeStep
+	public static inline var FIXED_STEP:Float = 1 / 20.0; // must match GameRoom.fixedTimeStep
 
 	var collision:CollisionMap;
 
@@ -33,21 +33,15 @@ class Simulation {
 			lastSeq = input.seq;
 			var inDir = Vector.fromAngle(input.dir);
 			switch (input.dir) {
-				case 1:
-					vx = 0;
-					vy = -p.speed; // N
-				case 2:
+				case 1: // N
+					vy = -p.speed;
+				case 2: // E
 					vx = p.speed;
-					vy = 0; // E
-				case 3:
-					vx = 0;
-					vy = p.speed; // S
-				case 4:
+				case 3: // S
+					vy = p.speed;
+				case 4: // W
 					vx = -p.speed;
-					vy = 0; // W
 				default:
-					vx = 0;
-					vy = 0;
 			}
 		}
 		var res = collision.resolveAABB(p.x, p.y, p.width, p.height, vx * elapsed, vy * elapsed);
