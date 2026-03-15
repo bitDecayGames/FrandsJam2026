@@ -32,14 +32,28 @@ class Simulation {
 		p.actionIntent = PlayerState.ACTION_IDLE;
 		for (input in inputs) {
 			lastSeq = input.seq;
-			if (input.dir == -1) {
-				// no input direction provided
-				continue;
+
+			switch (p.controlState) {
+				case PlayerState.CONTROL_STATE_IDLE:
+					if (input.buttons & PlayerState.BUTTON_A != 0) {
+						p.controlState = PlayerState.CONTROL_STATE_CHARGING;
+						return;
+					}
+
+					if (input.dir == -1) {
+						// no input direction provided
+						continue;
+					}
+					var inDir = Vector.fromAngle(input.dir);
+					vx = inDir.x * p.speed;
+					vy = inDir.y * p.speed;
+					p.actionIntent = PlayerState.ACTION_RUN;
+				case PlayerState.CONTROL_STATE_CHARGING:
+					if (input.buttons & PlayerState.BUTTON_A == 0) {
+						p.controlState = PlayerState.CONTROL_STATE_CASTING;
+						return;
+					}
 			}
-			var inDir = Vector.fromAngle(input.dir);
-			vx = inDir.x * p.speed;
-			vy = inDir.y * p.speed;
-			p.actionIntent = PlayerState.ACTION_RUN;
 		}
 		var res = collision.resolveAABB(p.x, p.y, p.width, p.height, vx * elapsed, vy * elapsed);
 		p.x = res.x;

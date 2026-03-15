@@ -11,6 +11,15 @@ import io.colyseus.serializer.schema.types.MapSchema;
 #end
 
 class PlayerState extends Schema {
+	public static final CONTROL_STATE_IDLE = "idle";
+	public static final CONTROL_STATE_CHARGING = "charging";
+	public static final CONTROL_STATE_CASTING = "casting";
+	public static final CONTROL_STATE_WAITING = "waiting";
+	public static final CONTROL_STATE_RETURNING = "casting";
+
+	public static final BUTTON_A = 1 << 0;
+	public static final BUTTON_B = 1 << 1;
+
 	public static final ACTION_IDLE = "idle";
 	public static final ACTION_RUN = "run";
 	public static final ACTION_CAST_START = "cast_start";
@@ -22,6 +31,7 @@ class PlayerState extends Schema {
 	public static final FACING_DOWN = 3;
 	public static final FACING_LEFT = 4;
 
+	@:type("string") public var controlState:String;
 	@:type("string") public var actionIntent:String;
 	@:type("string") public var actionState:String;
 
@@ -54,5 +64,25 @@ class PlayerState extends Schema {
 		skinIndex = -1;
 		score = 0;
 		lastProcessedSeq = 0;
+	}
+
+	public static function copy(source:PlayerState):PlayerState {
+		var newState = new PlayerState();
+
+		newState.actionState = source.actionState;
+		newState.x = source.x;
+		newState.y = source.y;
+		newState.width = source.width;
+		newState.height = source.height;
+		newState.speed = source.speed;
+		newState.facing = source.facing;
+		newState.velocityX = source.velocityX;
+		newState.velocityY = source.velocityY;
+		newState.name = source.name;
+		newState.skinIndex = source.skinIndex;
+		newState.score = source.score;
+		newState.lastProcessedSeq = source.lastProcessedSeq;
+
+		return newState;
 	}
 }

@@ -1,5 +1,6 @@
 package states;
 
+import input.SimpleController;
 import bitdecay.flixel.debug.DebugSuite;
 import schema.GameState;
 import schema.GameState.P_Input;
@@ -13,6 +14,8 @@ import flixel.util.FlxColor;
 import flixel.FlxSprite;
 import schema.FishState;
 import net.NetworkManager;
+import net.NetworkedState;
+import net.NetworkedState.PlayerClientState;
 import managers.RoundManager;
 import debug.DebugLayers;
 import bitdecay.flixel.debug.tools.draw.DebugDraw;
@@ -50,6 +53,9 @@ import flixel.text.FlxText;
 using states.FlxStateExt;
 
 class PlayState extends FlxTransitionableState {
+	static inline var REMOTE_TELEPORT_DIST_SQ:Float = 128 * 128;
+	static inline var REMOTE_SPRING_K:Float = 8.0;
+
 	var player:Player;
 
 	// Network things
@@ -57,10 +63,13 @@ class PlayState extends FlxTransitionableState {
 	var remotePlayers:Map<String, Player> = new Map();
 	var remoteFish:Map<String, WaterFish> = new Map();
 
+	// A map of IDs to a NetworkState<ServerState, ClientState>
+	var playerNetworkedStates:Map<String, NetworkedState<PlayerState, PlayerState>> = new Map();
+
 	// Client-side prediction
 	var simulation:Simulation;
-	var clientPlayerState:PlayerState;
-	var serverPlayerState:PlayerState;
+	// var clientPlayerState:PlayerState;
+	// var serverPlayerState:PlayerState;
 	var lastServerPos = FlxRect.get();
 	var pendingInputs:Array<P_Input> = [];
 	var inputSeq:Int = 0;
@@ -179,6 +188,7 @@ class PlayState extends FlxTransitionableState {
 
 	function onPlayerRemoved(sessionId:String) {
 		trace('PlayState: remote player $sessionId left, removing remote player');
+		playerNetworkedStates.remove(sessionId);
 		var remote = remotePlayers.get(sessionId);
 		if (remote != null) {
 			remove(remote);
@@ -187,15 +197,87 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
-	function bindPlayer(p:Player, client:PlayerState, serverState:PlayerState) {
+	function bindPlayer(sessionId:String, p:Player, localPrediction:PlayerState, serverState:PlayerState) {
+		#if !local
 		var cb = Callbacks.get(colyRoom);
-		cb.onChange(serverState, () -> {
-			if (client == null) {
-				// fully remote player. just set and forget
-				p.setPosition(serverState.x, serverState.y);
-				return;
-			}
+		#end
 
+		if (localPrediction == null) {
+			// --- Remote player: interpolate toward server position ---
+			var c:PlayerState = PlayerState.copy(serverState);
+			var ns = new NetworkedState<PlayerState, PlayerState>(serverState, c);
+
+			ns.onTick = (elapsed) -> {
+				var s = ns.server;
+				var cl = ns.client;
+
+				// Teleport if way off, otherwise spring toward server
+				var dx = s.x - cl.x;
+				var dy = s.y - cl.y;
+				if (dx * dx + dy * dy > REMOTE_TELEPORT_DIST_SQ) {
+					cl.x = s.x;
+					cl.y = s.y;
+				} else {
+					cl.x += dx * Math.min(elapsed * REMOTE_SPRING_K, 1.0);
+					cl.y += dy * Math.min(elapsed * REMOTE_SPRING_K, 1.0);
+				}
+
+				// Lerp velocity so animation direction smooths out
+				cl.velocityX += (s.velocityX - cl.velocityX) * Math.min(elapsed * REMOTE_SPRING_K, 1.0);
+				cl.velocityY += (s.velocityY - cl.velocityY) * Math.min(elapsed * REMOTE_SPRING_K, 1.0);
+
+				// Update facing from smooth velocity
+				if (Math.abs(cl.velocityX) > 5 || Math.abs(cl.velocityY) > 5) {
+					p.lastInputDir = Cardinal.closest(FlxPoint.weak(cl.velocityX, cl.velocityY));
+				}
+
+				p.isMoving = Math.abs(cl.velocityX) > 5 || Math.abs(cl.velocityY) > 5;
+				p.controlState = serverState.controlState;
+				p.setPosition(cl.x, cl.y);
+				p.velocity.set(0, 0);
+			};
+
+			ns.onServerUpdate = () -> {/* nothing needed — schema is a live ref */};
+
+			playerNetworkedStates.set(sessionId, ns);
+			#if !local
+			cb.onChange(serverState, () -> ns.serverUpdate());
+			#end
+			return;
+		}
+
+		// Seed controlState — copy() skips it but tickPlayer's state machine needs it
+		localPrediction.controlState = serverState.controlState;
+
+		// --- Local player: client-side prediction + server reconciliation ---
+		var ns = new NetworkedState<PlayerState, PlayerState>(serverState, localPrediction);
+
+		ns.onTick = (elapsed) -> {
+			if (!player.frozen) {
+				var inputDir = InputCalculator.getInputCardinal(0);
+				player.isMoving = (inputDir != NONE);
+				if (inputDir != NONE) {
+					player.lastInputDir = inputDir;
+				}
+				var inp:P_Input = {
+					seq: ++inputSeq,
+					dir: inputDir,
+					elapsed: elapsed,
+					buttons: getInputMask()
+				};
+				pendingInputs.push(inp);
+				#if !local
+				trace('sending input: ${inp}');
+				colyRoom.send(schema.GameState.MSG_P_INPUT, [inp]);
+				#end
+				// In local mode there's no NetworkedState onTick, so tick prediction here directly
+				simulation.tickPlayer(localPrediction, [inp], elapsed);
+				p.setPosition(localPrediction.x, localPrediction.y);
+				p.velocity.set(0, 0);
+			}
+		};
+
+		ns.onServerUpdate = () -> {
 			var ack = serverState.lastProcessedSeq;
 			// Prune inputs the server has already processed
 			while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
@@ -203,29 +285,37 @@ class PlayState extends FlxTransitionableState {
 			}
 
 			// Remember where client predicted it would be
-			var oldX = client.x;
-			var oldY = client.y;
+			var oldX = localPrediction.x;
+			var oldY = localPrediction.y;
 
-			// Always snap to server-confirmed position, then replay unacked inputs
-			client.x = serverState.x;
-			client.y = serverState.y;
-			client.velocityX = serverState.velocityX;
-			client.velocityY = serverState.velocityY;
+			// Snap to server-confirmed position, then replay unacked inputs
+			localPrediction.x = serverState.x;
+			localPrediction.y = serverState.y;
+			localPrediction.velocityX = serverState.velocityX;
+			localPrediction.velocityY = serverState.velocityY;
+			localPrediction.controlState = serverState.controlState;
 			lastServerPos.set(serverState.x, serverState.y, serverState.width, serverState.height);
 
 			for (inp in pendingInputs) {
-				simulation.tickPlayer(client, [inp], inp.elapsed);
+				simulation.tickPlayer(localPrediction, [inp], inp.elapsed);
 			}
 
-			// Only log if replay diverged from what client predicted (real server correction)
-			var ex = client.x - oldX;
-			var ey = client.y - oldY;
+			// Only log if replay diverged from predicted (real server correction)
+			var ex = localPrediction.x - oldX;
+			var ey = localPrediction.y - oldY;
 			if (ex * ex + ey * ey > 16) {
 				QLog.notice('server corrected position by (${ex}, ${ey})');
 			}
 
-			p.setPosition(client.x, client.y);
-		});
+			ns.client.x = localPrediction.x;
+			ns.client.y = localPrediction.y;
+			p.setPosition(localPrediction.x, localPrediction.y);
+		};
+
+		playerNetworkedStates.set(sessionId, ns);
+		#if !local
+		cb.onChange(serverState, () -> ns.serverUpdate());
+		#end
 	}
 
 	function onFishAdded(fishId:String, fishState:FishState) {
@@ -276,27 +366,27 @@ class PlayState extends FlxTransitionableState {
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
 		#if local
-		clientPlayerState = new PlayerState();
+		var clientPlayerState = new PlayerState();
+		clientPlayerState.controlState = PlayerState.CONTROL_STATE_IDLE;
 		player = Player.fromState(clientPlayerState, this);
 		ySortGroup.add(player);
+		bindPlayer("local", player, clientPlayerState, clientPlayerState);
 		#else
-		// standin until we get everything sent down from the server
-		// player = new Player(0, 0, this);
 		for (id => p in colyRoom.state.players) {
 			var loadedPlayer = Player.fromState(p, this);
 			var clientState:PlayerState = null;
 
 			if (id == colyRoom.sessionId) {
 				player = loadedPlayer;
-				clientState = new PlayerState();
+				clientState = PlayerState.copy(p);
 				clientState.x = p.x;
 				clientState.y = p.y;
-				clientPlayerState = clientState;
+				// clientPlayerState = clientState;
 				FlxG.watch.add(loadedPlayer, "x", "pX: ");
 				FlxG.watch.add(loadedPlayer, "y", "pY: ");
 			}
 
-			bindPlayer(loadedPlayer, clientState, p);
+			bindPlayer(id, loadedPlayer, clientState, p);
 			ySortGroup.add(loadedPlayer);
 		}
 		#end
@@ -438,30 +528,24 @@ class PlayState extends FlxTransitionableState {
 		// }
 	}
 
+	function getInputMask():Int {
+		var input = 0;
+		if (SimpleController.pressed(A)) {
+			input |= PlayerState.BUTTON_A;
+		}
+
+		if (SimpleController.pressed(B)) {
+			input |= PlayerState.BUTTON_B;
+		}
+
+		return input;
+	}
+
 	override public function update(elapsed:Float) {
-		// Run client-side prediction before super.update() so player.update()
-		// sees the correct lastInputDir and isMoving before calling playMovementAnim()
-		if (!player.frozen) {
-			var inputDir = InputCalculator.getInputCardinal(0);
-			// if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
-			// 	player.lastInputDir = inputDir;
-			// }
-			// var dir:Int = switch (inputDir) {
-			// 	case N: 1;
-			// 	case E: 2;
-			// 	case S: 3;
-			// 	case W: 4;
-			// 	default: 0;
-			// };
-			player.isMoving = (inputDir != NONE);
-			var inp:P_Input = {seq: ++inputSeq, dir: inputDir, elapsed: elapsed};
-			pendingInputs.push(inp);
-			#if !local
-			colyRoom.send(schema.GameState.MSG_P_INPUT, [inp]);
-			#end
-			simulation.tickPlayer(clientPlayerState, [inp], elapsed);
-			player.setPosition(clientPlayerState.x, clientPlayerState.y);
-			player.velocity.set(0, 0);
+		// Tick all NetworkedStates before super.update() so Player.update() → playMovementAnim()
+		// sees the correct position, isMoving, and lastInputDir that NS.onTick just wrote.
+		for (ns in playerNetworkedStates) {
+			ns.tick(elapsed);
 		}
 
 		super.update(elapsed);

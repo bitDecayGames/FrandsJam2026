@@ -54,6 +54,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			pState.y = spawn.y;
 			pState.name = data.name;
 			pState.skinIndex = data.skin;
+			pState.controlState = PlayerState.CONTROL_STATE_IDLE;
 			trace('  - ${data.sessionID}');
 			pendingReservations.set(data.sessionID, pState);
 		}
