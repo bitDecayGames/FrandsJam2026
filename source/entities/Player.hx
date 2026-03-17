@@ -224,6 +224,8 @@ class Player extends FlxSprite {
 				animation.pause();
 			case PlayerState.CONTROL_STATE_CASTING:
 				animation.play("cast_" + getDirSuffix(), true);
+			case PlayerState.CONTROL_STATE_RETURNING:
+				animation.play("catch_" + getDirSuffix(), true);
 		}
 	}
 

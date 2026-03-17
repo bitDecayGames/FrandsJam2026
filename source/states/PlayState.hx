@@ -267,12 +267,13 @@ class PlayState extends FlxTransitionableState {
 				};
 				pendingInputs.push(inp);
 				#if !local
-				trace('sending input: ${inp}');
+				// trace('sending input: ${inp}');
 				colyRoom.send(schema.GameState.MSG_P_INPUT, [inp]);
 				#end
 				// In local mode there's no NetworkedState onTick, so tick prediction here directly
 				simulation.tickPlayer(localPrediction, [inp], elapsed);
 				p.setPosition(localPrediction.x, localPrediction.y);
+				p.controlState = serverState.controlState;
 				p.velocity.set(0, 0);
 			}
 		};
