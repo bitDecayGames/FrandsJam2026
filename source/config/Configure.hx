@@ -100,6 +100,6 @@ class Configure {
 		return Sys.getEnv("SERVER_PROTOCOL");
 		#end
 
-		return "ws://";
+		return "https://";
 	}
 }
