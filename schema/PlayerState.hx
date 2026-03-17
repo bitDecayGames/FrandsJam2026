@@ -9,13 +9,14 @@ import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.schema.types.ArraySchema;
 import io.colyseus.serializer.schema.types.MapSchema;
 #end
+import utils.Cooldowns;
 
 class PlayerState extends Schema {
 	public static final CONTROL_STATE_IDLE = "idle";
 	public static final CONTROL_STATE_CHARGING = "charging";
 	public static final CONTROL_STATE_CASTING = "casting";
 	public static final CONTROL_STATE_WAITING = "waiting";
-	public static final CONTROL_STATE_RETURNING = "casting";
+	public static final CONTROL_STATE_RETURNING = "returning";
 
 	public static final BUTTON_A = 1 << 0;
 	public static final BUTTON_B = 1 << 1;
@@ -30,6 +31,11 @@ class PlayerState extends Schema {
 	public static final FACING_RIGHT = 2;
 	public static final FACING_DOWN = 3;
 	public static final FACING_LEFT = 4;
+
+	// Do we want to try to sync these?
+	public var cd:Cooldowns;
+
+	@:type("uint8") public var id:Int;
 
 	@:type("string") public var controlState:String;
 	@:type("string") public var actionIntent:String;
@@ -64,6 +70,8 @@ class PlayerState extends Schema {
 		skinIndex = -1;
 		score = 0;
 		lastProcessedSeq = 0;
+
+		cd = new Cooldowns();
 	}
 
 	public static function copy(source:PlayerState):PlayerState {

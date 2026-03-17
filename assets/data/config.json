@@ -1,7 +1,7 @@
 {
 	"server": {
-		"host": "Mercury.local",
-		"port": 2567
+		"host": "unnecessarily-plantable-augustina.ngrok-free.dev",
+		"port": 443
 	},
 	"analytics": {
 		"name": "frands",

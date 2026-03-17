@@ -50,6 +50,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			var data = pData[i];
 			var spawn = spawnPoints[i];
 			var pState = new PlayerState();
+			pState.id = i;
 			pState.x = spawn.x;
 			pState.y = spawn.y;
 			pState.name = data.name;

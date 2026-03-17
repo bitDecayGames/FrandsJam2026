@@ -114,13 +114,16 @@ class NetworkManager {
 
 	public function connect(host:String, port:Int) {
 		#if local return; #end
-		var addr = '${Configure.getServerProtocol()}$host:$port';
-		trace('attempting to connect to: ${addr}');
 		if (client == null) {
+			var addr = '${Configure.getServerProtocol()}$host:$port';
+			trace('attempting to connect to: ${addr}');
 			client = new Client(addr);
 			client.getLatency((e, l) -> {
 				QLog.notice('Latency Check: ${l}ms');
 			});
+			trace('connection successful');
+		} else {
+			trace('already connected. skipping...');
 		}
 	}
 

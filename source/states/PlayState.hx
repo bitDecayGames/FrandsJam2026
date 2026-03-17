@@ -376,6 +376,8 @@ class PlayState extends FlxTransitionableState {
 			var loadedPlayer = Player.fromState(p, this);
 			var clientState:PlayerState = null;
 
+			FlxG.watch.add(p, "controlState", 'p ${p.id} cState: ');
+
 			if (id == colyRoom.sessionId) {
 				player = loadedPlayer;
 				clientState = PlayerState.copy(p);
