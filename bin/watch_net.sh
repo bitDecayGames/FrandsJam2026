@@ -115,12 +115,16 @@ build_and_launch() {
     fi
 
     echo -e "\033[32m[watch]\033[0m both windows running (player=$PLAYER_PID bot=$BOT_PID)"
+    # write PIDs so screenshot listener can find them
+    echo "$PLAYER_PID" > .pid_player
+    echo "$BOT_PID" > .pid_bot
 }
 
 cleanup() {
     echo -e "\n\033[33m[watch]\033[0m shutting down..."
     kill_games
     kill_pid "$SERVER_PID" "server"
+    kill "$SCREENSHOT_PID" 2>/dev/null
     SERVER_PID=""
     exit 0
 }
@@ -135,6 +139,31 @@ echo -e "\033[35m[watch]\033[0m initial build at $(date +%H:%M:%S)"
 build_and_launch
 
 echo -e "\033[36m[watch]\033[0m waiting for rebuild signal...\n"
+
+SCREENSHOT=".screenshot"
+SCREENSHOT_DIR="screenshots"
+mkdir -p "$SCREENSHOT_DIR"
+
+# Screenshot listener runs in background, reads PIDs from files
+(
+    touch "$SCREENSHOT"
+    while true; do
+        inotifywait -qq -e close_write -e modify "$SCREENSHOT" 2>/dev/null
+        ppid=$(cat .pid_player 2>/dev/null)
+        bpid=$(cat .pid_bot 2>/dev/null)
+        if [[ -n "$ppid" ]] && kill -0 "$ppid" 2>/dev/null; then
+            ts=$(date +%H%M%S)
+            player_wid=$(xdotool search --pid "$ppid" 2>/dev/null | head -1)
+            bot_wid=$(xdotool search --pid "$bpid" 2>/dev/null | head -1)
+            [[ -n "$player_wid" ]] && import -window "$player_wid" "$SCREENSHOT_DIR/player_${ts}.png" 2>/dev/null
+            [[ -n "$bot_wid" ]] && import -window "$bot_wid" "$SCREENSHOT_DIR/bot_${ts}.png" 2>/dev/null
+            echo -e "\033[36m[watch]\033[0m screenshots saved to $SCREENSHOT_DIR/*_${ts}.png"
+        else
+            echo -e "\033[33m[watch]\033[0m screenshot: no running game windows found"
+        fi
+    done
+) &
+SCREENSHOT_PID=$!
 
 while true; do
     inotifywait -qq -e close_write -e modify -e create "$SIGNAL" 2>/dev/null &

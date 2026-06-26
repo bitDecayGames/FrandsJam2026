@@ -51,8 +51,14 @@ class WaterFish extends FlxSprite {
 		}
 		loadGraphic("assets/aseprite/characters/fishShadow.png");
 		centerOffsets();
-		alpha = 0;
-		fadeInTimer = 1.0;
+		if (isRemote) {
+			// server-driven fish start visible — server controls alive state
+			alpha = 1;
+			fadeInTimer = 0;
+		} else {
+			alpha = 0;
+			fadeInTimer = 1.0;
+		}
 		pickTarget();
 	}
 
@@ -71,12 +77,25 @@ class WaterFish extends FlxSprite {
 			return;
 		}
 
-		setPosition(state.x, state.y);
-		if (!visible) {
+		// Handle alive state from server
+		if (!state.alive) {
+			if (alive) {
+				alive = false;
+				visible = false;
+				velocity.set(0, 0);
+			}
+			return;
+		}
+
+		// Fish is alive on server
+		if (!alive) {
+			// Fish just respawned — revive and fade in
+			alive = true;
 			alpha = 0;
 			fadeInTimer = 1.0;
-			visible = true;
 		}
+
+		setPosition(state.x, state.y);
 	}
 
 	function pickTarget() {
@@ -94,8 +113,9 @@ class WaterFish extends FlxSprite {
 	}
 
 	public function fleeFrom(otherX:Float, otherY:Float) {
-		if (attracted)
+		if (attracted) {
 			return;
+		}
 		var awayX = x - otherX;
 		var awayY = y - otherY;
 		var len = Math.sqrt(awayX * awayX + awayY * awayY);
@@ -121,8 +141,9 @@ class WaterFish extends FlxSprite {
 		}
 
 		if (bestTile != null) {
-			if (target != null)
+			if (target != null) {
 				target.put();
+			}
 			target = FlxPoint.get(bestTile.x + FlxG.random.float(0, 12), bestTile.y + FlxG.random.float(0, 12));
 			retargetTimer = FlxG.random.float(2, 3);
 
@@ -144,7 +165,7 @@ class WaterFish extends FlxSprite {
 		}
 
 		if (isRemote) {
-			// TODO: drive animations but network controls main stuff
+			// Server drives position — just run base update for rendering
 			super.update(elapsed);
 			return;
 		}
@@ -215,8 +236,9 @@ class WaterFish extends FlxSprite {
 		var closestSid:String = null;
 
 		for (sid => bobb in bobbers) {
-			if (bobb == null)
+			if (bobb == null) {
 				continue;
+			}
 			var dx = (bobb.x + bobb.width / 2) - (x + width / 2);
 			var dy = (bobb.y + bobb.height / 2) - (y + height / 2);
 			var dist = Math.sqrt(dx * dx + dy * dy);
@@ -241,8 +263,9 @@ class WaterFish extends FlxSprite {
 			velocity.set(0, 0);
 			attracted = false;
 			respawnTimer = 3.0;
-			if (onCatch != null)
+			if (onCatch != null) {
 				onCatch(fishId, closestSid, fishType);
+			}
 			return;
 		}
 
@@ -253,8 +276,9 @@ class WaterFish extends FlxSprite {
 		pauseTimer = 0;
 		var dx = (closestBobber.x + closestBobber.width / 2) - (x + width / 2);
 		var dy = (closestBobber.y + closestBobber.height / 2) - (y + height / 2);
-		if (closestDist > 0.1)
+		if (closestDist > 0.1) {
 			velocity.set((dx / closestDist) * ATTRACT_SPEED, (dy / closestDist) * ATTRACT_SPEED);
+		}
 	}
 
 	public function scare(fromX:Float, fromY:Float) {

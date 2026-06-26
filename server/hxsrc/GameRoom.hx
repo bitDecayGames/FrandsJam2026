@@ -16,6 +16,20 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	var simulation:Simulation;
 	var elapsedTime:Float;
 
+	// Fish AI data
+	var waterBodies:Array<Array<{x:Float, y:Float}>>; // water tile positions per body
+	var bobberPositions:Map<String, {x:Float, y:Float}>; // sessionId -> bobber pos
+	var nextFishID:Int;
+	var ldtkRaw:Dynamic; // cached level data for flood-fill
+
+	static var FISH_SPEED:Float = 20;
+	static var FISH_ATTRACT_SPEED:Float = 40;
+	static var FISH_ARRIVE_DIST:Float = 2;
+	static var FISH_ATTRACT_DIST:Float = 32;
+	static var FISH_CATCH_DIST:Float = 4;
+	static var FISH_SEPARATION_DIST:Float = 20;
+	static var NUM_FISH_TYPES:Int = 12;
+
 	override public function onCreate(options:Dynamic):Void {
 		elapsedTime = 0;
 		maxClients = 6;
@@ -25,9 +39,18 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		var hitboxJson = sys.io.File.getContent("../assets/data/tile-hitboxes.json");
 		var ldtkProject = new LdtkProject();
 		var raw = ldtkProject.getLevel("Level_0");
+		ldtkRaw = raw;
 		state.collision = CollisionMap.fromLevel(raw, hitboxJson);
 		simulation = new Simulation(state.collision);
 		state.inputQueue = new Map();
+
+		// Initialize fish AI data
+		waterBodies = [];
+		bobberPositions = new Map();
+		nextFishID = 1;
+
+		// Spawn server-owned fish
+		spawnFish();
 
 		// Start fixed-tick simulation loop
 		this.setSimulationInterval(this.serverUpdate);
@@ -101,10 +124,13 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
-		// sent when a client spawns a fish
-		onMessage("fish_spawn", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_spawn" message: ${Json.stringify(data)}');
-			state.fish.set(data.id, new FishState(data.x, data.y, data.fishType != null ? Std.int(data.fishType) : 0));
+		// Bobber position messages for server-side fish attraction
+		onMessage("bobber_landed", (client:Client, data:{x:Float, y:Float}) -> {
+			bobberPositions.set(client.sessionId, {x: data.x, y: data.y});
+		});
+
+		onMessage("bobber_retracted", (client:Client, _) -> {
+			bobberPositions.remove(client.sessionId);
 		});
 
 		// sent when a player throws a rock
@@ -119,25 +145,11 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}, {except: client});
 		});
 
-		// sent when a rock lands in water
+		// sent when a rock lands in water — scare fish and broadcast
 		onMessage("rock_splash", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "rock_splash": x=${data.x} y=${data.y} big=${data.big}');
 			broadcast("rock_splash", {x: data.x, y: data.y, big: data.big}, {except: client});
-		});
-
-		// sent when a fish moves
-		onMessage("fish_move", (client:Client, data:Dynamic) -> {
-			var fish:FishState = state.fish.get(data.id);
-			if (fish != null) {
-				fish.x = data.x;
-				fish.y = data.y;
-			}
-		});
-
-		// sent by the host when a scared fish finishes fading and despawns
-		onMessage("fish_despawn", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_despawn": id=${data.id} respawnTime=${data.respawnTime}');
-			broadcast("fish_despawn", {id: data.id, respawnTime: data.respawnTime}, {except: client});
+			scareFish(data.x, data.y);
 		});
 
 		// sent when a player changes their skin selection in the lobby
@@ -379,6 +391,9 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		trace('successful clear: ${state.players.delete(client.sessionId)}');
 		state.inputQueue.remove(client.sessionId);
 
+		// Remove bobber position for leaving player
+		bobberPositions.remove(client.sessionId);
+
 		// Clear/rotate host
 		if (client.sessionId == state.hostSessionId) {
 			if (state.players.size <= 0) {
@@ -403,6 +418,368 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		return null;
 	}
 
+	/** Flood-fill the FishSpawner IntGrid layer (value=1 = water) to find water bodies,
+	    then spawn fish into each body that has a FishSpawner entity. */
+	function spawnFish() {
+		// Access the FishSpawner IntGrid layer from the LDTK level
+		// Use the CollisionMap to identify water tiles (FLAG_SWIMMABLE)
+		var col = state.collision;
+		var w = col.cols;
+		var h = col.rows;
+		var grid = col.tileSize;
+
+		var visited = new Array<Bool>();
+		visited.resize(w * h);
+		for (i in 0...visited.length) {
+			visited[i] = false;
+		}
+
+		// Collect FishSpawner entities keyed by their grid index
+		var spawnerCounts = new Map<Int, Int>();
+		var rawObjects:Dynamic = Reflect.getProperty(ldtkRaw, "l_Objects");
+		var allFishSpawner:Array<Dynamic> = Reflect.getProperty(rawObjects, "all_FishSpawner");
+		if (allFishSpawner != null) {
+			for (spawner in allFishSpawner) {
+				var cx:Int = spawner.cx;
+				var cy:Int = spawner.cy;
+				var idx = cx + cy * w;
+				var numFish:Int = spawner.f_numFish;
+				spawnerCounts.set(idx, numFish);
+			}
+		}
+
+		// Count swimmable tiles for debug
+		var swimmableCount = 0;
+		for (row in 0...h) {
+			for (c in 0...w) {
+				if (col.isSwimmableAt(c, row)) {
+					swimmableCount++;
+				}
+			}
+		}
+		trace('spawnFish: found ${Lambda.count(spawnerCounts)} FishSpawner entities, grid ${w}x${h}, swimmable tiles: $swimmableCount');
+
+		// Flood-fill to find connected groups of swimmable tiles
+		var bodyIndex = 0;
+		for (sy in 0...h) {
+			for (sx in 0...w) {
+				var startIdx = sx + sy * w;
+				if (visited[startIdx] || !col.isSwimmableAt(sx, sy)) {
+					continue;
+				}
+
+				var body = new Array<Int>();
+				var stack = [startIdx];
+				while (stack.length > 0) {
+					var idx = stack.pop();
+					if (idx < 0 || idx >= w * h || visited[idx]) {
+						continue;
+					}
+					var cx = idx % w;
+					var cy = Std.int(idx / w);
+					if (!col.isSwimmableAt(cx, cy)) {
+						continue;
+					}
+					visited[idx] = true;
+					body.push(idx);
+					if (cx > 0) { stack.push(idx - 1); }
+					if (cx < w - 1) { stack.push(idx + 1); }
+					if (cy > 0) { stack.push(idx - w); }
+					if (cy < h - 1) { stack.push(idx + w); }
+				}
+
+				// Find the FishSpawner entity in this body to get numFish
+				var numFish = 0;
+				for (idx in body) {
+					if (spawnerCounts.exists(idx)) {
+						numFish = spawnerCounts.get(idx);
+						break;
+					}
+				}
+
+				if (numFish <= 0) {
+					continue;
+				}
+
+				// Build shared water tile pixel positions for this body
+				var bodyTiles = new Array<{x:Float, y:Float}>();
+				for (idx in body) {
+					var cx = idx % w;
+					var cy = Std.int(idx / w);
+					bodyTiles.push({x: cx * grid + 2.0, y: cy * grid + 2.0});
+				}
+
+				var bIdx = waterBodies.length;
+				waterBodies.push(bodyTiles);
+
+				for (_ in 0...numFish) {
+					var fid = Std.string(nextFishID++);
+					var tileIdx = Std.int(Math.random() * bodyTiles.length);
+					var tile = bodyTiles[tileIdx];
+					var ftype = Std.int(Math.random() * NUM_FISH_TYPES);
+					var fish = new FishState(tile.x, tile.y, ftype);
+					fish.bodyIndex = bIdx;
+					state.fish.set(fid, fish);
+				}
+
+				bodyIndex++;
+			}
+		}
+
+		trace('spawnFish: spawned fish in ${bodyIndex} water bodies, total fish: ${nextFishID - 1}');
+	}
+
+	var fishTraceCounter:Int;
+
+	/** Update all server-owned fish AI. Called from fixedTick. */
+	function updateFish(t:Float) {
+		if (fishTraceCounter == null) { fishTraceCounter = 0; }
+		fishTraceCounter++;
+		// Collect fish IDs and states into arrays for pairwise separation checks
+		var fishIds = new Array<String>();
+		var fishStates = new Array<FishState>();
+		for (id => fish in state.fish) {
+			fishIds.push(id);
+			fishStates.push(fish);
+		}
+		if (fishTraceCounter % 100 == 1) {
+			for (i in 0...fishIds.length) {
+				var f = fishStates[i];
+				trace('[FISH] ${fishIds[i]} pos=(${Std.int(f.x)},${Std.int(f.y)}) vel=(${Std.int(f.velX)},${Std.int(f.velY)}) alive=${f.alive} pause=${Std.int(f.pauseTimer * 10) / 10} retarget=${Std.int(f.retargetTimer * 10) / 10}');
+			}
+		}
+
+		for (i in 0...fishIds.length) {
+			var fish = fishStates[i];
+			var fid = fishIds[i];
+
+			// Handle scared fish (fading out and fleeing)
+			if (fish.scaredTimer > 0) {
+				fish.scaredTimer -= t;
+				// Move along scare velocity
+				fish.x += fish.velX * t;
+				fish.y += fish.velY * t;
+				if (fish.scaredTimer <= 0) {
+					fish.alive = false;
+					fish.velX = 0;
+					fish.velY = 0;
+					fish.respawnTimer = 5.5;
+				}
+				continue;
+			}
+
+			// Handle dead fish waiting to respawn
+			if (!fish.alive) {
+				if (fish.respawnTimer > 0) {
+					fish.respawnTimer -= t;
+					if (fish.respawnTimer <= 0) {
+						// Respawn at random water tile in this body
+						var bodyTiles = waterBodies[fish.bodyIndex];
+						if (bodyTiles != null && bodyTiles.length > 0) {
+							var tileIdx = Std.int(Math.random() * bodyTiles.length);
+							var tile = bodyTiles[tileIdx];
+							fish.x = tile.x + Math.random() * 12;
+							fish.y = tile.y + Math.random() * 12;
+							fish.velX = 0;
+							fish.velY = 0;
+							fish.alive = true;
+							fish.attracted = false;
+							fish.pauseTimer = 0;
+							fish.retargetTimer = Math.random() + 2.0;
+							pickFishTarget(fish);
+						}
+					}
+				}
+				continue;
+			}
+
+			// Handle paused fish
+			if (fish.pauseTimer > 0) {
+				fish.pauseTimer -= t;
+				continue;
+			}
+
+			// Check bobber interactions — attraction and catch
+			var closestDist = 1e20;
+			var closestSid:String = null;
+			var closestBX:Float = 0;
+			var closestBY:Float = 0;
+			var hasBobbers = false;
+
+			for (sid => bpos in bobberPositions) {
+				hasBobbers = true;
+				var dx = bpos.x - fish.x;
+				var dy = bpos.y - fish.y;
+				var dist = Math.sqrt(dx * dx + dy * dy);
+				if (dist < closestDist) {
+					closestDist = dist;
+					closestSid = sid;
+					closestBX = bpos.x;
+					closestBY = bpos.y;
+				}
+			}
+
+			// If fish was attracted but bobber is gone (retracted), flee
+			if (fish.attracted && !hasBobbers) {
+				fish.attracted = false;
+				fleeFromFish(fish, fish.x + fish.velX, fish.y + fish.velY);
+				continue;
+			}
+			if (fish.attracted && closestDist > FISH_ATTRACT_DIST) {
+				fish.attracted = false;
+				fleeFromFish(fish, closestBX, closestBY);
+				continue;
+			}
+
+			if (hasBobbers && closestDist < FISH_CATCH_DIST) {
+				// Fish caught!
+				fish.alive = false;
+				fish.velX = 0;
+				fish.velY = 0;
+				fish.attracted = false;
+				fish.respawnTimer = 3.0;
+				// Broadcast fish_caught to all clients
+				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: fish.fishType});
+				continue;
+			}
+
+			if (hasBobbers && closestDist < FISH_ATTRACT_DIST) {
+				// Attract toward closest bobber
+				fish.attracted = true;
+				fish.pauseTimer = 0;
+				var dx = closestBX - fish.x;
+				var dy = closestBY - fish.y;
+				if (closestDist > 0.1) {
+					fish.velX = (dx / closestDist) * FISH_ATTRACT_SPEED;
+					fish.velY = (dy / closestDist) * FISH_ATTRACT_SPEED;
+				}
+				fish.x += fish.velX * t;
+				fish.y += fish.velY * t;
+				continue;
+			}
+
+			// Normal wandering AI
+			fish.retargetTimer -= t;
+			if (fish.retargetTimer <= 0) {
+				pickFishTarget(fish);
+			}
+
+			var dx = fish.targetX - fish.x;
+			var dy = fish.targetY - fish.y;
+			var dist = Math.sqrt(dx * dx + dy * dy);
+
+			if (dist < FISH_ARRIVE_DIST) {
+				fish.velX = 0;
+				fish.velY = 0;
+				fish.pauseTimer = 1.0 + Math.random() * 2.0;
+				pickFishTarget(fish);
+			} else {
+				fish.velX = (dx / dist) * FISH_SPEED;
+				fish.velY = (dy / dist) * FISH_SPEED;
+			}
+
+			fish.x += fish.velX * t;
+			fish.y += fish.velY * t;
+		}
+
+		// Separation: check pairs of alive fish
+		for (i in 0...fishStates.length) {
+			var a = fishStates[i];
+			if (!a.alive) { continue; }
+			for (j in (i + 1)...fishStates.length) {
+				var b = fishStates[j];
+				if (!b.alive) { continue; }
+				var dx = a.x - b.x;
+				var dy = a.y - b.y;
+				if (dx * dx + dy * dy < FISH_SEPARATION_DIST * FISH_SEPARATION_DIST) {
+					fleeFromFish(a, b.x, b.y);
+					fleeFromFish(b, a.x, a.y);
+				}
+			}
+		}
+	}
+
+	/** Pick a new random target tile in this fish's water body. */
+	function pickFishTarget(fish:FishState) {
+		var bodyTiles = waterBodies[fish.bodyIndex];
+		if (bodyTiles == null || bodyTiles.length == 0) {
+			return;
+		}
+		var tileIdx = Std.int(Math.random() * bodyTiles.length);
+		var tile = bodyTiles[tileIdx];
+		fish.targetX = tile.x + Math.random() * 12;
+		fish.targetY = tile.y + Math.random() * 12;
+		fish.retargetTimer = 2.0 + Math.random();
+	}
+
+	/** Make a fish flee from a position — pick the farthest water tile in the away direction. */
+	function fleeFromFish(fish:FishState, fromX:Float, fromY:Float) {
+		if (fish.attracted) { return; }
+
+		var awayX = fish.x - fromX;
+		var awayY = fish.y - fromY;
+		var len = Math.sqrt(awayX * awayX + awayY * awayY);
+		if (len < 0.01) {
+			awayX = Math.random() * 2 - 1;
+			awayY = Math.random() * 2 - 1;
+			len = Math.sqrt(awayX * awayX + awayY * awayY);
+		}
+		awayX /= len;
+		awayY /= len;
+
+		// Pick the farthest water tile in the away direction
+		var bodyTiles = waterBodies[fish.bodyIndex];
+		if (bodyTiles == null || bodyTiles.length == 0) { return; }
+
+		var bestDot:Float = -999999;
+		var bestTile:{x:Float, y:Float} = null;
+		for (tile in bodyTiles) {
+			var dx = tile.x - fish.x;
+			var dy = tile.y - fish.y;
+			var dot = dx * awayX + dy * awayY;
+			if (dot > bestDot) {
+				bestDot = dot;
+				bestTile = tile;
+			}
+		}
+
+		if (bestTile != null) {
+			fish.targetX = bestTile.x + Math.random() * 12;
+			fish.targetY = bestTile.y + Math.random() * 12;
+			fish.retargetTimer = 2.0 + Math.random();
+
+			var fdx = fish.targetX - fish.x;
+			var fdy = fish.targetY - fish.y;
+			var fdist = Math.sqrt(fdx * fdx + fdy * fdy);
+			if (fdist > 0.1) {
+				fish.velX = (fdx / fdist) * FISH_SPEED;
+				fish.velY = (fdy / fdist) * FISH_SPEED;
+			}
+		}
+
+		fish.pauseTimer = 0;
+	}
+
+	/** Scare all fish within radius of a splash point. */
+	function scareFish(splashX:Float, splashY:Float, radius:Float = 80) {
+		for (id => fish in state.fish) {
+			if (!fish.alive) { continue; }
+			var dx = fish.x - splashX;
+			var dy = fish.y - splashY;
+			if (dx * dx + dy * dy < radius * radius) {
+				// flee from splash
+				fish.scaredTimer = 0.5;
+				fish.attracted = false;
+				// set velocity away from splash
+				var len = Math.sqrt(dx * dx + dy * dy);
+				if (len > 0.01) {
+					fish.velX = (dx / len) * FISH_SPEED * 1.5;
+					fish.velY = (dy / len) * FISH_SPEED * 1.5;
+				}
+			}
+		}
+	}
+
 	function serverUpdate(delta:Float) {
 		elapsedTime += delta / 1000;
 		var fixedStep = Simulation.FIXED_STEP;
@@ -425,5 +802,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 			queue.splice(0, queue.length);
 		}
+
+		// Update server-side fish AI
+		updateFish(t);
 	}
 }

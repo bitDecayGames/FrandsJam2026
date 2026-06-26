@@ -144,7 +144,7 @@ class PlayState extends FlxTransitionableState {
 		#if !local
 		setupNetwork();
 		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		fishSpawner.setNet(GameManager.ME.net);
+		// Fish are now spawned and managed server-side; no need for fishSpawner.setNet()
 		#end
 
 		loadLevel("Level_0");
@@ -291,6 +291,16 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
 		GameManager.ME.net.onTimerSync.add(onTimerSync);
 		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
+
+		// Fish may have been added to the schema before we subscribed
+		// (server spawns fish on room creation, before clients join PlayState).
+		// Manually check for any existing fish and create renderers.
+		var serverState = GameManager.ME.net.getState();
+		if (serverState != null) {
+			for (id => fish in serverState.fish) {
+				onFishAdded(id, fish);
+			}
+		}
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -309,11 +319,13 @@ class PlayState extends FlxTransitionableState {
 			return;
 		}
 
-		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y}');
+		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y} alive=${fishState.alive}');
 
 		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true, fishState.fishType);
 		remoteFish.set(fishId, newFish);
-		fishSpawner.add(newFish);
+		fishSpawner.fishMap.set(fishId, newFish);
+		// add directly to state — fishSpawner group doesn't render fish added after create()
+		add(newFish);
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
 
@@ -459,13 +471,14 @@ class PlayState extends FlxTransitionableState {
 		add(seagullGroup);
 
 		#if local
-		shop = new Shop();
-		shop.spawnRandom(level, terrainLayer, 640, 480);
-		ySortGroup.add(shop);
+		// shop disabled for now
+		// shop = new Shop();
+		// shop.spawnRandom(level, terrainLayer, 640, 480);
+		// ySortGroup.add(shop);
 		#end
 
-		shopInterior = new BaitShopInterior();
-		midGroundGroup.add(shopInterior.tilemap);
+		// shopInterior = new BaitShopInterior();
+		// midGroundGroup.add(shopInterior.tilemap);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -511,7 +524,7 @@ class PlayState extends FlxTransitionableState {
 
 	function spawnWorldItems(level:Level) {
 		rockGroup.spawn(level);
-		fishSpawner.spawn(level);
+		// Fish are now spawned server-side; clients receive them via schema onAdd
 		wadersPickup.spawn(level, terrainLayer);
 		pepperPickup.spawn(level, terrainLayer);
 	}
@@ -569,21 +582,26 @@ class PlayState extends FlxTransitionableState {
 			}
 			return;
 		}
+		// Ensure IS_HOST is set correctly — the deferred schema callback may not
+		// have fired yet, but we know the answer from the schema directly
+		NetworkManager.IS_HOST = isHost;
 		if (isHost) {
 			spawnBushes();
 			spawnWeeds();
 			spawnWorldItems(level);
 			broadcastWorldItems();
 			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
-			shop = new Shop();
-			shop.spawnRandom(level, terrainLayer, 640, 480);
-			ySortGroup.add(shop);
-			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
+			// shop disabled for now
+			// shop = new Shop();
+			// shop.spawnRandom(level, terrainLayer, 640, 480);
+			// ySortGroup.add(shop);
+			GameManager.ME.net.sendWorldSetup(bushPositions, 0, 0);
 		} else {
 			// non-host: check if world state already arrived
 			var state = GameManager.ME.net.getState();
 			if (state != null && state.shopReady) {
-				placeShopAt(state.shopX, state.shopY);
+				// shop disabled for now
+				// placeShopAt(state.shopX, state.shopY);
 				for (_ => bush in state.bushes) {
 					placeBushAt(bush.x, bush.y);
 				}
@@ -982,20 +1000,7 @@ class PlayState extends FlxTransitionableState {
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
 		if (!insideShop) {
-			var bobbers:Map<String, FlxSprite> = new Map();
-			if (player.isBobberLanded()) {
-				bobbers.set(player.sessionId, player.castBobber);
-			}
-			#if !local
-			if (NetworkManager.IS_HOST) {
-				for (sid => remote in remotePlayers) {
-					if (remote.isBobberLanded()) {
-						bobbers.set(sid, remote.castBobber);
-					}
-				}
-			}
-			#end
-			fishSpawner.setBobbers(bobbers);
+			// Bobber checks are handled server-side now; no need to set bobbers on fish
 			rockGroup.checkPickup(player);
 			groundFishGroup.checkPickup(player);
 			wadersPickup.checkPickup(player);

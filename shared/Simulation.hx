@@ -44,7 +44,9 @@ class Simulation {
 			}
 		}
 
-		var res = collision.resolveAABB(p.x, p.y, p.width, p.height, vx * elapsed, vy * elapsed);
+		// block both SOLID and SHALLOW tiles (shallow water acts as a wall)
+		var blockFlags = CollisionMap.FLAG_SOLID | CollisionMap.FLAG_SHALLOW;
+		var res = collision.resolveAABB(p.x, p.y, p.width, p.height, vx * elapsed, vy * elapsed, blockFlags);
 		p.x = res.x;
 		p.y = res.y;
 		p.velocityX = if (res.hitX) 0 else vx;

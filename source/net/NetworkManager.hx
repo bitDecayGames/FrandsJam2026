@@ -143,6 +143,9 @@ class NetworkManager {
 					// trace('NetMan: (fish: ${id} y update');
 					onFishMove.dispatch(id, fish);
 				});
+				cb.listen(fish, "alive", (_, _) -> {
+					onFishMove.dispatch(id, fish);
+				});
 			});
 
 			cb.onAdd(room.state, "bushes", (bush:BushState, id:String) -> {

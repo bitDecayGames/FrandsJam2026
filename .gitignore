@@ -44,3 +44,7 @@ dump/
 colyseus.log
 game_player.log
 game_bot.log
+screenshots/
+.screenshot
+.pid_player
+.pid_bot

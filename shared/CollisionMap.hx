@@ -13,10 +13,10 @@ typedef Result = {x:Float, y:Float, hitX:Bool, hitY:Bool};
 **/
 class CollisionMap {
 	// cellFlags bit masks
-	static inline var FLAG_SOLID = 1;
-	static inline var FLAG_SHALLOW = 2;
-	static inline var FLAG_SWIMMABLE = 4;
-	static inline var FLAG_HAS_POLYGON = 8;
+	public static inline var FLAG_SOLID = 1;
+	public static inline var FLAG_SHALLOW = 2;
+	public static inline var FLAG_SWIMMABLE = 4;
+	public static inline var FLAG_HAS_POLYGON = 8;
 
 	public var cols(default, null):Int;
 	public var rows(default, null):Int;
@@ -161,7 +161,11 @@ class CollisionMap {
 	 *
 	 * Returns the corrected position plus hitX/hitY flags.
 	**/
-	public function resolveAABB(x:Float, y:Float, w:Float, h:Float, dx:Float, dy:Float):Result {
+	public function resolveAABB(x:Float, y:Float, w:Float, h:Float, dx:Float, dy:Float, blockFlags:Int = 0):Result {
+		// default: block on SOLID. Caller can add FLAG_SHALLOW to also block shallow water.
+		if (blockFlags == 0) {
+			blockFlags = FLAG_SOLID;
+		}
 		var hitX = false;
 		var hitY = false;
 		var ts = tileSize;
@@ -180,7 +184,7 @@ class CollisionMap {
 					continue;
 				}
 				var fi = cellIdx(col, row);
-				if ((cellFlags[fi] & FLAG_SOLID) == 0) {
+				if ((cellFlags[fi] & blockFlags) == 0) {
 					continue;
 				}
 				var tx:Float = col * ts;
@@ -225,7 +229,7 @@ class CollisionMap {
 					continue;
 				}
 				var fi = cellIdx(col, row);
-				if ((cellFlags[fi] & FLAG_SOLID) == 0) {
+				if ((cellFlags[fi] & blockFlags) == 0) {
 					continue;
 				}
 				var tx:Float = col * ts;

@@ -1088,6 +1088,10 @@ class Player extends FlxSprite {
 					TODO.sfx("bobber_land");
 					if (onBobberLanded != null)
 						onBobberLanded(castTarget.x + 4, castTarget.y + 4);
+					// Tell server where the bobber landed so fish AI can detect it
+					if (!isRemote) {
+						GameManager.ME.net.sendMessage("bobber_landed", {x: castTarget.x + 4, y: castTarget.y + 4});
+					}
 				}
 			case CAST_ANIM:
 				// TODO: We can
@@ -1169,6 +1173,10 @@ class Player extends FlxSprite {
 			if (!isRemote && !hasFish) {
 				GameManager.ME.net.sendLinePulled();
 				GameManager.ME.net.sendMessage("cast_retract", {});
+			}
+			// Tell server the bobber is no longer in the water
+			if (!isRemote) {
+				GameManager.ME.net.sendMessage("bobber_retracted", {});
 			}
 			if (hasFish) {
 				TODO.sfx("fish_caught");
