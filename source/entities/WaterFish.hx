@@ -91,6 +91,7 @@ class WaterFish extends FlxSprite {
 		if (!alive) {
 			// Fish just respawned — revive and fade in
 			alive = true;
+			visible = true;
 			alpha = 0;
 			fadeInTimer = 1.0;
 		}
