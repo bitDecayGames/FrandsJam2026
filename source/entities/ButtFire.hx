@@ -10,11 +10,17 @@ class ButtFire extends FlxSprite {
 
 	var elapsed:Float = 0;
 
-	public function new(cx:Float, cy:Float, dirX:Float, dirY:Float) {
+	public function new(cx:Float, cy:Float, dirX:Float, dirY:Float, smoke:Bool = false) {
 		super(cx, cy);
 
 		var size = FlxG.random.int(2, 3);
-		var color = FlxG.random.bool(60) ? FlxColor.fromRGB(255, FlxG.random.int(80, 140), 0) : FlxColor.fromRGB(255, FlxG.random.int(140, 200), 0);
+		var color:FlxColor;
+		if (smoke) {
+			var g = FlxG.random.int(100, 200);
+			color = FlxColor.fromRGB(g, g, g);
+		} else {
+			color = FlxG.random.bool(60) ? FlxColor.fromRGB(255, FlxG.random.int(80, 140), 0) : FlxColor.fromRGB(255, FlxG.random.int(140, 200), 0);
+		}
 		makeGraphic(size, size, color);
 		x -= size / 2;
 		y -= size / 2;

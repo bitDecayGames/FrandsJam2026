@@ -25,43 +25,51 @@ class Shop extends FlxSprite {
 		// TODO Hook into network call
 	}
 
-	// Re-written by Lumo, Proton’s multi‑model AI assistant
+	// Re-written by Lumo, Proton's multi-model AI assistant
 	// with some slight hooman modifications.
-	public function spawnRandom(level:Level, ?terrain:BDTilemap) {
+	public function spawnRandom(level:Level, ?terrain:BDTilemap, maxPxW:Float = 0, maxPxH:Float = 0) {
 		// Level grid information
 		var layer = level.waterGrid;
 		var cols = layer.cWid; // number of cells horizontally
 		var rows = layer.cHei; // number of cells vertically
 		var gridSize = layer.gridSize; // size of one cell in pixels
 
-		// Pixel dimensions of the whole level
+		// Pixel dimensions of the spawn area (default to full level)
 		var levelPxW = cols * gridSize;
 		var levelPxH = rows * gridSize;
+		if (maxPxW > 0) {
+			levelPxW = Std.int(Math.min(levelPxW, maxPxW));
+		}
+		if (maxPxH > 0) {
+			levelPxH = Std.int(Math.min(levelPxH, maxPxH));
+		}
+		var maxCols = Std.int(levelPxW / gridSize);
+		var maxRows = Std.int(levelPxH / gridSize);
 
 		// Size of the shop sprite (set when the graphic is loaded)
-		var shopW = this.width; // 64 px in the original asset
-		var shopH = this.height; // 48 px in the original asset
+		var shopW = this.width; // 64 px in the original asset
+		var shopH = this.height; // 48 px in the original asset
 
-		// Extra clearance we want around the shop (16 px on each side)
+		// Extra clearance we want around the shop (16 px on each side)
 		var margin = 16;
 
-		// Collect all cells that are walkable (value != 1) **and**
+		// Collect all cells that are walkable (value != 1) and
 		// leave enough room for the shop + margin.
 		var candidates = new Array<Int>();
-		for (cy in 0...rows) {
-			for (cx in 0...cols) {
-				// 1️⃣  Cell must be walkable (not water, not shallow)
+		for (cy in 0...maxRows) {
+			for (cx in 0...maxCols) {
+				// Cell must be walkable (not water, not shallow)
 				if (layer.getInt(cx, cy) != 1) {
 					var tileX = cx * gridSize + gridSize / 2;
 					var tileY = cy * gridSize + gridSize / 2;
 					if (terrain != null && terrain.isShallowAt(tileX, tileY)) {
 						continue;
 					}
-					// 2️⃣  Compute the pixel position where the shop’s top‑left corner would land
+					// Compute the pixel position where the shop's top-left corner would land
 					var posX = cx * gridSize;
 					var posY = cy * gridSize;
 
-					// 3️⃣  Verify the margin constraints
+					// Verify the margin constraints
 					var fitsHorizontally = (posX - margin >= 0) && (posX + shopW + margin <= levelPxW);
 					var fitsVertically = (posY - margin >= 0) && (posY + shopH + margin <= levelPxH);
 
@@ -73,7 +81,7 @@ class Shop extends FlxSprite {
 			}
 		}
 
-		// No viable spots – just bail out
+		// No viable spots - just bail out
 		if (candidates.length == 0) {
 			QLog.error("Shop: no suitable location found to spawn.");
 			return;
@@ -96,7 +104,7 @@ class Shop extends FlxSprite {
 		}
 	}
 
-	function sellFish(player:Player) {
+	public function sellFish(player:Player) {
 		var totalValue = 0;
 		var count = 0;
 		var fishData = player.inventory.removeAnyFishFull();

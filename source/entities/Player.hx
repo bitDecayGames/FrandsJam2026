@@ -56,9 +56,19 @@ class Player extends FlxSprite {
 	var playerNum = 0;
 
 	public var hotModeActive:Bool = false;
+	public var drowned:Bool = false;
 
 	var hotModeTimer:Float = 0;
 	var fireEmitTimer:Float = 0;
+	var drownTimer:Float = 0;
+	var drownBlinkTimer:Float = 0;
+	var drownBlinksLeft:Int = 0;
+	var drownReturnX:Float = 0;
+	var drownReturnY:Float = 0;
+
+	static inline var DROWN_HIDE_DURATION:Float = 2.0;
+	static inline var DROWN_BLINK_RATE:Float = 0.15;
+	static inline var DROWN_BLINK_COUNT:Int = 3;
 
 	public var inventory = new Inventory();
 	public var score:Int = 0;
@@ -149,6 +159,7 @@ class Player extends FlxSprite {
 	// Group for ground-level effects (dust, footprints) — set by PlayState
 	public var groundEffectsGroup:FlxGroup;
 
+
 	// Factory for creating thrown rocks — set by PlayState
 	public var makeRock:(Float, Float, Bool) -> Rock;
 
@@ -229,6 +240,9 @@ class Player extends FlxSprite {
 		}
 
 		// Footstep effects on foot-plant frames of run animations
+		if (drowned) {
+			return;
+		}
 		if (StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
 			var fx = x + width / 2;
 			var fy = y + 4;
@@ -454,6 +468,45 @@ class Player extends FlxSprite {
 	override public function update(delta:Float) {
 		super.update(delta);
 
+		// drown recovery — hidden phase blocks everything
+		if (drowned) {
+			if (drownTimer > 0) {
+				drownTimer -= delta;
+				// emit smoke at the splash spot
+				fireEmitTimer += delta;
+				if (fireEmitTimer >= 0.05) {
+					fireEmitTimer = 0;
+					for (_ in 0...2) {
+						var smoke = new ButtFire(drownReturnX + width / 2 + FlxG.random.float(-4, 4), drownReturnY + height / 2 + FlxG.random.float(-2, 2), FlxG.random.float(-0.5, 0.5), -1, true);
+						state.add(smoke);
+					}
+				}
+				if (drownTimer <= 0) {
+					// respawn at water entry point
+					setPosition(drownReturnX, drownReturnY);
+					visible = true;
+					frozen = false;
+					fireEmitTimer = 0;
+					drownBlinkTimer = DROWN_BLINK_RATE;
+				}
+				return;
+			}
+			// blink phase — player can move, just toggle visibility
+			drownBlinkTimer -= delta;
+			if (drownBlinkTimer <= 0) {
+				drownBlinkTimer = DROWN_BLINK_RATE;
+				visible = !visible;
+				if (visible) {
+					drownBlinksLeft--;
+				}
+				if (drownBlinksLeft <= 0) {
+					visible = true;
+					drowned = false;
+				}
+			}
+			// fall through to normal update
+		}
+
 		// Run for both local and remote players
 		updateCast(delta);
 		updateFishingLine();
@@ -523,6 +576,14 @@ class Player extends FlxSprite {
 		} else if (FlxG.keys.justPressed.E) {
 			skinIndex = (skinIndex + 1) % SKINS.length;
 			swapSkin();
+		}
+
+		if (FlxG.keys.justPressed.P) {
+			if (hotModeActive) {
+				deactivateHotMode();
+			} else {
+				activateHotMode(99);
+			}
 		}
 
 		if (frozen) {
@@ -1120,10 +1181,10 @@ class Player extends FlxSprite {
 		}
 	}
 
-	public function activateHotMode() {
+	public function activateHotMode(duration:Float = 3.0) {
 		if (!hotModeActive) {
 			hotModeActive = true;
-			hotModeTimer = 3.0;
+			hotModeTimer = duration;
 			TODO.sfx("hot_mode_activate");
 			#if !local
 			if (!isRemote) {
@@ -1135,6 +1196,23 @@ class Player extends FlxSprite {
 
 	public function deactivateHotMode() {
 		hotModeActive = false;
+	}
+
+	public function drown() {
+		if (drowned) {
+			return;
+		}
+		drowned = true;
+		drownReturnX = x;
+		drownReturnY = y;
+		deactivateHotMode();
+		frozen = true;
+		visible = false;
+		velocity.set();
+		drownTimer = DROWN_HIDE_DURATION;
+		drownBlinksLeft = DROWN_BLINK_COUNT;
+		drownBlinkTimer = 0;
+		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
 	}
 
 	public function pickupItem(item:InventoryItem):Bool {
@@ -1178,6 +1256,36 @@ class Player extends FlxSprite {
 		}
 		cleanupNetwork();
 		super.destroy();
+	}
+
+	public function cancelAllActions() {
+		// Cancel casting and clean up bobber
+		if (castBobber != null) {
+			state.remove(castBobber);
+			castBobber.destroy();
+			castBobber = null;
+		}
+		if (castTarget != null) {
+			castTarget.put();
+			castTarget = null;
+		}
+		if (castStartPos != null) {
+			castStartPos.put();
+			castStartPos = null;
+		}
+		castState = IDLE;
+		powerBarBg.visible = false;
+		powerBarFill.visible = false;
+
+		// Cancel throwing
+		throwing = false;
+		if (rockTarget != null) {
+			rockTarget.put();
+			rockTarget = null;
+		}
+
+		frozen = false;
+		velocity.set(0, 0);
 	}
 
 	private function cleanupNetwork() {

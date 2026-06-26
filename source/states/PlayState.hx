@@ -34,10 +34,12 @@ import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
 import entities.Bush;
+import entities.Splash;
 import entities.CloudShadow;
 import entities.Player;
 import entities.Ripple;
 import entities.Seagull;
+import entities.BaitShopInterior;
 import entities.Shop;
 import entities.WaterSparkle;
 import events.gen.Event;
@@ -71,10 +73,10 @@ class PlayState extends FlxTransitionableState {
 	var shop:Shop;
 	var terrainLayer:BDTilemap;
 	var shallowColliders:FlxTypedGroup<FlxSprite>;
+	var waterColliders:FlxTypedGroup<FlxSprite>;
 	var inventoryHUD:InventoryHUD;
 	var scoreHUD:ScoreHUD;
 	var activeCameraTransition:CameraTransition = null;
-	var hotText:FlashingText;
 	var weedGroup = new FlxTypedGroup<entities.Weed>();
 	var seagullGroup = new FlxTypedGroup<Seagull>();
 	var seagullTimer:Float = 0;
@@ -85,6 +87,13 @@ class PlayState extends FlxTransitionableState {
 
 	var waterLayer:levels.ldtk.WaterGrid;
 	var sparkleTimer:Float = 0;
+
+	var shopInterior:BaitShopInterior;
+	var insideShop:Bool = false;
+	var shopReturnX:Float = 0;
+	var shopReturnY:Float = 0;
+	var mainWorldBounds:FlxRect;
+	var mainCameraBounds:FlxRect;
 
 	var ldtk = new LdtkProject();
 
@@ -121,6 +130,7 @@ class PlayState extends FlxTransitionableState {
 
 		// Build out our render order
 		add(midGroundGroup);
+		add(weedGroup);
 		add(rockGroup);
 		add(groundFishGroup);
 		add(wadersPickup);
@@ -138,8 +148,6 @@ class PlayState extends FlxTransitionableState {
 
 		loadLevel("Level_0");
 
-		hotText = new FlashingText("HOT", 0.15, 3.0);
-		add(hotText);
 
 		if (round != null) {
 			round.initialize(this);
@@ -157,7 +165,79 @@ class PlayState extends FlxTransitionableState {
 				status: RoundState.STATUS_ACTIVE,
 			});
 		}
+
+		#if db
+		addDebugButtons();
+		#end
 	}
+
+	#if db
+	function addDebugButtons() {
+		var labels = ["Rock", "Big Rock", "Pepper", "Waders"];
+		var btnW = 60;
+		var btnH = 16;
+		var margin = 4;
+		var startX = FlxG.width - btnW - margin;
+		var startY = 40;
+		for (i in 0...labels.length) {
+			var bg = new FlxSprite(startX, startY + i * (btnH + margin));
+			bg.makeGraphic(btnW, btnH, FlxColor.fromRGB(40, 40, 40, 180));
+			bg.scrollFactor.set(0, 0);
+			add(bg);
+			var label = new FlxText(startX, startY + i * (btnH + margin) + 1, btnW, labels[i]);
+			label.size = 8;
+			label.alignment = FlxTextAlign.CENTER;
+			label.color = FlxColor.WHITE;
+			label.scrollFactor.set(0, 0);
+			add(label);
+		}
+	}
+
+	function checkDebugButtons() {
+		if (FlxG.mouse.justPressedRight) {
+			player.setPosition(FlxG.mouse.x, FlxG.mouse.y);
+		}
+		if (!FlxG.mouse.justPressed) {
+			return;
+		}
+		var btnW = 60;
+		var btnH = 16;
+		var margin = 4;
+		var startX = FlxG.width - btnW - margin;
+		var startY = 40;
+		var pos = FlxG.mouse.getScreenPosition();
+		var mx = pos.x;
+		var my = pos.y;
+		pos.put();
+		if (mx < startX || mx > startX + btnW) {
+			return;
+		}
+		for (i in 0...4) {
+			var by = startY + i * (btnH + margin);
+			if (my >= by && my < by + btnH) {
+				switch (i) {
+					case 0:
+						player.inventory.add(Rock);
+					case 1:
+						player.inventory.add(BigRock);
+					case 2:
+						if (player.hotModeActive) {
+							player.deactivateHotMode();
+						} else {
+							player.activateHotMode(99);
+						}
+					case 3:
+						if (player.inventory.hasWaders()) {
+							player.inventory.remove(Waders);
+						} else {
+							player.inventory.add(Waders);
+						}
+				}
+				return;
+			}
+		}
+	}
+	#end
 
 	override function destroy() {
 		super.destroy();
@@ -231,10 +311,13 @@ class PlayState extends FlxTransitionableState {
 		}
 		terrainLayer = level.terrainLayer;
 		midGroundGroup.add(terrainLayer);
-		midGroundGroup.add(level.tileColliders);
+		waterColliders = level.tileColliders;
+		midGroundGroup.add(waterColliders);
 		shallowColliders = level.shallowTileColliders;
 		midGroundGroup.add(shallowColliders);
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
+		mainWorldBounds = FlxRect.get();
+		mainWorldBounds.copyFrom(FlxG.worldBounds);
 
 		// pick random spawn points for all players
 		var allSessionIds = [GameManager.ME.net.mySessionId];
@@ -266,7 +349,7 @@ class PlayState extends FlxTransitionableState {
 		player.sessionId = GameManager.ME.net.mySessionId;
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
-		camera.follow(player);
+		camera.follow(player, TOPDOWN);
 		ySortGroup.add(player);
 
 		for (_ => seshID in GameManager.ME.sessions) {
@@ -362,13 +445,13 @@ class PlayState extends FlxTransitionableState {
 
 		#if local
 		shop = new Shop();
-		shop.spawnRandom(level, terrainLayer);
+		shop.spawnRandom(level, terrainLayer, 640, 480);
 		ySortGroup.add(shop);
 		#else
 		if (NetworkManager.IS_HOST) {
 			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
 			shop = new Shop();
-			shop.spawnRandom(level, terrainLayer);
+			shop.spawnRandom(level, terrainLayer, 640, 480);
 			ySortGroup.add(shop);
 			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
 		} else {
@@ -382,6 +465,9 @@ class PlayState extends FlxTransitionableState {
 			}
 		}
 		#end
+
+		shopInterior = new BaitShopInterior();
+		midGroundGroup.add(shopInterior.tilemap);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -400,6 +486,7 @@ class PlayState extends FlxTransitionableState {
 		for (_ => zone in level.camZones) {
 			if (zone.containsPoint(playerPos)) {
 				setCameraBounds(zone);
+				mainCameraBounds = zone;
 			}
 		}
 		playerPos.put();
@@ -439,6 +526,7 @@ class PlayState extends FlxTransitionableState {
 				var by = FlxG.random.float(bounds.y, bounds.bottom - 32);
 				if (classifyGround(terrainLayer.sampleColorAt(bx, by)) == "grass") {
 					var bush = new Bush(bx, by, this);
+					bush.groundGroup = midGroundGroup;
 					bushGroup.add(bush);
 					ySortGroup.add(bush);
 					break;
@@ -456,8 +544,8 @@ class PlayState extends FlxTransitionableState {
 				var ground = classifyGround(terrainLayer.sampleColorAt(wx, wy));
 				if (ground == "grass" || ground == "dirt") {
 					var weed = new entities.Weed(wx, wy, this);
+					weed.groundGroup = midGroundGroup;
 					weedGroup.add(weed);
-					midGroundGroup.add(weed);
 					break;
 				}
 			}
@@ -515,8 +603,8 @@ class PlayState extends FlxTransitionableState {
 		if (weedPositions != null) {
 			for (w in weedPositions) {
 				var weed = new entities.Weed(w.x, w.y, this);
+				weed.groundGroup = midGroundGroup;
 				weedGroup.add(weed);
-				midGroundGroup.add(weed);
 			}
 		}
 
@@ -612,6 +700,7 @@ class PlayState extends FlxTransitionableState {
 
 	function placeBushAt(bx:Float, by:Float) {
 		var bush = new Bush(bx, by, this);
+		bush.groundGroup = midGroundGroup;
 		bushGroup.add(bush);
 		ySortGroup.add(bush);
 	}
@@ -757,76 +846,110 @@ class PlayState extends FlxTransitionableState {
 			EventBus.fire(new Click(FlxG.mouse.x, FlxG.mouse.y));
 		}
 
-		FlxG.collide(midGroundGroup, player);
-		FlxG.collide(bushGroup, player, (bush:Bush, p:Player) -> {
-			var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
-			var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
-			var dist = Math.sqrt(dx * dx + dy * dy);
-			var dirX = dist > 0 ? dx / dist : 1.0;
-			var dirY = dist > 0 ? dy / dist : 0.0;
-			bush.rustleFrom(dirX, dirY);
-			var index = bushGroup.members.indexOf(bush);
-			GameManager.ME.net.sendBushRustle(index, dirX, dirY);
-		});
-		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
-			var index = weedGroup.members.indexOf(weed);
-			weed.burst();
-			GameManager.ME.net.sendWeedBurst(index);
-			GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
-		});
-		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
-			TODO.sfx("worm_squish");
-			midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
-			worm.kill();
-			GameManager.ME.net.sendMessage("worm_killed", {});
-			GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
-		});
-		if (shop != null) {
-			FlxG.collide(shop, player, Shop.onCollide);
+		#if db
+		checkDebugButtons();
+		#end
+
+		// hot player touching water = drown (check before collide separates them)
+		// waders protect you — just cancel pepper and wade normally
+		if (player.hotModeActive && !player.drowned) {
+			if (FlxG.overlap(waterColliders, player) || FlxG.overlap(shallowColliders, player)) {
+				if (player.inventory.hasWaders()) {
+					player.deactivateHotMode();
+				} else {
+					add(new Splash(player.x + player.width / 2, player.y + player.height, true));
+					player.drown();
+				}
+			}
 		}
 
-		if (player.inventory.hasWaders() && terrainLayer != null) {
-			player.inShallowWater = terrainLayer.isFullyInTaggedArea(player, [SHALLOW, SOLID]);
+		FlxG.collide(midGroundGroup, player);
+
+		if (insideShop) {
+			checkShopExit();
 		} else {
-			player.inShallowWater = false;
+			FlxG.collide(bushGroup, player, (bush:Bush, p:Player) -> {
+				if (p.hotModeActive && !bush.burning) {
+					bush.ignite();
+					return;
+				}
+				var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
+				var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
+				var dist = Math.sqrt(dx * dx + dy * dy);
+				var dirX = dist > 0 ? dx / dist : 1.0;
+				var dirY = dist > 0 ? dy / dist : 0.0;
+				bush.rustleFrom(dirX, dirY);
+				var index = bushGroup.members.indexOf(bush);
+				GameManager.ME.net.sendBushRustle(index, dirX, dirY);
+			});
+			FlxG.overlap(weedGroup, player, (weed:entities.Weed, p:Player) -> {
+				if (p.hotModeActive) {
+					if (!weed.burning) {
+						weed.ignite();
+					}
+					return;
+				}
+				var index = weedGroup.members.indexOf(weed);
+				weed.burst();
+				GameManager.ME.net.sendWeedBurst(index);
+				GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
+			});
+			FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
+				TODO.sfx("worm_squish");
+				midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
+				worm.kill();
+				GameManager.ME.net.sendMessage("worm_killed", {});
+				GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
+			});
+			if (shop != null && FlxG.overlap(shop, player)) {
+				enterShop();
+			}
+
+			if (player.inventory.hasWaders() && terrainLayer != null) {
+				player.inShallowWater = terrainLayer.isFullyInTaggedArea(player, [SHALLOW, SOLID]);
+			} else {
+				player.inShallowWater = false;
+			}
 		}
+
 		ySortGroup.sort((order, a, b) -> {
 			var objA:flixel.FlxObject = cast a;
 			var objB:flixel.FlxObject = cast b;
 			return FlxSort.byValues(order, objA.y + objA.height, objB.y + objB.height);
 		});
-		handleCameraBounds();
 
-		if (player.hotModeActive && !hotText.isFlashing()) {
-			hotText.start();
+		if (!insideShop) {
+			handleCameraBounds();
 		}
+
 
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
-		var bobbers:Map<String, FlxSprite> = new Map();
-		if (player.isBobberLanded())
-			bobbers.set(player.sessionId, player.castBobber);
-		#if !local
-		if (NetworkManager.IS_HOST) {
-			for (sid => remote in remotePlayers) {
-				if (remote.isBobberLanded())
-					bobbers.set(sid, remote.castBobber);
+		if (!insideShop) {
+			var bobbers:Map<String, FlxSprite> = new Map();
+			if (player.isBobberLanded()) {
+				bobbers.set(player.sessionId, player.castBobber);
 			}
-		}
-		#end
-		fishSpawner.setBobbers(bobbers);
-		rockGroup.checkPickup(player);
-		groundFishGroup.checkPickup(player);
-		wadersPickup.checkPickup(player);
-		pepperPickup.checkPickup(player);
-		if (shop != null) {
-			shop.checkInteraction(player);
-		}
+			#if !local
+			if (NetworkManager.IS_HOST) {
+				for (sid => remote in remotePlayers) {
+					if (remote.isBobberLanded()) {
+						bobbers.set(sid, remote.castBobber);
+					}
+				}
+			}
+			#end
+			fishSpawner.setBobbers(bobbers);
+			rockGroup.checkPickup(player);
+			groundFishGroup.checkPickup(player);
+			wadersPickup.checkPickup(player);
+			pepperPickup.checkPickup(player);
 
-		updateSparkles(elapsed);
-		updateSeagulls(elapsed);
-		updateWorms(elapsed);
+			updateSparkles(elapsed);
+			updateSeagulls(elapsed);
+			updateWorms(elapsed);
+		}
 	}
 
 	function updateSeagulls(elapsed:Float) {
@@ -956,6 +1079,39 @@ class PlayState extends FlxTransitionableState {
 						QLog.error('camera transition area has unsupported cardinal direction ${dir}');
 				}
 			}
+		}
+	}
+
+	function enterShop() {
+		insideShop = true;
+		shopReturnX = shop.x + shop.width / 2;
+		shopReturnY = shop.y + shop.height + 4;
+
+		// Cancel any active casting or throwing before teleport
+		player.cancelAllActions();
+
+		// Sell fish on entry
+		shop.sellFish(player);
+
+		// Teleport player into the shop interior
+		player.setPosition(shopInterior.spawnPoint.x, shopInterior.spawnPoint.y);
+		FlxG.worldBounds.copyFrom(shopInterior.worldBounds);
+		setCameraBounds(shopInterior.cameraBounds);
+	}
+
+	function checkShopExit() {
+		if (shopInterior.isPlayerPastExit(player.y, player.height)) {
+			exitShop();
+		}
+	}
+
+	function exitShop() {
+		insideShop = false;
+		player.setPosition(shopReturnX, shopReturnY);
+
+		FlxG.worldBounds.copyFrom(mainWorldBounds);
+		if (mainCameraBounds != null) {
+			setCameraBounds(mainCameraBounds);
 		}
 	}
 
