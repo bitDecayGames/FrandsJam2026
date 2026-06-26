@@ -19,12 +19,25 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	// Fish AI data
 	var waterBodies:Array<Array<{x:Float, y:Float}>>; // water tile positions per body
 	var bobberPositions:Map<String, {x:Float, y:Float}>; // sessionId -> bobber pos
+	var hotModePlayers:Map<String, Bool>; // sessionId -> on fire
+	var wadersPlayers:Map<String, Bool>; // sessionId -> has waders
+	var bushRects:Array<{x:Float, y:Float, w:Float, h:Float}>; // bush collision rects
 	var nextFishID:Int;
 	var ldtkRaw:Dynamic; // cached level data for flood-fill
+
+	// Cached world data for late joiners
+	var cachedWorldItems:Dynamic;
+	var cachedSpawnLocations:Dynamic;
 
 	// Worm spawning data
 	var wormTimer:Float;
 	var nextWormId:Int;
+
+	// Round timer (server-authoritative)
+	var roundTimerSec:Float;
+	var roundDurationSec:Float;
+	var timerSyncCooldown:Float;
+	var gameplayStarted:Bool;
 
 	// Seagull AI data
 	var seagulls:Array<{
@@ -69,14 +82,20 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// Initialize fish AI data
 		waterBodies = [];
 		bobberPositions = new Map();
+		hotModePlayers = new Map();
+		wadersPlayers = new Map();
+		bushRects = [];
 		nextFishID = 1;
-
-		// Spawn server-owned fish
-		spawnFish();
 
 		// Initialize worm data
 		wormTimer = 999; // don't spawn until a client requests via "start_gameplay"
 		nextWormId = 1;
+
+		// Initialize round timer
+		roundTimerSec = 0;
+		roundDurationSec = 90;
+		timerSyncCooldown = 5.0;
+		gameplayStarted = false;
 
 		// Initialize seagull data
 		seagulls = [];
@@ -119,15 +138,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
-		// client tells server where it spawned so the server's PlayerState
-		// starts at the right position (server doesn't run Flixel spawn logic)
-		onMessage("set_position", (client:Client, data:{x:Float, y:Float}) -> {
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.x = data.x;
-				player.y = data.y;
-			}
-		});
+		// set_position removed — server computes spawn positions itself
 
 		// --- Cast system: server validates and broadcasts state changes ---
 		onMessage("cast_start", (client:Client, data:{dir:String}) -> {
@@ -162,18 +173,27 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			// frozen managed client-side
 		});
 
-		// Client signals PlayState is loaded — start spawning creatures
+		// Client signals PlayState is loaded — start spawning creatures and world items
 		onMessage("start_gameplay", (client:Client, _) -> {
-			// send cloud data
+			if (!gameplayStarted) {
+				// New round (or first round): reset and respawn everything
+				resetRoundState();
+				spawnWorldItems();
+				gameplayStarted = true;
+				roundTimerSec = 0;
+			}
+			// Send cached data to this specific client
+			if (cachedWorldItems != null) {
+				client.send("world_items", cachedWorldItems);
+			}
+			if (cachedSpawnLocations != null) {
+				client.send("spawn_locations", cachedSpawnLocations);
+			}
+			client.send("timer_sync", {runTimeSec: roundTimerSec, totalSec: roundDurationSec});
+			// Always send clouds and existing seagulls
 			client.send("cloud_sync", {angle: windAngle, clouds: clouds});
-			// send any existing seagulls
 			for (gull in seagulls) {
 				client.send("seagull_spawn", {id: gull.id, x: gull.x, y: gull.y, velX: gull.velX, velY: gull.velY, altitude: gull.altitude});
-			}
-			// start spawning if this is the first client ready
-			if (seagullSpawnTimer > 100) {
-				seagullSpawnTimer = 3.0;
-				wormTimer = 3.0;
 			}
 		});
 
@@ -257,18 +277,14 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
-		// sent by the host to broadcast all world item positions
-		onMessage("world_items", (client:Client, data:Dynamic) -> {
-			if (client.sessionId != state.hostSessionId) {
-				return;
-			}
-			trace('${client.sessionId}: sent "world_items"');
-			broadcast("world_items", data, {except: client});
-		});
-
 		// sent when a player picks up a world item (rock, waders, pepper)
 		onMessage("item_pickup", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "item_pickup": itemType=${data.itemType} index=${data.index}');
+			if (data.itemType == "waders") {
+				wadersPlayers.set(client.sessionId, true);
+			} else if (data.itemType == "waders_remove") {
+				wadersPlayers.remove(client.sessionId);
+			}
 			broadcast("item_pickup", {sessionId: client.sessionId, itemType: data.itemType, index: data.index}, {except: client});
 		});
 
@@ -278,10 +294,34 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("weed_burst", {sessionId: client.sessionId, index: data.index}, {except: client});
 		});
 
+		// sent when a hot player drowns in water
+		onMessage("player_drown", (client:Client, data:Dynamic) -> {
+			broadcast("player_drown", {sessionId: client.sessionId, x: data.x, y: data.y}, {except: client});
+		});
+
 		// sent when a player walks into a bush
 		onMessage("bush_rustle", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "bush_rustle": index=${data.index}');
 			broadcast("bush_rustle", {index: data.index, dirX: data.dirX, dirY: data.dirY}, {except: client});
+		});
+
+		// sent when a hot player ignites a bush
+		onMessage("bush_ignite", (client:Client, data:Dynamic) -> {
+			broadcast("bush_ignite", {index: data.index}, {except: client});
+		});
+
+		// sent when a bush finishes burning and despawns — remove its collision rect
+		onMessage("bush_dead", (client:Client, data:Dynamic) -> {
+			var idx:Int = data.index;
+			if (idx >= 0 && idx < bushRects.length) {
+				bushRects[idx] = {x: 0.0, y: 0.0, w: 0.0, h: 0.0};
+				simulation.entityRects = bushRects;
+			}
+		});
+
+		// sent when a hot player ignites a weed
+		onMessage("weed_ignite", (client:Client, data:Dynamic) -> {
+			broadcast("weed_ignite", {index: data.index}, {except: client});
 		});
 
 		// sent when a player kills a worm
@@ -293,14 +333,37 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// sent when a player activates or deactivates hot pepper mode
 		onMessage("hot_pepper", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "hot_pepper": isStart=${data.isStart}');
-			broadcast("hot_pepper", {sessionId: client.sessionId, isStart: data.isStart}, {except: client});
+			var isStart:Bool = data.isStart;
+			hotModePlayers.set(client.sessionId, isStart);
+			var ps = state.players.get(client.sessionId);
+			if (ps != null) {
+				ps.speed = isStart ? 150 : 100;
+			}
+			broadcast("hot_pepper", {sessionId: client.sessionId, isStart: isStart}, {except: client});
 		});
 
-		// host periodically broadcasts the timer state so non-host clients can sync
-		onMessage("timer_sync", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "timer_sync": runTimeSec=${data.runTimeSec} totalSec=${data.totalSec}');
-			broadcast("timer_sync", {runTimeSec: data.runTimeSec, totalSec: data.totalSec}, {except: client});
+		// timer_sync is now server-originated (see fixedTick); no client relay needed
+
+		// debug: force end the current round
+		onMessage("debug_end_round", (client:Client, _) -> {
+			trace('${client.sessionId}: debug_end_round');
+			if (gameplayStarted) {
+				broadcast("round_time_up", {});
+				gameplayStarted = false;
+				// Also transition server round status so ready-up flow works
+				if (state.round.status == RoundState.STATUS_ACTIVE) {
+					var newData = new RoundState();
+					newData.status = RoundState.STATUS_POST_ROUND;
+					newData.currentRound = state.round.currentRound;
+					newData.totalRounds = state.round.totalRounds;
+					state.round = newData;
+					for (sId => pp in state.players) {
+						pp.ready = false;
+					}
+				}
+			}
 		});
+
 
 		// sent when a player sells a fish — broadcast to other clients so they can track it
 		onMessage("fish_sold", (client:Client, data:Dynamic) -> {
@@ -324,12 +387,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}, {except: client});
 		});
 
-		// sent when a player catches a fish; catcherSessionId may differ from client.sessionId
-		// because the host reports catches on behalf of any player whose bobber a fish swam into
-		onMessage("fish_caught", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_caught": fishId=${data.fishId} catcher=${data.catcherSessionId} fishType=${data.fishType}');
-			broadcast("fish_caught", {sessionId: data.catcherSessionId, fishId: data.fishId, fishType: data.fishType});
-		});
+		// fish_caught relay removed — server detects catches directly in updateFish
 
 		// sent when a player pulls in their line
 		onMessage("line_pulled", (client:Client, data:Dynamic) -> {
@@ -337,53 +395,26 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("line_pulled", {sessionId: client.sessionId});
 		});
 
-		// sent by the host to assign random spawn positions for all players
-		onMessage("spawn_locations", (client:Client, data:Dynamic) -> {
-			if (client.sessionId != state.hostSessionId) {
-				return;
-			}
-			trace('${client.sessionId}: sent "spawn_locations"');
-			broadcast("spawn_locations", data, {except: client});
-		});
-
-		// sent by the host to establish shared world layout (bushes + shop)
-		onMessage("world_setup", (client:Client, data:Dynamic) -> {
-			if (client.sessionId != state.hostSessionId) {
-				return;
-			}
-			var bushArray:Array<Dynamic> = data.bushes;
-			for (i => bush in bushArray) {
-				state.bushes.set(Std.string(i), new BushState(bush.x, bush.y));
-			}
-			state.shopX = data.shopX;
-			state.shopY = data.shopY;
-			state.shopReady = true;
-		});
-
 		onMessage("round_update", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "round_update" message: ${Json.stringify(data)}');
-			if (data != null) {
-				var newData = new RoundState();
-				newData.status = state.round.status;
-				newData.currentRound = state.round.currentRound;
-				newData.totalRounds = state.round.totalRounds;
-
-				if (data.status != null) {
-					trace('update round status: ${state.round.status} -> ${data.status}');
-					newData.status = data.status;
-
-					for (sId => pp in state.players) {
-						pp.ready = false;
-					}
-				}
-				if (data.currentRound != null) {
-					newData.currentRound = data.currentRound;
-				}
-				if (data.totalRounds != null) {
-					newData.totalRounds = data.totalRounds;
-				}
-				state.round = newData;
+			if (data == null) { return; }
+			// Ignore duplicate status transitions from multiple clients
+			var newStatus = data.status != null ? data.status : state.round.status;
+			var newRound = data.currentRound != null ? (data.currentRound : Int) : state.round.currentRound;
+			var newTotal = data.totalRounds != null ? (data.totalRounds : Int) : state.round.totalRounds;
+			if (newStatus == state.round.status && newRound == state.round.currentRound && newTotal == state.round.totalRounds) {
+				return; // no change
 			}
+			trace('${client.sessionId}: round_update ${state.round.status} -> ${newStatus}');
+			var newData = new RoundState();
+			newData.status = newStatus;
+			newData.currentRound = newRound;
+			newData.totalRounds = newTotal;
+			if (data.status != null) {
+				for (sId => pp in state.players) {
+					pp.ready = false;
+				}
+			}
+			state.round = newData;
 		});
 
 		onMessage("kick", (client:Client, data:{targetSessionId:String}) -> {
@@ -397,19 +428,10 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			// onLeave will also fire after the WebSocket closes but will safely no-op.
 			state.players.delete(data.targetSessionId);
 
-			// Rotate host if the kicked player was the host
-			if (data.targetSessionId == state.hostSessionId) {
-				var remaining = [];
-				for (sId => _ in state.players) {
-					remaining.push(sId);
-				}
-				if (remaining.length > 0) {
-					state.hostSessionId = remaining[Std.random(remaining.length)];
-					trace('host changed ${data.targetSessionId} -> ${state.hostSessionId}');
-				} else {
-					disconnect();
-					return;
-				}
+			// Disconnect room if no players remain
+			if (state.players.size <= 0) {
+				disconnect();
+				return;
 			}
 
 			// Tell all remaining clients explicitly so they can update their player lists
@@ -464,11 +486,6 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		ps.width = 16;
 		ps.height = 8;
 
-		// Set host
-		if (state.hostSessionId == null || state.hostSessionId == "") {
-			state.hostSessionId = client.sessionId;
-			trace('host set ${client.sessionId}');
-		}
 
 		// Cloud sync is requested by client after PlayState loads
 		// (can't send on join — onMsg handlers aren't registered yet)
@@ -481,31 +498,208 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		trace('successful clear: ${state.players.delete(client.sessionId)}');
 		state.inputQueue.remove(client.sessionId);
 
-		// Remove bobber position for leaving player
+		// Remove player tracking
 		bobberPositions.remove(client.sessionId);
+		hotModePlayers.remove(client.sessionId);
+		wadersPlayers.remove(client.sessionId);
 
-		// Clear/rotate host
-		if (client.sessionId == state.hostSessionId) {
-			if (state.players.size <= 0) {
-				state.hostSessionId = null;
-			} else {
-				var sIds = [];
-				for (sId => _ in state.players) {
-					sIds.push(sId);
-				}
-				var sIdx = Std.random(state.players.size);
-				state.hostSessionId = sIds[sIdx];
-			};
-
-			trace('host changed ${client.sessionId} -> ${state.hostSessionId}');
-			if (state.hostSessionId == null) {
-				// after the last person leaves a room, just close it down
-				trace('disconnect room: ${roomId}:${roomName}');
-				disconnect();
-			}
+		// Disconnect room when empty
+		if (state.players.size <= 0) {
+			trace('disconnect room: ${roomId}:${roomName}');
+			disconnect();
 		}
 
 		return null;
+	}
+
+	/** Reset all transient round state so a fresh round starts clean. */
+	function resetRoundState() {
+		// Clear fish schema and respawn
+		var fishIds:Array<String> = [];
+		for (id => _ in state.fish) { fishIds.push(id); }
+		trace('resetRoundState: clearing ${fishIds.length} fish');
+		for (id in fishIds) { state.fish.delete(id); }
+		nextFishID = 1;
+		spawnFish();
+
+		// Clear bushes schema
+		var bushIds:Array<String> = [];
+		for (id => _ in state.bushes) { bushIds.push(id); }
+		for (id in bushIds) { state.bushes.delete(id); }
+
+		// Clear seagulls
+		seagulls = [];
+
+		// Reset spawn timers
+		seagullSpawnTimer = 3.0;
+		wormTimer = 3.0;
+		timerSyncCooldown = 5.0;
+
+		// Reset bobber tracking
+		bobberPositions = new Map();
+
+		// New wind and clouds
+		windAngle = Math.random() * Math.PI * 2;
+		var worldW = state.collision.cols * state.collision.tileSize;
+		var worldH = state.collision.rows * state.collision.tileSize;
+		clouds = [];
+		for (i in 0...5) {
+			var s = 1.0 + Math.random() * 2.0;
+			var speed = 8 + Math.random() * 8;
+			var dx = Math.cos(windAngle) * speed;
+			var dy = Math.sin(windAngle) * speed;
+			var cx = Math.random() * worldW;
+			var cy = Math.random() * worldH;
+			clouds.push({id: i, x: cx, y: cy, velX: dx, velY: dy, scale: s});
+		}
+
+		// Clear cached world data
+		cachedWorldItems = null;
+		cachedSpawnLocations = null;
+
+		// Reset player scores
+		for (_ => p in state.players) {
+			p.score = 0;
+			p.ready = false;
+		}
+
+		trace('resetRoundState: cleared fish, bushes, seagulls, clouds, scores');
+	}
+
+	/** Server picks all world item positions and broadcasts them to all clients.
+	    Called once from the first start_gameplay message. */
+	function spawnWorldItems() {
+		var col = state.collision;
+		var w = col.cols;
+		var h = col.rows;
+		var grid = col.tileSize;
+
+		// Collect grass tiles (no flags, has a tile) and walkable tiles (not solid/shallow/swimmable)
+		var grassTiles = new Array<{cx:Int, cy:Int}>();
+		var walkableTiles = new Array<{cx:Int, cy:Int}>();
+		for (row in 0...h) {
+			for (c in 0...w) {
+				if (col.isGrassAt(c, row)) {
+					grassTiles.push({cx: c, cy: row});
+				}
+				if (col.isWalkableAt(c, row)) {
+					walkableTiles.push({cx: c, cy: row});
+				}
+			}
+		}
+		trace('spawnWorldItems: grassTiles=${grassTiles.length} walkableTiles=${walkableTiles.length}');
+
+		// --- Bushes: 5 on grass tiles ---
+		var bushPositions = new Array<{x:Float, y:Float}>();
+		for (_ in 0...5) {
+			if (grassTiles.length == 0) { break; }
+			var idx = Std.int(Math.random() * grassTiles.length);
+			var tile = grassTiles[idx];
+			var bx = tile.cx * grid + Math.random() * (grid - 8);
+			var by = tile.cy * grid + Math.random() * (grid - 8);
+			bushPositions.push({x: bx, y: by});
+		}
+		// Store bushes in schema so late joiners get them via onAdd
+		// Build server-side collision rects (matching client Bush hitbox: 14x6, offset 9,20)
+		bushRects = [];
+		for (i in 0...bushPositions.length) {
+			var bp = bushPositions[i];
+			state.bushes.set(Std.string(i), new BushState(bp.x, bp.y));
+			bushRects.push({x: bp.x + 2, y: bp.y + 2, w: 10.0, h: 2.0});
+		}
+		simulation.entityRects = bushRects;
+		trace('spawnWorldItems: placed ${bushPositions.length} bushes');
+
+		// --- Weeds: 20 on walkable tiles (grass or dirt) ---
+		var weedPositions = new Array<{x:Float, y:Float}>();
+		for (_ in 0...20) {
+			if (walkableTiles.length == 0) { break; }
+			var idx = Std.int(Math.random() * walkableTiles.length);
+			var tile = walkableTiles[idx];
+			var wx = tile.cx * grid + Math.random() * (grid - 8);
+			var wy = tile.cy * grid + Math.random() * (grid - 8);
+			weedPositions.push({x: wx, y: wy});
+		}
+
+		// --- Rocks: 3-8 on walkable tiles ---
+		var numRocks = 3 + Std.int(Math.random() * 6);
+		var rockPositions = new Array<{x:Float, y:Float, big:Bool}>();
+		var hasBigRock = false;
+		for (_ in 0...numRocks) {
+			if (walkableTiles.length == 0) { break; }
+			var idx = Std.int(Math.random() * walkableTiles.length);
+			var tile = walkableTiles[idx];
+			var rx = tile.cx * grid + Math.random() * (grid - 8);
+			var ry = tile.cy * grid + Math.random() * (grid - 8);
+			var big = Math.random() < 0.2;
+			if (big) { hasBigRock = true; }
+			rockPositions.push({x: rx, y: ry, big: big});
+		}
+		// guarantee at least one big rock
+		if (!hasBigRock && rockPositions.length > 0) {
+			rockPositions[0].big = true;
+		}
+
+		// --- Waders: 1 on a walkable tile ---
+		var wadersX:Null<Float> = null;
+		var wadersY:Null<Float> = null;
+		if (walkableTiles.length > 0) {
+			var idx = Std.int(Math.random() * walkableTiles.length);
+			var tile = walkableTiles[idx];
+			wadersX = tile.cx * grid + grid / 2.0;
+			wadersY = tile.cy * grid + grid / 2.0;
+		}
+
+		// --- Pepper: 1 on a walkable tile ---
+		var pepperX:Null<Float> = null;
+		var pepperY:Null<Float> = null;
+		if (walkableTiles.length > 0) {
+			var idx = Std.int(Math.random() * walkableTiles.length);
+			var tile = walkableTiles[idx];
+			pepperX = tile.cx * grid + grid / 2.0;
+			pepperY = tile.cy * grid + grid / 2.0;
+		}
+
+		// Build and cache world_items payload
+		var worldData:Dynamic = {
+			rocks: rockPositions,
+			weeds: weedPositions,
+		};
+		if (wadersX != null && wadersY != null) {
+			worldData.wadersX = wadersX;
+			worldData.wadersY = wadersY;
+		}
+		if (pepperX != null && pepperY != null) {
+			worldData.pepperX = pepperX;
+			worldData.pepperY = pepperY;
+		}
+		cachedWorldItems = worldData;
+		trace('spawnWorldItems: cached world_items (${rockPositions.length} rocks, ${weedPositions.length} weeds)');
+
+		// --- Spawn locations: use LDTK spawn point for all players ---
+		var rawObjects:Dynamic = Reflect.getProperty(ldtkRaw, "l_Objects");
+		var allSpawn:Array<Dynamic> = Reflect.getProperty(rawObjects, "all_Spawn");
+		var sx:Float = 48.0;
+		var sy:Float = 48.0;
+		if (allSpawn != null && allSpawn.length > 0) {
+			sx = allSpawn[0].pixelX;
+			sy = allSpawn[0].pixelY;
+		}
+
+		var spawnData:Dynamic = {};
+		var playerIndex = 0;
+		for (sId => _ in state.players) {
+			Reflect.setField(spawnData, sId, {x: sx, y: sy});
+			// set server-side PlayerState position so simulation starts correctly
+			var ps = state.players.get(sId);
+			if (ps != null) {
+				ps.x = sx;
+				ps.y = sy;
+			}
+			playerIndex++;
+		}
+		cachedSpawnLocations = spawnData;
+		trace('spawnWorldItems: cached spawn_locations at (${sx}, ${sy}) for $playerIndex players');
 	}
 
 	/** Flood-fill the FishSpawner IntGrid layer (value=1 = water) to find water bodies,
@@ -1044,8 +1238,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 				p.velocityY = 0;
 				continue;
 			}
+			// Hot mode or waders: allow walking into shallow water (only block SOLID)
+			var isHot = hotModePlayers.exists(id) && hotModePlayers.get(id);
+			var hasWaders = wadersPlayers.exists(id) && wadersPlayers.get(id);
+			var blockFlags = if (isHot || hasWaders) CollisionMap.FLAG_SOLID else 0;
 			for (inp in queue) {
-				simulation.tickPlayer(p, [inp], inp.elapsed);
+				simulation.tickPlayer(p, [inp], inp.elapsed, blockFlags);
 			}
 			queue.splice(0, queue.length);
 		}
@@ -1058,5 +1256,30 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 		// Update server-side worms
 		updateWorms(t);
+
+		// Tick round timer and broadcast syncs
+		if (gameplayStarted) {
+			roundTimerSec += t;
+			timerSyncCooldown -= t;
+			if (timerSyncCooldown <= 0) {
+				timerSyncCooldown = 5.0;
+				broadcast("timer_sync", {runTimeSec: roundTimerSec, totalSec: roundDurationSec});
+			}
+			if (roundTimerSec >= roundDurationSec) {
+				broadcast("round_time_up", {});
+				gameplayStarted = false; // stop ticking
+				// Transition server round status so ready-up flow works
+				if (state.round.status == RoundState.STATUS_ACTIVE) {
+					var newData = new RoundState();
+					newData.status = RoundState.STATUS_POST_ROUND;
+					newData.currentRound = state.round.currentRound;
+					newData.totalRounds = state.round.totalRounds;
+					state.round = newData;
+					for (sId => pp in state.players) {
+						pp.ready = false;
+					}
+				}
+			}
+		}
 	}
 }

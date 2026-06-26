@@ -135,21 +135,21 @@ class LobbyState extends FlxTransitionableState {
 		#if !local
 		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
 		#end
-		FlxTimer.wait(2, () -> {
+		FlxTimer.wait(0.5, () -> {
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
 
 			#if (bot || db)
 			// auto-setup: set name, pick first available skin, auto-ready
 			// bot waits longer so the player's skin choice syncs first
 			var autoName = #if bot "bot" #else "player" #end;
-			var skinDelay:Float = #if bot 2.0 #else 0.0 #end;
+			var skinDelay:Float = #if bot 1.5 #else 0.0 #end;
 			GameManager.ME.net.sendMessage("player_name_changed", {name: autoName});
 			FlxTimer.wait(skinDelay, () -> {
 				_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
 				if (_selectedSkinIndex > -1) {
 					GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
 				}
-				FlxTimer.wait(1, () -> {
+				FlxTimer.wait(0.5, () -> {
 					if (_selectedSkinIndex >= 0) {
 						GameManager.ME.mySkinIndex = _selectedSkinIndex;
 						GameManager.ME.net.sendMessage("player_ready", true);

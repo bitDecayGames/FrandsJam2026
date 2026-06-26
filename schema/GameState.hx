@@ -32,7 +32,6 @@ class GameState extends Schema {
 	@:type("map", BushState) public var bushes = new MapSchema<BushState>(); // Superceded by `objects`
 
 	#end
-	@:type("string") public var hostSessionId:String;
 	@:type("float32") public var shopX:Float;
 	@:type("float32") public var shopY:Float;
 	@:type("boolean") public var shopReady:Bool;

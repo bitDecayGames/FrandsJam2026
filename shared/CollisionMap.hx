@@ -171,6 +171,24 @@ class CollisionMap {
 		return cellTileIds[cellIdx(col, row)] >= 0;
 	}
 
+	/** Returns true if the given grid cell is a grass tile (has a tile, no flags set). **/
+	public function isGrassAt(col:Int, row:Int):Bool {
+		if (col < 0 || col >= cols || row < 0 || row >= rows) {
+			return false;
+		}
+		var idx = cellIdx(col, row);
+		return cellTileIds[idx] >= 0 && cellFlags[idx] == 0;
+	}
+
+	/** Returns true if the given grid cell is walkable (has a tile, not solid/shallow/swimmable). **/
+	public function isWalkableAt(col:Int, row:Int):Bool {
+		if (col < 0 || col >= cols || row < 0 || row >= rows) {
+			return false;
+		}
+		var idx = cellIdx(col, row);
+		return cellTileIds[idx] >= 0 && (cellFlags[idx] & (FLAG_SOLID | FLAG_SHALLOW | FLAG_SWIMMABLE)) == 0;
+	}
+
 	/**
 	 * Axis-separated AABB sweep against all solid tiles.
 	 *

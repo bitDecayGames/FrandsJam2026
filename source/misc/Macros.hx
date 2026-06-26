@@ -34,6 +34,12 @@ class Macros {
 		return macro $v{haxe.macro.Context.defined(key)};
 	}
 
+	public static macro function getBuildTimestamp():haxe.macro.Expr.ExprOf<String> {
+		var now = Date.now();
+		var stamp = DateTools.format(now, "%Y-%m-%d %H:%M:%S");
+		return macro $v{stamp};
+	}
+
 	public static macro function getGitCommitShortHash():haxe.macro.Expr.ExprOf<String> {
 		#if !display
 		try {

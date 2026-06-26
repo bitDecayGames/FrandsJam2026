@@ -2,6 +2,7 @@ import colyseus.server.Colyseus.Server;
 
 class Main {
 	static function main():Void {
+		trace('SERVER BUILD: ${BuildInfo.timestamp()}');
 		var port:Int = 2567;
 		var gameServer = new Server({});
 		gameServer.define("game_room", GameRoom);

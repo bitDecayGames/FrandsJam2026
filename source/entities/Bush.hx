@@ -27,6 +27,7 @@ class Bush extends FlxSprite {
 
 	public var burning:Bool = false;
 	public var groundGroup:FlxGroup;
+	public var onDeath:Void->Void;
 
 	var burnTimer:Float = 0;
 	var fireEmitTimer:Float = 0;
@@ -119,6 +120,9 @@ class Bush extends FlxSprite {
 			}
 
 			if (burnTimer <= 0) {
+				if (onDeath != null) {
+					onDeath();
+				}
 				kill();
 				return;
 			}

@@ -20,11 +20,9 @@ typedef PlayerStateSignal = FlxTypedSignal<(String, PlayerUpdateData) -> Void>; 
 typedef FishStateSignal = FlxTypedSignal<String->FishState->Void>; // fishId, fishState
 typedef RoundStateSignal = FlxTypedSignal<RoundState->Void>;
 typedef PlayersReadySignal = FlxTypedSignal<Void->Void>;
-typedef HostSignal = FlxTypedSignal<Bool->Bool->Void>; // cur, prev
 typedef RockThrowSignal = FlxTypedSignal<(String, FlxPoint, Bool, String) -> Void>; // sessionId, targetX, targetY, big, dir
 
 class NetworkManager {
-	public static var IS_HOST:Bool = #if local true #else false #end;
 
 	var client:Client;
 	var room:Room<GameState>;
@@ -32,7 +30,6 @@ class NetworkManager {
 	public var mySessionId:String = "";
 
 	public var onJoined:SessionIdSignal = new SessionIdSignal();
-	public var onHostChanged:HostSignal = new HostSignal();
 	public var onPlayerAdded:PlayerStateSignal = new PlayerStateSignal();
 	public var onPlayerChanged:PlayerStateSignal = new PlayerStateSignal();
 	public var onPlayerNameChanged = new FlxTypedSignal<String->String->Void>(); // seshId, name
@@ -64,12 +61,16 @@ class NetworkManager {
 	public var onWorldItems = new FlxTypedSignal<Dynamic->Void>();
 	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
 	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
+	public var onBushIgnite = new FlxTypedSignal<Int->Void>(); // index
+	public var onWeedIgnite = new FlxTypedSignal<Int->Void>(); // index
 	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
+	public var onPlayerDrown = new FlxTypedSignal<String->Float->Float->Void>(); // sessionId, x, y
 	public var onCastStart = new FlxTypedSignal<String->String->Void>(); // sessionId, dir
 	public var onGroundFishSpawn = new FlxTypedSignal<Dynamic->Void>(); // {startX, startY, landX, landY, fishType, lengthCm}
 	public var onGroundFishPickup = new FlxTypedSignal<Float->Float->Void>(); // x, y (approximate match)
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
+	public var onRoundTimeUp = new FlxTypedSignal<Void->Void>();
 	public var onLocalPlayerAck = new FlxTypedSignal<PlayerState->Void>();
 	public var onCloudSync = new FlxTypedSignal<Dynamic->Void>(); // {angle, clouds}
 	public var onWormSpawn = new FlxTypedSignal<Dynamic->Void>(); // {id, srcX, srcY, destX, destY}
@@ -116,16 +117,6 @@ class NetworkManager {
 			onJoined.dispatch(mySessionId);
 
 			var cb = Callbacks.get(room);
-
-			cb.listen("hostSessionId", (val:String, prev:String) -> {
-				trace('NetworkManager: hostSessionId callback FIRED');
-				var prevIsHost = IS_HOST;
-				IS_HOST = val == mySessionId;
-				trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
-				onHostChanged.dispatch(IS_HOST, prevIsHost);
-			});
-
-			trace('NetworkManager: hostSessionId listener registered');
 
 			cb.listen("round", (round:RoundState, _:RoundState) -> {
 				trace('RoundState: ${round}');
@@ -302,6 +293,14 @@ class NetworkManager {
 				onBushRustle.dispatch(Std.int(message.index), message.dirX, message.dirY);
 			});
 
+			onMsg("bush_ignite", (message:Dynamic) -> {
+				onBushIgnite.dispatch(Std.int(message.index));
+			});
+
+			onMsg("weed_ignite", (message:Dynamic) -> {
+				onWeedIgnite.dispatch(Std.int(message.index));
+			});
+
 			onMsg("worm_killed", (message:Dynamic) -> {
 				trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
 				onWormKilled.dispatch(message.sessionId, Std.int(message.id));
@@ -309,6 +308,10 @@ class NetworkManager {
 
 			onMsg("worm_spawn", (message:Dynamic) -> {
 				onWormSpawn.dispatch(message);
+			});
+
+			onMsg("player_drown", (message:Dynamic) -> {
+				onPlayerDrown.dispatch(message.sessionId, message.x, message.y);
 			});
 
 			onMsg("hot_pepper", (message:Dynamic) -> {
@@ -336,6 +339,11 @@ class NetworkManager {
 			onMsg("timer_sync", (message:Dynamic) -> {
 				trace('[NetMan] timer_sync received: runTimeSec=${message.runTimeSec} totalSec=${message.totalSec}');
 				onTimerSync.dispatch(message.runTimeSec, message.totalSec);
+			});
+
+			onMsg("round_time_up", (_) -> {
+				trace('[NetMan] round_time_up received');
+				onRoundTimeUp.dispatch();
 			});
 
 			onMsg("ground_fish_spawn", (message:Dynamic) -> {
@@ -371,29 +379,15 @@ class NetworkManager {
 		sendMessage("kick", {targetSessionId: targetSessionId});
 	}
 
-	public function sendWorldSetup(bushPositions:Array<{x:Float, y:Float}>, shopX:Float, shopY:Float) {
-		sendMessage("world_setup", {
-			bushes: bushPositions,
-			shopX: shopX,
-			shopY: shopY,
-		});
-	}
+	// sendWorldSetup, sendSpawnLocations, sendWorldItems removed — server computes world layout
 
-	public function sendSpawnLocations(locations:Dynamic) {
-		sendMessage("spawn_locations", locations);
-	}
-
-	public function sendTimerSync(runTimeSec:Float, totalSec:Float) {
-		sendMessage("timer_sync", {runTimeSec: runTimeSec, totalSec: totalSec});
-	}
+	// sendTimerSync removed — server now originates timer_sync broadcasts
 
 	public function getState():GameState {
 		return room != null ? room.state : null;
 	}
 
-	public function sendFishCaught(fishId:String, catcherSessionId:String, fishType:Int) {
-		sendMessage("fish_caught", {fishId: fishId, catcherSessionId: catcherSessionId, fishType: fishType});
-	}
+	// sendFishCaught removed — server detects catches directly
 
 	public function sendFishPocketed(fishId:String, catcherSessionId:String) {
 		sendMessage("fish_pocketed", {fishId: fishId, catcherSessionId: catcherSessionId});
@@ -405,10 +399,6 @@ class NetworkManager {
 
 	public function sendLinePulled() {
 		sendMessage("line_pulled", {});
-	}
-
-	public function sendWorldItems(data:Dynamic) {
-		sendMessage("world_items", data);
 	}
 
 	public function sendItemPickup(itemType:String, index:Int) {

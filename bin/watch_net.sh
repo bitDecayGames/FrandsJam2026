@@ -6,7 +6,7 @@
 
 SIGNAL=".rebuild"
 SERVER_DIR="server"
-PLAYER_BUILD="lime build hl -Dplay -Ddb -Dforcelocal"
+PLAYER_BUILD="lime build hl -debug -Dplay -Ddb -Dforcelocal"
 BOT_BUILD="lime build hl -Dplay -Dbot -Dforcelocal"
 GAME_BIN="export/hl/bin/FrandsJam"
 SERVER_PID=""
@@ -47,8 +47,13 @@ start_server() {
     fi
     echo -e "\033[36m[watch]\033[0m building and starting colyseus server..."
     cd "$SERVER_DIR"
-    haxe server.hxml 2>&1 | tail -3
-    node dist/server.js > ../colyseus.log 2>&1 &
+    haxe server.hxml 2>&1 | tee -a ../build.log | sed -u 's/^/\x1b[33m[server-build]\x1b[0m /'
+    if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+        echo -e "\033[31m[watch]\033[0m server build failed!"
+        cd ..
+        return
+    fi
+    node dist/server.js > >(tee ../colyseus.log | sed -u 's/^/\x1b[33m[server]\x1b[0m /') 2>&1 &
     SERVER_PID=$!
     cd ..
     sleep 1
@@ -60,7 +65,7 @@ build_and_launch() {
     start_server
 
     echo -e "\033[36m[watch]\033[0m building player..."
-    $PLAYER_BUILD 2>&1 | tee build.log | tail -5
+    $PLAYER_BUILD 2>&1 | tee -a build.log | tail -5
     if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
         echo -e "\033[31m[watch]\033[0m player build failed!"
         return
@@ -86,13 +91,13 @@ build_and_launch() {
     cp -r export/hl/bin export/hl/bin_bot 2>/dev/null
 
     echo -e "\033[36m[watch]\033[0m launching player window..."
-    (cd export/hl/bin_player && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) > game_player.log 2>&1 &
+    (cd export/hl/bin_player && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) > >(tee game_player.log | sed -u 's/^/\x1b[32m[player]\x1b[0m /') 2>&1 &
     PLAYER_PID=$!
 
     sleep 0.5
 
     echo -e "\033[36m[watch]\033[0m launching bot window..."
-    (cd export/hl/bin_bot && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) > game_bot.log 2>&1 &
+    (cd export/hl/bin_bot && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) > >(tee game_bot.log | sed -u 's/^/\x1b[34m[bot]\x1b[0m /') 2>&1 &
     BOT_PID=$!
 
     # position windows side by side in center of primary monitor

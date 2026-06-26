@@ -626,7 +626,14 @@ class Player extends FlxSprite {
 
 		if (simulation != null && playerState != null) {
 			// Server-authoritative mode: send movement input, predict locally
-			var dirAngle = if (frozen) -1 else cardinalToAngle(inputDir);
+			var moveDir = inputDir;
+			// Hot mode: force running in last direction even without input
+			if (hotModeActive && moveDir == NONE && lastInputDir != NONE) {
+				moveDir = lastInputDir;
+			}
+			var dirAngle = if (frozen) -1 else cardinalToAngle(moveDir);
+			// Hot mode speed boost (1.5x)
+			playerState.speed = if (hotModeActive) 150 else 100;
 			var inp:schema.GameState.P_Input = {
 				seq: ++inputSeq,
 				dir: dirAngle,
@@ -635,7 +642,9 @@ class Player extends FlxSprite {
 			};
 			pendingInputs.push(inp);
 			GameManager.ME.net.sendInput(inp);
-			simulation.tickPlayer(playerState, [inp], delta);
+			// Hot mode or waders: allow walking into shallow water (only block SOLID)
+			var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
+			simulation.tickPlayer(playerState, [inp], delta, blockFlags);
 			setPosition(playerState.x, playerState.y);
 			velocity.set(0, 0);
 		} else if (frozen) {
@@ -1267,16 +1276,23 @@ class Player extends FlxSprite {
 	}
 
 	public function deactivateHotMode() {
-		hotModeActive = false;
+		if (hotModeActive) {
+			hotModeActive = false;
+			#if !local
+			if (!isRemote) {
+				GameManager.ME.net.sendHotPepper(false);
+			}
+			#end
+		}
 	}
 
-	public function drown() {
+	public function drown(?drownX:Float, ?drownY:Float) {
 		if (drowned) {
 			return;
 		}
 		drowned = true;
-		drownReturnX = x;
-		drownReturnY = y;
+		drownReturnX = drownX != null ? drownX : x;
+		drownReturnY = drownY != null ? drownY : y;
 		deactivateHotMode();
 		frozen = true;
 		visible = false;
@@ -1366,15 +1382,15 @@ class Player extends FlxSprite {
 		while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
 			pendingInputs.shift();
 		}
-		// snap to server-authoritative position
+		// snap to server-authoritative position and replay unacked inputs
 		playerState.x = serverState.x;
 		playerState.y = serverState.y;
 		playerState.velocityX = serverState.velocityX;
 		playerState.velocityY = serverState.velocityY;
-		// re-apply unacknowledged inputs for prediction
 		if (simulation != null) {
+			var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
 			for (inp in pendingInputs) {
-				simulation.tickPlayer(playerState, [inp], inp.elapsed);
+				simulation.tickPlayer(playerState, [inp], inp.elapsed, blockFlags);
 			}
 		}
 		setPosition(playerState.x, playerState.y);

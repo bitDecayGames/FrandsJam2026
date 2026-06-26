@@ -70,7 +70,7 @@ class GameManager {
 		net.onScoreChanged.add(onScoreChanged);
 		net.onFishSold.add(onFishSold);
 		net.onWormKilled.add(recordWormKill);
-		net.onHostChanged.add(onHostChange);
+
 		net.onKicked.add(handleKicked);
 	}
 
@@ -244,13 +244,6 @@ class GameManager {
 		scores.remove(sessionId);
 	}
 
-	private function onHostChange(isHost:Bool, prevIsHost:Bool) {
-		// the host has just been changed to you
-		if (isHost && isHost != prevIsHost) {
-			// TODO: MW not sure what to do yet...
-		}
-	}
-
 	private function setCurrentRound(round:RoundManager) {
 		if (this.round != null) {
 			this.round.completed.remove(this.onRoundDone);
@@ -260,6 +253,7 @@ class GameManager {
 	}
 
 	private function onRoundDone() {
+		roundStatus = RoundState.STATUS_POST_ROUND;
 		FlxG.switchState(() -> new PostRoundState());
 	}
 
@@ -343,23 +337,23 @@ class GameManager {
 
 	public function setStatus(status:String, ?currentRound:Int = -1) {
 		roundStatus = status;
-		if (NetworkManager.IS_HOST) {
-			if (currentRound >= 0 && currentRound != currentRoundNumber) {
-				trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRoundNumber}');
-				currentRoundNumber = currentRound;
-				GameManager.ME.net.sendMessage("round_update", {
-					status: roundStatus,
-					currentRound: currentRound,
-					totalRounds: totalRounds,
-				});
-			} else {
-				trace('set status: ${roundStatus} -> ${status}');
-				GameManager.ME.net.sendMessage("round_update", {
-					status: roundStatus,
-					totalRounds: totalRounds,
-				});
-			}
+		#if !local
+		if (currentRound >= 0 && currentRound != currentRoundNumber) {
+			trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRound}');
+			currentRoundNumber = currentRound;
+			GameManager.ME.net.sendMessage("round_update", {
+				status: roundStatus,
+				currentRound: currentRound,
+				totalRounds: totalRounds,
+			});
+		} else {
+			trace('set status: ${roundStatus} -> ${status}');
+			GameManager.ME.net.sendMessage("round_update", {
+				status: roundStatus,
+				totalRounds: totalRounds,
+			});
 		}
+		#end
 	}
 
 	private function reset() {

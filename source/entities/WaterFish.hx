@@ -307,6 +307,10 @@ class WaterFish extends FlxSprite {
 	}
 
 	override function destroy() {
+		if (isRemote) {
+			GameManager.ME.net.onFishMove.remove(handleChange);
+			GameManager.ME.net.onFishDespawn.remove(handleDespawn);
+		}
 		if (target != null) {
 			target.put();
 			target = null;

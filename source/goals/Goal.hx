@@ -13,6 +13,13 @@ class Goal extends FlxBasic {
 	private var scores:Map<String, Int> = new Map<String, Int>();
 
 	public function initialize(state:PlayState) {
+		// Reset goal state for reuse across rounds
+		exists = true;
+		alive = true;
+		active = true;
+		complete = false;
+		paused = false;
+		runTimeSec = 0;
 		scores = new Map<String, Int>();
 		state.add(this);
 	}
