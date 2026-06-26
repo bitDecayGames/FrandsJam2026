@@ -178,7 +178,7 @@ class NetworkManager {
 					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player});
 				});
-				cb.listen(player, "velocitY", (_, prevY:Float) -> {
+				cb.listen(player, "velocityY", (_, prevY:Float) -> {
 					playerDebugTrace('NetMan: (sesh: ${sessionId} y: ${prevY} -> ${player.y}');
 					onPlayerChanged.dispatch(sessionId, {state: player});
 				});

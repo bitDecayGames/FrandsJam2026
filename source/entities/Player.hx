@@ -55,9 +55,13 @@ class Player extends FlxSprite {
 	public static function cardinalToAngle(dir:Cardinal):Int {
 		return switch (dir) {
 			case N: 0;
+			case NE: 45;
 			case E: 90;
+			case SE: 135;
 			case S: 180;
+			case SW: 225;
 			case W: 270;
+			case NW: 315;
 			default: -1;
 		};
 	}
@@ -369,7 +373,12 @@ class Player extends FlxSprite {
 	}
 
 	function playMovementAnim(force:Bool = false) {
-		var moving = velocity.x != 0 || velocity.y != 0;
+		// in prediction mode velocity is zeroed — use playerState velocity instead
+		var moving = if (playerState != null) {
+			playerState.velocityX != 0 || playerState.velocityY != 0;
+		} else {
+			velocity.x != 0 || velocity.y != 0;
+		};
 		if (!force && moving == lastMoving && lastInputDir == lastAnimDir && !inShallowWater)
 			return;
 
