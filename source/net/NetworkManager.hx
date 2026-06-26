@@ -71,6 +71,9 @@ class NetworkManager {
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 	public var onLocalPlayerAck = new FlxTypedSignal<PlayerState->Void>();
+	public var onSeagullSpawn = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, velX, velY, altitude}
+	public var onSeagullPoop = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, fallDist, birdVelX, hitWater}
+	public var onSeagullDespawn = new FlxTypedSignal<Dynamic->Void>(); // {id}
 
 	public static inline var roomName:String = "game_room";
 
@@ -335,6 +338,18 @@ class NetworkManager {
 
 			onMsg("ground_fish_pickup", (message:Dynamic) -> {
 				onGroundFishPickup.dispatch(message.x, message.y);
+			});
+
+			onMsg("seagull_spawn", (message:Dynamic) -> {
+				onSeagullSpawn.dispatch(message);
+			});
+
+			onMsg("seagull_poop", (message:Dynamic) -> {
+				onSeagullPoop.dispatch(message);
+			});
+
+			onMsg("seagull_despawn", (message:Dynamic) -> {
+				onSeagullDespawn.dispatch(message);
 			});
 			}); // end runInMainThread
 		});

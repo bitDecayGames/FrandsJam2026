@@ -44,6 +44,10 @@ class Seagull extends FlxSprite {
 	// The world-space area this bird flies across, captured at spawn time
 	var flyBounds:FlxRect;
 
+	// Server-driven seagull support
+	public var seagullId:Int = 0;
+	public var isServerDriven:Bool = false;
+
 	public function new(goingRight:Bool, state:FlxState, groundGroup:FlxGroup, terrain:BDTilemap, fishSpawner:FishSpawner) {
 		super();
 		this.goingRight = goingRight;
@@ -74,6 +78,21 @@ class Seagull extends FlxSprite {
 		spawnAtEdge();
 	}
 
+	/** Create a server-driven seagull from broadcast data. */
+	public static function fromServer(data:Dynamic, state:FlxState, groundGroup:FlxGroup, terrain:BDTilemap):Seagull {
+		var goingRight:Bool = data.velX > 0;
+		var gull = new Seagull(goingRight, state, groundGroup, terrain, null);
+		gull.isServerDriven = true;
+		gull.seagullId = Std.int(data.id);
+		// Override spawn position and velocity with server values
+		gull.x = data.x;
+		gull.y = data.y;
+		gull.velocity.x = data.velX;
+		gull.velocity.y = data.velY;
+		gull.flipX = goingRight;
+		return gull;
+	}
+
 	function spawnAtEdge() {
 		if (goingRight) {
 			x = flyBounds.left - width - MARGIN;
@@ -87,6 +106,7 @@ class Seagull extends FlxSprite {
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
+		// Flap/soar animation runs for all seagulls (local and server-driven)
 		stateTimer -= elapsed;
 		if (stateTimer <= 0) {
 			if (soaring) {
@@ -98,6 +118,12 @@ class Seagull extends FlxSprite {
 				animation.play("soar");
 				stateTimer = FlxG.random.float(SOAR_MIN, SOAR_MAX);
 			}
+		}
+
+		// Server-driven seagulls skip poop, drift, and off-screen detection
+		// (server handles those and broadcasts events)
+		if (isServerDriven) {
+			return;
 		}
 
 		driftTimer -= elapsed;

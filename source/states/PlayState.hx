@@ -39,6 +39,7 @@ import entities.CloudShadow;
 import entities.Player;
 import entities.Ripple;
 import entities.Seagull;
+import entities.SeagullPoop;
 import entities.BaitShopInterior;
 import entities.Shop;
 import entities.WaterSparkle;
@@ -81,6 +82,7 @@ class PlayState extends FlxTransitionableState {
 	var weedGroup = new FlxTypedGroup<entities.Weed>();
 	var seagullGroup = new FlxTypedGroup<Seagull>();
 	var seagullTimer:Float = 0;
+	var serverSeagulls:Map<Int, Seagull> = new Map();
 	var wormGroup = new FlxTypedGroup<Worm>();
 	var wormTimer:Float = 0;
 
@@ -273,6 +275,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 		GameManager.ME.net.onTimerSync.remove(onTimerSync);
 		GameManager.ME.net.onLocalPlayerAck.remove(onServerAck);
+		GameManager.ME.net.onSeagullSpawn.remove(onServerSeagullSpawn);
+		GameManager.ME.net.onSeagullPoop.remove(onServerSeagullPoop);
+		GameManager.ME.net.onSeagullDespawn.remove(onServerSeagullDespawn);
 	}
 
 	function setupNetwork() {
@@ -295,6 +300,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
 		GameManager.ME.net.onGroundFishSpawn.add(onRemoteGroundFishSpawn);
 		GameManager.ME.net.onGroundFishPickup.add(onRemoteGroundFishPickup);
+		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
+		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
+		GameManager.ME.net.onSeagullDespawn.add(onServerSeagullDespawn);
 
 		// Fish may have been added to the schema before we subscribed
 		// (server spawns fish on room creation, before clients join PlayState).
@@ -1063,12 +1071,40 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function updateSeagulls(elapsed:Float) {
+		// In networked mode, seagull spawning is server-driven via messages.
+		// Only spawn locally in #if local mode.
+		#if local
 		seagullTimer -= elapsed;
 		if (seagullTimer > 0) {
 			return;
 		}
 		seagullTimer = FlxG.random.float(2.0, 6.0);
 		seagullGroup.add(new Seagull(FlxG.random.bool(), this, midGroundGroup, terrainLayer, fishSpawner));
+		#end
+	}
+
+	function onServerSeagullSpawn(data:Dynamic) {
+		var gull = Seagull.fromServer(data, this, midGroundGroup, terrainLayer);
+		seagullGroup.add(gull);
+		serverSeagulls.set(gull.seagullId, gull);
+	}
+
+	function onServerSeagullPoop(data:Dynamic) {
+		// Create a poop projectile at the given position. Fish scare is handled server-side.
+		var poopX:Float = data.x;
+		var poopY:Float = data.y;
+		var fallDist:Float = data.fallDist;
+		var birdVelX:Float = data.birdVelX;
+		add(new SeagullPoop(poopX, poopY, fallDist, birdVelX, this, midGroundGroup, terrainLayer, null));
+	}
+
+	function onServerSeagullDespawn(data:Dynamic) {
+		var sid:Int = Std.int(data.id);
+		var gull = serverSeagulls.get(sid);
+		if (gull != null) {
+			gull.kill();
+			serverSeagulls.remove(sid);
+		}
 	}
 
 	function updateWorms(elapsed:Float) {

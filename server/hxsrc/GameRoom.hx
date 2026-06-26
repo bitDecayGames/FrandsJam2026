@@ -22,6 +22,22 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	var nextFishID:Int;
 	var ldtkRaw:Dynamic; // cached level data for flood-fill
 
+	// Seagull AI data
+	var seagulls:Array<{
+		id:Int,
+		x:Float,
+		y:Float,
+		velX:Float,
+		velY:Float,
+		goingRight:Bool,
+		poopTimer:Float,
+		altitude:Float,
+		driftTimer:Float,
+		driftVelY:Float
+	}>;
+	var nextSeagullId:Int;
+	var seagullSpawnTimer:Float;
+
 	static var FISH_SPEED:Float = 20;
 	static var FISH_ATTRACT_SPEED:Float = 40;
 	static var FISH_ARRIVE_DIST:Float = 2;
@@ -51,6 +67,11 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 		// Spawn server-owned fish
 		spawnFish();
+
+		// Initialize seagull data
+		seagulls = [];
+		nextSeagullId = 1;
+		seagullSpawnTimer = 3.0;
 
 		// Start fixed-tick simulation loop
 		this.setSimulationInterval(this.serverUpdate);
@@ -805,6 +826,104 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		}
 	}
 
+	/** Update server-owned seagulls. Called from fixedTick. */
+	function updateSeagulls(t:Float) {
+		var col = state.collision;
+		var worldWidth:Float = col.cols * col.tileSize;
+		var worldHeight:Float = col.rows * col.tileSize;
+
+		// Spawn timer
+		seagullSpawnTimer -= t;
+		if (seagullSpawnTimer <= 0) {
+			seagullSpawnTimer = 2.0 + Math.random() * 4.0;
+			var goingRight = Math.random() > 0.5;
+			var speed = 40 + Math.random() * 30; // 40-70
+			var spawnX:Float = goingRight ? -32.0 : worldWidth + 32;
+			// spawn in upper portion so shadows land in playable area
+			var spawnY:Float = -80 + Math.random() * (worldHeight * 0.5 + 80);
+			var alt:Float = Math.random() * 40;
+			var sid = nextSeagullId++;
+			var gull = {
+				id: sid,
+				x: spawnX,
+				y: spawnY,
+				velX: goingRight ? speed : -speed,
+				velY: 0.0,
+				goingRight: goingRight,
+				poopTimer: 8.0 + Math.random() * 8.0,
+				altitude: alt,
+				driftTimer: 0.5 + Math.random() * 1.0,
+				driftVelY: 0.0
+			};
+			seagulls.push(gull);
+			broadcast("seagull_spawn", {
+				id: sid,
+				x: spawnX,
+				y: spawnY,
+				velX: gull.velX,
+				velY: gull.velY,
+				altitude: alt
+			});
+		}
+
+		// Update each seagull
+		var i = seagulls.length - 1;
+		while (i >= 0) {
+			var gull = seagulls[i];
+
+			// Drift (vertical wobble)
+			gull.driftTimer -= t;
+			if (gull.driftTimer <= 0) {
+				gull.driftTimer = 0.5 + Math.random() * 1.0;
+				gull.driftVelY = (Math.random() * 2 - 1) * 10; // DRIFT_SPEED = 10
+			}
+			gull.velY = gull.driftVelY;
+
+			// Move
+			gull.x += gull.velX * t;
+			gull.y += gull.velY * t;
+
+			// Poop timer
+			gull.poopTimer -= t;
+			if (gull.poopTimer <= 0) {
+				gull.poopTimer = 8.0 + Math.random() * 8.0;
+
+				// Compute where poop lands
+				// altitude factor: how high the bird is relative to world
+				var altFactor = Math.max(0, Math.min(1, (worldHeight - gull.y) / worldHeight));
+				var shadowOffsetY = 80 + altFactor * 40; // SHADOW_BASE_OFFSET + altitude*40
+				var landX = gull.x + 12; // roughly center of 24px sprite
+				var landY = gull.y + shadowOffsetY;
+
+				// Check if landing position is in water
+				var tileX = Std.int(landX / col.tileSize);
+				var tileY = Std.int(landY / col.tileSize);
+				var hitWater = col.isSwimmableAt(tileX, tileY);
+
+				if (hitWater) {
+					scareFish(landX, landY, 30);
+				}
+
+				broadcast("seagull_poop", {
+					id: gull.id,
+					x: gull.x + 12,
+					y: gull.y + 12,
+					fallDist: shadowOffsetY - 12,
+					birdVelX: gull.velX,
+					hitWater: hitWater
+				});
+			}
+
+			// Off-screen despawn
+			if ((gull.goingRight && gull.x > worldWidth + 100) || (!gull.goingRight && gull.x < -100)) {
+				broadcast("seagull_despawn", {id: gull.id});
+				seagulls.splice(i, 1);
+			}
+
+			i--;
+		}
+	}
+
 	function serverUpdate(delta:Float) {
 		elapsedTime += delta / 1000;
 		var fixedStep = Simulation.FIXED_STEP;
@@ -830,5 +949,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 		// Update server-side fish AI
 		updateFish(t);
+
+		// Update server-side seagulls
+		updateSeagulls(t);
 	}
 }
