@@ -22,6 +22,10 @@ class WaterFish extends FlxSprite {
 	public var fishId = "";
 	public var fishType:Int = 0;
 
+	// In local mode, holds a direct reference to the GameLogic's FishState
+	// so we can read position each frame without schema signals
+	public var serverFishState:FishState = null;
+
 	static inline var SPEED:Float = 20;
 	static inline var ATTRACT_SPEED:Float = 40;
 	static inline var ARRIVE_DIST:Float = 2;
@@ -166,7 +170,21 @@ class WaterFish extends FlxSprite {
 		}
 
 		if (isRemote) {
-			// Server drives position — just run base update for rendering
+			// In local mode, read position directly from GameLogic's FishState
+			if (serverFishState != null) {
+				if (!serverFishState.alive && alive) {
+					alive = false;
+					visible = false;
+				} else if (serverFishState.alive && !alive) {
+					alive = true;
+					visible = true;
+					alpha = 0;
+					fadeInTimer = 1.0;
+				}
+				if (alive) {
+					setPosition(serverFishState.x, serverFishState.y);
+				}
+			}
 			super.update(elapsed);
 			return;
 		}

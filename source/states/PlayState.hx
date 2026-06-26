@@ -348,6 +348,11 @@ class PlayState extends FlxTransitionableState {
 		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y} alive=${fishState.alive}');
 
 		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true, fishState.fishType);
+		// In local mode, give the sprite a direct reference to the GameLogic's FishState
+		// so it can read position each frame without schema signals
+		if (GameManager.ME.net.isLocal()) {
+			newFish.serverFishState = fishState;
+		}
 		remoteFish.set(fishId, newFish);
 		fishSpawner.fishMap.set(fishId, newFish);
 		serverFishGroup.add(newFish);
@@ -867,9 +872,11 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	override public function update(elapsed:Float) {
-		super.update(elapsed);
-
+		// Tick game logic (local or networked) BEFORE updating children
+		// so Player.update() reads the latest server-computed position
 		GameManager.ME.net.update(elapsed);
+
+		super.update(elapsed);
 
 		updateTimerHUD(elapsed);
 

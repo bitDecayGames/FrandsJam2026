@@ -133,7 +133,14 @@ class LobbyState extends FlxTransitionableState {
 		createSkinSelection();
 
 		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		FlxTimer.wait(0.5, () -> {
+
+		// Wait for the room to be joined before sending messages.
+		// In local mode, onJoined fires synchronously during connect().
+		// In networked mode, it fires async after joinOrCreate completes.
+		// If already connected (re-entering lobby after a round), run immediately.
+		var alreadyConnected = GameManager.ME.net.mySessionId != "";
+		var onReady = (_:Dynamic) -> {
+			trace('LobbyState: room ready, starting lobby setup');
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
 
 			#if (bot || db)
@@ -165,7 +172,12 @@ class LobbyState extends FlxTransitionableState {
 				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
 			}
 			#end
-		});
+		};
+		if (alreadyConnected) {
+			onReady(null);
+		} else {
+			GameManager.ME.net.onJoined.add(onReady);
+		}
 	}
 
 	private function createSkinSelection():Void {

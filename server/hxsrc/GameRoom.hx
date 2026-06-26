@@ -1,5 +1,5 @@
 import schema.GameState;
-import schema.GameState.P_Input;
+import PInput.P_Input;
 import schema.BushState;
 import schema.FishState;
 import schema.PlayerState;

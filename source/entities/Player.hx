@@ -640,12 +640,18 @@ class Player extends FlxSprite {
 				buttons: 0,
 				elapsed: delta
 			};
-			pendingInputs.push(inp);
 			GameManager.ME.net.sendInput(inp);
-			// Hot mode or waders: allow walking into shallow water (only block SOLID)
-			var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
-			simulation.tickPlayer(playerState, [inp], delta, blockFlags);
-			setPosition(playerState.x, playerState.y);
+			if (GameManager.ME.net.isLocal()) {
+				// Local mode: GameLogic is the authority, just read position after it ticks
+				// (ticked by PlayState.update -> net.update)
+				setPosition(playerState.x, playerState.y);
+			} else {
+				// Networked mode: predict locally, reconcile from server later
+				pendingInputs.push(inp);
+				var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
+				simulation.tickPlayer(playerState, [inp], delta, blockFlags);
+				setPosition(playerState.x, playerState.y);
+			}
 			velocity.set(0, 0);
 		} else if (frozen) {
 			velocity.set();
