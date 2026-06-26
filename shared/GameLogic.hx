@@ -1,14 +1,13 @@
 package;
 
-import schema.GameState;
-import schema.GameState.P_Input;
-import schema.BushState;
+import PInput.P_Input;
 import schema.FishState;
 import schema.PlayerState;
 import schema.RoundState;
 
 /**
  * Pure game simulation logic — no Colyseus, no Flixel, no platform imports.
+ * Uses plain Maps instead of MapSchema so it compiles on all Haxe targets.
  * Runs identically on the Node.js server (via GameRoom) and embedded in the
  * HL client (via LocalRoom). Uses callbacks for I/O.
 **/
@@ -16,18 +15,31 @@ class GameLogic {
 	// Callbacks — set by the host (GameRoom or LocalRoom)
 	public var broadcast:(topic:String, data:Dynamic) -> Void;
 	public var sendToClient:(clientId:String, topic:String, data:Dynamic) -> Void;
-	public var onBushAdded:(x:Float, y:Float) -> Void;
+	// Called when players/fish/bushes are added/removed so the host can sync to MapSchema
+	public var onPlayerAdded:(id:String, ps:PlayerState) -> Void;
+	public var onPlayerRemoved:(id:String) -> Void;
 	public var onFishAdded:(id:String, fish:FishState) -> Void;
+	public var onFishRemoved:(id:String) -> Void;
+	public var onBushAdded:(id:String, x:Float, y:Float) -> Void;
+	public var onBushRemoved:(id:String) -> Void;
+	public var onRoundChanged:(round:RoundState) -> Void;
 
-	public var state:Dynamic;
+	// Game state — plain Maps, no MapSchema
+	public var players:Map<String, PlayerState> = new Map();
+	public var fish:Map<String, FishState> = new Map();
+	public var bushPositions:Map<String, {x:Float, y:Float}> = new Map();
+	public var round:RoundState = new RoundState();
+	public var inputQueue:Map<String, Array<P_Input>> = new Map();
+
 	public var simulation:Simulation;
+	public var collision:CollisionMap;
 
 	// Fish AI data
 	var waterBodies:Array<Array<{x:Float, y:Float}>>;
 	var bobberPositions:Map<String, {x:Float, y:Float}>;
 	var hotModePlayers:Map<String, Bool>;
 	var wadersPlayers:Map<String, Bool>;
-	var bushRects:Array<{x:Float, y:Float, w:Float, h:Float}>;
+	public var bushRects:Array<{x:Float, y:Float, w:Float, h:Float}>;
 	var nextFishID:Int;
 
 	// Worm spawning data
@@ -42,16 +54,9 @@ class GameLogic {
 
 	// Seagull AI data
 	var seagulls:Array<{
-		id:Int,
-		x:Float,
-		y:Float,
-		velX:Float,
-		velY:Float,
-		goingRight:Bool,
-		poopTimer:Float,
-		altitude:Float,
-		driftTimer:Float,
-		driftVelY:Float
+		id:Int, x:Float, y:Float, velX:Float, velY:Float,
+		goingRight:Bool, poopTimer:Float, altitude:Float,
+		driftTimer:Float, driftVelY:Float
 	}>;
 	var nextSeagullId:Int;
 	var seagullSpawnTimer:Float;
@@ -74,23 +79,20 @@ class GameLogic {
 	static var NUM_FISH_TYPES:Int = 12;
 
 	public function new() {
-		// defaults — overridden by init()
 		broadcast = (_, _) -> {};
 		sendToClient = (_, _, _) -> {};
-		onBushAdded = (_, _) -> {};
+		onPlayerAdded = (_, _) -> {};
+		onPlayerRemoved = (_) -> {};
 		onFishAdded = (_, _) -> {};
+		onFishRemoved = (_) -> {};
+		onBushAdded = (_, _, _) -> {};
+		onBushRemoved = (_) -> {};
+		onRoundChanged = (_) -> {};
 	}
 
-	/**
-	 * Initialize game state from level data.
-	 * @param collision — the collision map built from LDTK
-	 * @param raw — the raw LDTK level data (Dynamic) for spawn point / fish spawner lookup
-	 */
-	public function init(collision:CollisionMap, raw:Dynamic) {
-		state = new GameState();
-		state.collision = collision;
-		state.inputQueue = new Map();
-		simulation = new Simulation(collision);
+	public function init(col:CollisionMap, raw:Dynamic) {
+		collision = col;
+		simulation = new Simulation(col);
 		ldtkRaw = raw;
 
 		waterBodies = [];
@@ -113,37 +115,40 @@ class GameLogic {
 		seagullSpawnTimer = 999;
 
 		windAngle = Math.random() * Math.PI * 2;
-		var worldW = collision.cols * collision.tileSize;
-		var worldH = collision.rows * collision.tileSize;
+		var worldW = col.cols * col.tileSize;
+		var worldH = col.rows * col.tileSize;
 		clouds = [];
 		for (i in 0...5) {
 			var s = 1.0 + Math.random() * 2.0;
 			var speed = 8 + Math.random() * 8;
-			var dx = Math.cos(windAngle) * speed;
-			var dy = Math.sin(windAngle) * speed;
-			var cx = Math.random() * worldW;
-			var cy = Math.random() * worldH;
-			clouds.push({id: i, x: cx, y: cy, velX: dx, velY: dy, scale: s});
+			clouds.push({
+				id: i,
+				x: Math.random() * worldW, y: Math.random() * worldH,
+				velX: Math.cos(windAngle) * speed, velY: Math.sin(windAngle) * speed,
+				scale: s
+			});
 		}
 	}
 
 	// --- Player lifecycle ---
 
 	public function addPlayer(sessionId:String) {
-		MapHelper.set(state.players,sessionId, new PlayerState());
-		state.inputQueue.set(sessionId, []);
-		var ps = MapHelper.get(state.players,sessionId);
+		var ps = new PlayerState();
 		ps.speed = 100;
 		ps.width = 16;
 		ps.height = 8;
+		players.set(sessionId, ps);
+		inputQueue.set(sessionId, []);
+		onPlayerAdded(sessionId, ps);
 	}
 
 	public function removePlayer(sessionId:String) {
-		MapHelper.delete(state.players,sessionId);
-		state.inputQueue.remove(sessionId);
+		players.remove(sessionId);
+		inputQueue.remove(sessionId);
 		bobberPositions.remove(sessionId);
 		hotModePlayers.remove(sessionId);
 		wadersPlayers.remove(sessionId);
+		onPlayerRemoved(sessionId);
 	}
 
 	// --- Message handling ---
@@ -151,13 +156,11 @@ class GameLogic {
 	public function handleMessage(clientId:String, topic:String, data:Dynamic) {
 		switch (topic) {
 			case "player_input":
-				if (!MapHelper.has(state.players,clientId)) { return; }
-				if (!state.inputQueue.exists(clientId)) {
-					state.inputQueue.set(clientId, []);
-				}
+				if (!players.exists(clientId)) { return; }
+				if (!inputQueue.exists(clientId)) { inputQueue.set(clientId, []); }
 				if (data == null) { return; }
 				for (input in (data : Array<P_Input>)) {
-					state.inputQueue.get(clientId).push(input);
+					inputQueue.get(clientId).push(input);
 				}
 
 			case "start_gameplay":
@@ -187,7 +190,7 @@ class GameLogic {
 			case "cast_release":
 				broadcast("cast_line", {sessionId: clientId, x: data.targetX, y: data.targetY, dir: data.dir});
 			case "cast_retract" | "cast_cancel":
-				// no-op — frozen managed client-side
+				// no-op
 
 			case "ground_fish_drop":
 				var px:Float = data.playerX;
@@ -196,15 +199,14 @@ class GameLogic {
 				var dist = 16 + Math.random() * 16;
 				broadcast("ground_fish_spawn", {
 					startX: px, startY: py,
-					landX: px + Math.cos(angle) * dist,
-					landY: py + Math.sin(angle) * dist,
+					landX: px + Math.cos(angle) * dist, landY: py + Math.sin(angle) * dist,
 					fishType: data.fishType, lengthCm: data.lengthCm
 				});
 			case "ground_fish_pickup":
 				broadcast("ground_fish_pickup", data);
 
 			case "player_name_changed":
-				var ps = MapHelper.get(state.players,clientId);
+				var ps = players.get(clientId);
 				if (ps != null) { ps.name = data.name; }
 
 			case "bobber_landed":
@@ -219,18 +221,15 @@ class GameLogic {
 				scareFish(data.x, data.y);
 
 			case "skin_changed":
-				var ps = MapHelper.get(state.players,clientId);
+				var ps = players.get(clientId);
 				if (ps != null) { ps.skinIndex = data.skinIndex; }
 			case "score_update":
-				var ps = MapHelper.get(state.players,clientId);
+				var ps = players.get(clientId);
 				if (ps != null) { ps.score = data.score; }
 
 			case "item_pickup":
-				if (data.itemType == "waders") {
-					wadersPlayers.set(clientId, true);
-				} else if (data.itemType == "waders_remove") {
-					wadersPlayers.remove(clientId);
-				}
+				if (data.itemType == "waders") { wadersPlayers.set(clientId, true); }
+				else if (data.itemType == "waders_remove") { wadersPlayers.remove(clientId); }
 				broadcast("item_pickup", {sessionId: clientId, itemType: data.itemType, index: data.index});
 
 			case "weed_burst":
@@ -255,7 +254,7 @@ class GameLogic {
 			case "hot_pepper":
 				var isStart:Bool = data.isStart;
 				hotModePlayers.set(clientId, isStart);
-				var ps = MapHelper.get(state.players,clientId);
+				var ps = players.get(clientId);
 				if (ps != null) { ps.speed = isStart ? 150 : 100; }
 				broadcast("hot_pepper", {sessionId: clientId, isStart: isStart});
 
@@ -263,15 +262,14 @@ class GameLogic {
 				if (gameplayStarted) {
 					broadcast("round_time_up", {});
 					gameplayStarted = false;
-					if (state.round.status == RoundState.STATUS_ACTIVE) {
+					if (round.status == RoundState.STATUS_ACTIVE) {
 						var newData = new RoundState();
 						newData.status = RoundState.STATUS_POST_ROUND;
-						newData.currentRound = state.round.currentRound;
-						newData.totalRounds = state.round.totalRounds;
-						state.round = newData;
-						for (sId => pp in state.players) {
-							pp.ready = false;
-						}
+						newData.currentRound = round.currentRound;
+						newData.totalRounds = round.totalRounds;
+						round = newData;
+						onRoundChanged(round);
+						for (sId => pp in players) { pp.ready = false; }
 					}
 				}
 
@@ -284,10 +282,10 @@ class GameLogic {
 
 			case "round_update":
 				if (data == null) { return; }
-				var newStatus = data.status != null ? data.status : state.round.status;
-				var newRound = data.currentRound != null ? (data.currentRound : Int) : state.round.currentRound;
-				var newTotal = data.totalRounds != null ? (data.totalRounds : Int) : state.round.totalRounds;
-				if (newStatus == state.round.status && newRound == state.round.currentRound && newTotal == state.round.totalRounds) {
+				var newStatus = data.status != null ? data.status : round.status;
+				var newRound = data.currentRound != null ? Std.int(data.currentRound) : round.currentRound;
+				var newTotal = data.totalRounds != null ? Std.int(data.totalRounds) : round.totalRounds;
+				if (newStatus == round.status && newRound == round.currentRound && newTotal == round.totalRounds) {
 					return;
 				}
 				var newData = new RoundState();
@@ -295,29 +293,26 @@ class GameLogic {
 				newData.currentRound = newRound;
 				newData.totalRounds = newTotal;
 				if (data.status != null) {
-					for (sId => pp in state.players) {
-						pp.ready = false;
-					}
+					for (sId => pp in players) { pp.ready = false; }
 				}
-				state.round = newData;
+				round = newData;
+				onRoundChanged(round);
 
 			case "player_ready":
-				if (state.round.status != RoundState.STATUS_LOBBY
-					&& state.round.status != RoundState.STATUS_PRE_ROUND
-					&& state.round.status != RoundState.STATUS_POST_ROUND) {
+				if (round.status != RoundState.STATUS_LOBBY
+					&& round.status != RoundState.STATUS_PRE_ROUND
+					&& round.status != RoundState.STATUS_POST_ROUND) {
 					return;
 				}
-				var ps = MapHelper.get(state.players,clientId);
+				var ps = players.get(clientId);
 				if (ps != null) { ps.ready = true; }
 				var ready = true;
-				for (sId => pp in state.players) {
+				for (sId => pp in players) {
 					if (!pp.ready) { ready = false; break; }
 				}
 				if (ready) {
 					broadcast("players_ready", true);
-					for (sId => pp in state.players) {
-						pp.ready = false;
-					}
+					for (sId => pp in players) { pp.ready = false; }
 				}
 		}
 	}
@@ -325,15 +320,12 @@ class GameLogic {
 	// --- Tick ---
 
 	public function update(deltaMs:Float) {
-		var elapsed = deltaMs / 1000.0;
-		var fixedStep = Simulation.FIXED_STEP;
-		// accumulate time — but for simplicity just tick once per call with elapsed
-		fixedTick(elapsed);
+		fixedTick(deltaMs / 1000.0);
 	}
 
 	function fixedTick(t:Float) {
-		for (id => p in state.players) {
-			var queue = state.inputQueue.get(id);
+		for (id => p in players) {
+			var queue = inputQueue.get(id);
 			if (queue == null || queue.length == 0) {
 				p.velocityX = 0;
 				p.velocityY = 0;
@@ -362,15 +354,14 @@ class GameLogic {
 			if (roundTimerSec >= roundDurationSec) {
 				broadcast("round_time_up", {});
 				gameplayStarted = false;
-				if (state.round.status == RoundState.STATUS_ACTIVE) {
+				if (round.status == RoundState.STATUS_ACTIVE) {
 					var newData = new RoundState();
 					newData.status = RoundState.STATUS_POST_ROUND;
-					newData.currentRound = state.round.currentRound;
-					newData.totalRounds = state.round.totalRounds;
-					state.round = newData;
-					for (sId => pp in state.players) {
-						pp.ready = false;
-					}
+					newData.currentRound = round.currentRound;
+					newData.totalRounds = round.totalRounds;
+					round = newData;
+					onRoundChanged(round);
+					for (sId => pp in players) { pp.ready = false; }
 				}
 			}
 		}
@@ -379,15 +370,19 @@ class GameLogic {
 	// --- Round lifecycle ---
 
 	public function resetRoundState() {
-		var fishIds:Array<String> = [];
-		for (id => _ in state.fish) { fishIds.push(id); }
-		for (id in fishIds) { MapHelper.delete(state.fish,id); }
+		// Clear and respawn fish
+		for (id in [for (k in fish.keys()) k]) {
+			fish.remove(id);
+			onFishRemoved(id);
+		}
 		nextFishID = 1;
 		spawnFish();
 
-		var bushIds:Array<String> = [];
-		for (id => _ in state.bushes) { bushIds.push(id); }
-		for (id in bushIds) { MapHelper.delete(state.bushes,id); }
+		// Clear bushes
+		for (id in [for (k in bushPositions.keys()) k]) {
+			bushPositions.remove(id);
+			onBushRemoved(id);
+		}
 
 		seagulls = [];
 		seagullSpawnTimer = 3.0;
@@ -396,59 +391,53 @@ class GameLogic {
 		bobberPositions = new Map();
 
 		windAngle = Math.random() * Math.PI * 2;
-		var worldW = state.collision.cols * state.collision.tileSize;
-		var worldH = state.collision.rows * state.collision.tileSize;
+		var worldW = collision.cols * collision.tileSize;
+		var worldH = collision.rows * collision.tileSize;
 		clouds = [];
 		for (i in 0...5) {
 			var s = 1.0 + Math.random() * 2.0;
 			var speed = 8 + Math.random() * 8;
-			var dx = Math.cos(windAngle) * speed;
-			var dy = Math.sin(windAngle) * speed;
-			var cx = Math.random() * worldW;
-			var cy = Math.random() * worldH;
-			clouds.push({id: i, x: cx, y: cy, velX: dx, velY: dy, scale: s});
+			clouds.push({
+				id: i,
+				x: Math.random() * worldW, y: Math.random() * worldH,
+				velX: Math.cos(windAngle) * speed, velY: Math.sin(windAngle) * speed,
+				scale: s
+			});
 		}
 
 		cachedWorldItems = null;
 		cachedSpawnLocations = null;
-
-		for (_ => p in state.players) {
-			p.score = 0;
-			p.ready = false;
-		}
+		for (_ => p in players) { p.score = 0; p.ready = false; }
 	}
 
 	// --- World spawning ---
 
 	public function spawnWorldItems() {
-		var col = state.collision;
-		var w = col.cols;
-		var h = col.rows;
-		var grid = col.tileSize;
+		var w = collision.cols;
+		var h = collision.rows;
+		var grid = collision.tileSize;
 
 		var grassTiles = new Array<{cx:Int, cy:Int}>();
 		var walkableTiles = new Array<{cx:Int, cy:Int}>();
 		for (row in 0...h) {
 			for (c in 0...w) {
-				if (col.isGrassAt(c, row)) { grassTiles.push({cx: c, cy: row}); }
-				if (col.isWalkableAt(c, row)) { walkableTiles.push({cx: c, cy: row}); }
+				if (collision.isGrassAt(c, row)) { grassTiles.push({cx: c, cy: row}); }
+				if (collision.isWalkableAt(c, row)) { walkableTiles.push({cx: c, cy: row}); }
 			}
 		}
 
 		// Bushes
-		var bushPositions = new Array<{x:Float, y:Float}>();
+		bushRects = [];
 		for (_ in 0...5) {
 			if (grassTiles.length == 0) { break; }
 			var idx = Std.int(Math.random() * grassTiles.length);
 			var tile = grassTiles[idx];
-			bushPositions.push({x: tile.cx * grid + Math.random() * (grid - 8), y: tile.cy * grid + Math.random() * (grid - 8)});
-		}
-		bushRects = [];
-		for (i in 0...bushPositions.length) {
-			var bp = bushPositions[i];
-			MapHelper.set(state.bushes,Std.string(i), new BushState(bp.x, bp.y));
-			bushRects.push({x: bp.x + 2, y: bp.y + 2, w: 10.0, h: 2.0});
-			onBushAdded(bp.x, bp.y);
+			var bx = tile.cx * grid + Math.random() * (grid - 8);
+			var by = tile.cy * grid + Math.random() * (grid - 8);
+			var bid = Std.string(Lambda.count(bushPositions));
+			bushPositions.set(bid, {x: bx, y: by});
+			bushRects.push({x: bx + 2, y: by + 2, w: 10.0, h: 2.0});
+			onBushAdded(bid, bx, by);
 		}
 		simulation.entityRects = bushRects;
 
@@ -510,10 +499,10 @@ class GameLogic {
 			sy = allSpawn[0].pixelY;
 		}
 		var spawnData:Dynamic = {};
-		for (sId => _ in state.players) {
+		for (sId => ps in players) {
 			Reflect.setField(spawnData, sId, {x: sx, y: sy});
-			var ps = MapHelper.get(state.players,sId);
-			if (ps != null) { ps.x = sx; ps.y = sy; }
+			ps.x = sx;
+			ps.y = sy;
 		}
 		cachedSpawnLocations = spawnData;
 	}
@@ -521,10 +510,9 @@ class GameLogic {
 	// --- Fish ---
 
 	public function spawnFish() {
-		var col = state.collision;
-		var w = col.cols;
-		var h = col.rows;
-		var grid = col.tileSize;
+		var w = collision.cols;
+		var h = collision.rows;
+		var grid = collision.tileSize;
 
 		var visited = new Array<Bool>();
 		visited.resize(w * h);
@@ -545,7 +533,7 @@ class GameLogic {
 		for (sy in 0...h) {
 			for (sx in 0...w) {
 				var startIdx = sx + sy * w;
-				if (visited[startIdx] || !col.isSwimmableAt(sx, sy)) { continue; }
+				if (visited[startIdx] || !collision.isSwimmableAt(sx, sy)) { continue; }
 
 				var body = new Array<Int>();
 				var stack = [startIdx];
@@ -554,7 +542,7 @@ class GameLogic {
 					if (idx < 0 || idx >= w * h || visited[idx]) { continue; }
 					var cx = idx % w;
 					var cy = Std.int(idx / w);
-					if (!col.isSwimmableAt(cx, cy)) { continue; }
+					if (!collision.isSwimmableAt(cx, cy)) { continue; }
 					visited[idx] = true;
 					body.push(idx);
 					if (cx > 0) { stack.push(idx - 1); }
@@ -571,9 +559,7 @@ class GameLogic {
 
 				var bodyTiles = new Array<{x:Float, y:Float}>();
 				for (idx in body) {
-					var cx = idx % w;
-					var cy = Std.int(idx / w);
-					bodyTiles.push({x: cx * grid + 2.0, y: cy * grid + 2.0});
+					bodyTiles.push({x: (idx % w) * grid + 2.0, y: Std.int(idx / w) * grid + 2.0});
 				}
 				var bIdx = waterBodies.length;
 				waterBodies.push(bodyTiles);
@@ -583,145 +569,95 @@ class GameLogic {
 					var tileIdx = Std.int(Math.random() * bodyTiles.length);
 					var tile = bodyTiles[tileIdx];
 					var ftype = Std.int(Math.random() * NUM_FISH_TYPES);
-					var fish = new FishState(tile.x, tile.y, ftype);
-					fish.bodyIndex = bIdx;
-					MapHelper.set(state.fish,fid, fish);
-					onFishAdded(fid, fish);
+					var f = new FishState(tile.x, tile.y, ftype);
+					f.bodyIndex = bIdx;
+					fish.set(fid, f);
+					onFishAdded(fid, f);
 				}
 				bodyIndex++;
 			}
 		}
 	}
 
-	var fishTraceCounter:Int = 0;
-
 	function updateFish(t:Float) {
-		fishTraceCounter++;
-		var fishIds = new Array<String>();
-		var fishStates = new Array<FishState>();
-		for (id => fish in state.fish) {
-			fishIds.push(id);
-			fishStates.push(fish);
-		}
+		var fishIds = [for (k in fish.keys()) k];
+		var fishStates = [for (f in fish) f];
 
 		for (i in 0...fishIds.length) {
-			var fish = fishStates[i];
+			var f = fishStates[i];
 			var fid = fishIds[i];
 
-			if (fish.scaredTimer > 0) {
-				fish.scaredTimer -= t;
-				fish.x += fish.velX * t;
-				fish.y += fish.velY * t;
-				if (fish.scaredTimer <= 0) {
-					fish.alive = false;
-					fish.velX = 0;
-					fish.velY = 0;
-					fish.respawnTimer = 5.5;
+			if (f.scaredTimer > 0) {
+				f.scaredTimer -= t;
+				f.x += f.velX * t;
+				f.y += f.velY * t;
+				if (f.scaredTimer <= 0) {
+					f.alive = false; f.velX = 0; f.velY = 0; f.respawnTimer = 5.5;
 				}
 				continue;
 			}
 
-			if (!fish.alive) {
-				if (fish.respawnTimer > 0) {
-					fish.respawnTimer -= t;
-					if (fish.respawnTimer <= 0) {
-						var bodyTiles = waterBodies[fish.bodyIndex];
+			if (!f.alive) {
+				if (f.respawnTimer > 0) {
+					f.respawnTimer -= t;
+					if (f.respawnTimer <= 0) {
+						var bodyTiles = waterBodies[f.bodyIndex];
 						if (bodyTiles != null && bodyTiles.length > 0) {
-							var tileIdx = Std.int(Math.random() * bodyTiles.length);
-							var tile = bodyTiles[tileIdx];
-							fish.x = tile.x + Math.random() * 12;
-							fish.y = tile.y + Math.random() * 12;
-							fish.velX = 0;
-							fish.velY = 0;
-							fish.alive = true;
-							fish.attracted = false;
-							fish.pauseTimer = 0;
-							fish.retargetTimer = Math.random() + 2.0;
-							pickFishTarget(fish);
+							var tile = bodyTiles[Std.int(Math.random() * bodyTiles.length)];
+							f.x = tile.x + Math.random() * 12;
+							f.y = tile.y + Math.random() * 12;
+							f.velX = 0; f.velY = 0; f.alive = true;
+							f.attracted = false; f.pauseTimer = 0;
+							f.retargetTimer = Math.random() + 2.0;
+							pickFishTarget(f);
 						}
 					}
 				}
 				continue;
 			}
 
-			if (fish.pauseTimer > 0) {
-				fish.pauseTimer -= t;
-				continue;
-			}
+			if (f.pauseTimer > 0) { f.pauseTimer -= t; continue; }
 
+			// Bobber interaction
 			var closestDist = 1e20;
 			var closestSid:String = null;
 			var closestBX:Float = 0;
 			var closestBY:Float = 0;
 			var hasBobbers = false;
-
 			for (sid => bpos in bobberPositions) {
 				hasBobbers = true;
-				var dx = bpos.x - fish.x;
-				var dy = bpos.y - fish.y;
+				var dx = bpos.x - f.x;
+				var dy = bpos.y - f.y;
 				var dist = Math.sqrt(dx * dx + dy * dy);
-				if (dist < closestDist) {
-					closestDist = dist;
-					closestSid = sid;
-					closestBX = bpos.x;
-					closestBY = bpos.y;
-				}
+				if (dist < closestDist) { closestDist = dist; closestSid = sid; closestBX = bpos.x; closestBY = bpos.y; }
 			}
 
-			if (fish.attracted && !hasBobbers) {
-				fish.attracted = false;
-				fleeFromFish(fish, fish.x + fish.velX, fish.y + fish.velY);
-				continue;
-			}
-			if (fish.attracted && closestDist > FISH_ATTRACT_DIST) {
-				fish.attracted = false;
-				fleeFromFish(fish, closestBX, closestBY);
-				continue;
-			}
-
+			if (f.attracted && !hasBobbers) { f.attracted = false; fleeFromFish(f, f.x + f.velX, f.y + f.velY); continue; }
+			if (f.attracted && closestDist > FISH_ATTRACT_DIST) { f.attracted = false; fleeFromFish(f, closestBX, closestBY); continue; }
 			if (hasBobbers && closestDist < FISH_CATCH_DIST) {
-				fish.alive = false;
-				fish.velX = 0;
-				fish.velY = 0;
-				fish.attracted = false;
-				fish.respawnTimer = 3.0;
-				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: fish.fishType});
+				f.alive = false; f.velX = 0; f.velY = 0; f.attracted = false; f.respawnTimer = 3.0;
+				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: f.fishType});
 				continue;
 			}
-
 			if (hasBobbers && closestDist < FISH_ATTRACT_DIST) {
-				fish.attracted = true;
-				fish.pauseTimer = 0;
-				var dx = closestBX - fish.x;
-				var dy = closestBY - fish.y;
-				if (closestDist > 0.1) {
-					fish.velX = (dx / closestDist) * FISH_ATTRACT_SPEED;
-					fish.velY = (dy / closestDist) * FISH_ATTRACT_SPEED;
-				}
-				fish.x += fish.velX * t;
-				fish.y += fish.velY * t;
+				f.attracted = true; f.pauseTimer = 0;
+				var dx = closestBX - f.x; var dy = closestBY - f.y;
+				if (closestDist > 0.1) { f.velX = (dx / closestDist) * FISH_ATTRACT_SPEED; f.velY = (dy / closestDist) * FISH_ATTRACT_SPEED; }
+				f.x += f.velX * t; f.y += f.velY * t;
 				continue;
 			}
 
-			fish.retargetTimer -= t;
-			if (fish.retargetTimer <= 0) { pickFishTarget(fish); }
-
-			var dx = fish.targetX - fish.x;
-			var dy = fish.targetY - fish.y;
+			// Wander
+			f.retargetTimer -= t;
+			if (f.retargetTimer <= 0) { pickFishTarget(f); }
+			var dx = f.targetX - f.x; var dy = f.targetY - f.y;
 			var dist = Math.sqrt(dx * dx + dy * dy);
-
 			if (dist < FISH_ARRIVE_DIST) {
-				fish.velX = 0;
-				fish.velY = 0;
-				fish.pauseTimer = 1.0 + Math.random() * 2.0;
-				pickFishTarget(fish);
+				f.velX = 0; f.velY = 0; f.pauseTimer = 1.0 + Math.random() * 2.0; pickFishTarget(f);
 			} else {
-				fish.velX = (dx / dist) * FISH_SPEED;
-				fish.velY = (dy / dist) * FISH_SPEED;
+				f.velX = (dx / dist) * FISH_SPEED; f.velY = (dy / dist) * FISH_SPEED;
 			}
-
-			fish.x += fish.velX * t;
-			fish.y += fish.velY * t;
+			f.x += f.velX * t; f.y += f.velY * t;
 		}
 
 		// Separation
@@ -731,67 +667,54 @@ class GameLogic {
 			for (j in (i + 1)...fishStates.length) {
 				var b = fishStates[j];
 				if (!b.alive) { continue; }
-				var dx = a.x - b.x;
-				var dy = a.y - b.y;
+				var dx = a.x - b.x; var dy = a.y - b.y;
 				if (dx * dx + dy * dy < FISH_SEPARATION_DIST * FISH_SEPARATION_DIST) {
-					fleeFromFish(a, b.x, b.y);
-					fleeFromFish(b, a.x, a.y);
+					fleeFromFish(a, b.x, b.y); fleeFromFish(b, a.x, a.y);
 				}
 			}
 		}
 	}
 
-	function pickFishTarget(fish:FishState) {
-		var bodyTiles = waterBodies[fish.bodyIndex];
+	function pickFishTarget(f:FishState) {
+		var bodyTiles = waterBodies[f.bodyIndex];
 		if (bodyTiles == null || bodyTiles.length == 0) { return; }
-		var tileIdx = Std.int(Math.random() * bodyTiles.length);
-		var tile = bodyTiles[tileIdx];
-		fish.targetX = tile.x + Math.random() * 12;
-		fish.targetY = tile.y + Math.random() * 12;
-		fish.retargetTimer = 2.0 + Math.random();
+		var tile = bodyTiles[Std.int(Math.random() * bodyTiles.length)];
+		f.targetX = tile.x + Math.random() * 12;
+		f.targetY = tile.y + Math.random() * 12;
+		f.retargetTimer = 2.0 + Math.random();
 	}
 
-	function fleeFromFish(fish:FishState, fromX:Float, fromY:Float) {
-		if (fish.attracted) { return; }
-		var awayX = fish.x - fromX;
-		var awayY = fish.y - fromY;
+	function fleeFromFish(f:FishState, fromX:Float, fromY:Float) {
+		if (f.attracted) { return; }
+		var awayX = f.x - fromX; var awayY = f.y - fromY;
 		var len = Math.sqrt(awayX * awayX + awayY * awayY);
 		if (len < 0.01) { awayX = Math.random() * 2 - 1; awayY = Math.random() * 2 - 1; len = Math.sqrt(awayX * awayX + awayY * awayY); }
-		awayX /= len;
-		awayY /= len;
-
-		var bodyTiles = waterBodies[fish.bodyIndex];
+		awayX /= len; awayY /= len;
+		var bodyTiles = waterBodies[f.bodyIndex];
 		if (bodyTiles == null || bodyTiles.length == 0) { return; }
-		var bestDot:Float = -999999;
-		var bestTile:{x:Float, y:Float} = null;
+		var bestDot:Float = -999999; var bestTile:{x:Float, y:Float} = null;
 		for (tile in bodyTiles) {
-			var dx = tile.x - fish.x;
-			var dy = tile.y - fish.y;
-			var dot = dx * awayX + dy * awayY;
+			var dot = (tile.x - f.x) * awayX + (tile.y - f.y) * awayY;
 			if (dot > bestDot) { bestDot = dot; bestTile = tile; }
 		}
 		if (bestTile != null) {
-			fish.targetX = bestTile.x + Math.random() * 12;
-			fish.targetY = bestTile.y + Math.random() * 12;
-			fish.retargetTimer = 2.0 + Math.random();
-			var fdx = fish.targetX - fish.x;
-			var fdy = fish.targetY - fish.y;
+			f.targetX = bestTile.x + Math.random() * 12; f.targetY = bestTile.y + Math.random() * 12;
+			f.retargetTimer = 2.0 + Math.random();
+			var fdx = f.targetX - f.x; var fdy = f.targetY - f.y;
 			var fdist = Math.sqrt(fdx * fdx + fdy * fdy);
-			if (fdist > 0.1) { fish.velX = (fdx / fdist) * FISH_SPEED; fish.velY = (fdy / fdist) * FISH_SPEED; }
+			if (fdist > 0.1) { f.velX = (fdx / fdist) * FISH_SPEED; f.velY = (fdy / fdist) * FISH_SPEED; }
 		}
-		fish.pauseTimer = 0;
+		f.pauseTimer = 0;
 	}
 
 	function scareFish(splashX:Float, splashY:Float, radius:Float = 80) {
-		for (id => fish in state.fish) {
-			if (!fish.alive) { continue; }
-			var dx = fish.x - splashX;
-			var dy = fish.y - splashY;
+		for (id => f in fish) {
+			if (!f.alive) { continue; }
+			var dx = f.x - splashX; var dy = f.y - splashY;
 			if (dx * dx + dy * dy < radius * radius) {
-				fish.scaredTimer = 0.5;
-				fish.attracted = false;
+				f.scaredTimer = 0.5; f.attracted = false;
 				var len = Math.sqrt(dx * dx + dy * dy);
-				if (len > 0.01) { fish.velX = (dx / len) * FISH_SPEED * 1.5; fish.velY = (dy / len) * FISH_SPEED * 1.5; }
+				if (len > 0.01) { f.velX = (dx / len) * FISH_SPEED * 1.5; f.velY = (dy / len) * FISH_SPEED * 1.5; }
 			}
 		}
 	}
@@ -799,9 +722,8 @@ class GameLogic {
 	// --- Seagulls ---
 
 	function updateSeagulls(t:Float) {
-		var col = state.collision;
-		var worldWidth:Float = col.cols * col.tileSize;
-		var worldHeight:Float = col.rows * col.tileSize;
+		var worldWidth:Float = collision.cols * collision.tileSize;
+		var worldHeight:Float = collision.rows * collision.tileSize;
 
 		seagullSpawnTimer -= t;
 		if (seagullSpawnTimer <= 0) {
@@ -812,38 +734,31 @@ class GameLogic {
 			var spawnY:Float = -80 + Math.random() * (worldHeight * 0.5 + 80);
 			var alt:Float = Math.random() * 40;
 			var sid = nextSeagullId++;
-			var gull = {
+			seagulls.push({
 				id: sid, x: spawnX, y: spawnY,
 				velX: goingRight ? speed : -speed, velY: 0.0,
 				goingRight: goingRight, poopTimer: 8.0 + Math.random() * 8.0,
 				altitude: alt, driftTimer: 0.5 + Math.random() * 1.0, driftVelY: 0.0
-			};
-			seagulls.push(gull);
-			broadcast("seagull_spawn", {id: sid, x: spawnX, y: spawnY, velX: gull.velX, velY: gull.velY, altitude: alt});
+			});
+			broadcast("seagull_spawn", {id: sid, x: spawnX, y: spawnY, velX: (goingRight ? speed : -speed), velY: 0.0, altitude: alt});
 		}
 
 		var i = seagulls.length - 1;
 		while (i >= 0) {
 			var gull = seagulls[i];
 			gull.driftTimer -= t;
-			if (gull.driftTimer <= 0) {
-				gull.driftTimer = 0.5 + Math.random() * 1.0;
-				gull.driftVelY = (Math.random() * 2 - 1) * 10;
-			}
+			if (gull.driftTimer <= 0) { gull.driftTimer = 0.5 + Math.random() * 1.0; gull.driftVelY = (Math.random() * 2 - 1) * 10; }
 			gull.velY = gull.driftVelY;
-			gull.x += gull.velX * t;
-			gull.y += gull.velY * t;
+			gull.x += gull.velX * t; gull.y += gull.velY * t;
 
 			gull.poopTimer -= t;
 			if (gull.poopTimer <= 0) {
 				gull.poopTimer = 8.0 + Math.random() * 8.0;
 				var altFactor = Math.max(0, Math.min(1, (worldHeight - gull.y) / worldHeight));
 				var shadowOffsetY = 80 + altFactor * 40;
-				var landX = gull.x + 12;
-				var landY = gull.y + shadowOffsetY;
-				var tileX = Std.int(landX / col.tileSize);
-				var tileY = Std.int(landY / col.tileSize);
-				var hitWater = col.isSwimmableAt(tileX, tileY);
+				var landX = gull.x + 12; var landY = gull.y + shadowOffsetY;
+				var tileX = Std.int(landX / collision.tileSize); var tileY = Std.int(landY / collision.tileSize);
+				var hitWater = collision.isSwimmableAt(tileX, tileY);
 				if (hitWater) { scareFish(landX, landY, 30); }
 				broadcast("seagull_poop", {id: gull.id, x: gull.x + 12, y: gull.y + 12, fallDist: shadowOffsetY - 12, birdVelX: gull.velX, hitWater: hitWater});
 			}
@@ -863,33 +778,23 @@ class GameLogic {
 		if (wormTimer > 0) { return; }
 		wormTimer = 2.5 + Math.random() * 2.0;
 
-		var col = state.collision;
-		var w = col.cols;
-		var h = col.rows;
-		var grid = col.tileSize;
-
+		var w = collision.cols; var h = collision.rows; var grid = collision.tileSize;
 		for (_ in 0...50) {
-			var cx = Std.int(Math.random() * w);
-			var cy = Std.int(Math.random() * h);
-			if (!col.isDirtAt(cx, cy)) { continue; }
-
-			var srcX = cx * grid + Math.random() * grid;
-			var srcY = cy * grid + Math.random() * grid;
+			var cx = Std.int(Math.random() * w); var cy = Std.int(Math.random() * h);
+			if (!collision.isDirtAt(cx, cy)) { continue; }
+			var srcX = cx * grid + Math.random() * grid; var srcY = cy * grid + Math.random() * grid;
 			var dir = if (Math.random() > 0.5) 1 else -1;
 			var dist = 2 + Std.int(Math.random() * 3);
 			var destCx = cx + dir * dist;
 			if (destCx < 0 || destCx >= w) { continue; }
-			if (!col.isDirtAt(destCx, cy)) { continue; }
-
+			if (!collision.isDirtAt(destCx, cy)) { continue; }
 			var pathOk = true;
-			var stepDir = if (dir > 0) 1 else -1;
-			var step = cx + stepDir;
+			var step = cx + (if (dir > 0) 1 else -1);
 			while (step != destCx) {
-				if (!col.isDirtAt(step, cy)) { pathOk = false; break; }
-				step += stepDir;
+				if (!collision.isDirtAt(step, cy)) { pathOk = false; break; }
+				step += if (dir > 0) 1 else -1;
 			}
 			if (!pathOk) { continue; }
-
 			broadcast("worm_spawn", {id: nextWormId++, srcX: srcX, srcY: srcY, destX: destCx * grid + Math.random() * grid, destY: cy * grid + Math.random() * grid});
 			break;
 		}

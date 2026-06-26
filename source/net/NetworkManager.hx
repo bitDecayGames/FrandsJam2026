@@ -9,7 +9,7 @@ import io.colyseus.Room;
 import io.colyseus.serializer.schema.Callbacks;
 import schema.BushState;
 import schema.GameState;
-import schema.GameState.P_Input;
+import PInput.P_Input;
 import schema.PlayerState;
 import schema.FishState;
 import schema.RoundState;
@@ -386,16 +386,31 @@ class NetworkManager {
 		});
 	}
 
+	public function isLocal():Bool {
+		return localRoom != null;
+	}
+
+	public function getLocalSimulation():Simulation {
+		return localRoom != null ? localRoom.getSimulation() : null;
+	}
+
+	public function getLocalCollision():CollisionMap {
+		return localRoom != null ? localRoom.getCollision() : null;
+	}
+
+	public function getLocalPlayerState():schema.PlayerState {
+		return localRoom != null ? localRoom.getPlayerState() : null;
+	}
+
 	public function sendKick(targetSessionId:String) {
 		sendMessage("kick", {targetSessionId: targetSessionId});
 	}
 
-	// sendWorldSetup, sendSpawnLocations, sendWorldItems removed — server computes world layout
-
 	// sendTimerSync removed — server now originates timer_sync broadcasts
 
 	public function getState():GameState {
-		if (localRoom != null) { return localRoom.getState(); }
+		// LocalRoom doesn't use GameState schema — return null
+		if (localRoom != null) { return null; }
 		return room != null ? room.state : null;
 	}
 

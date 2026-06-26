@@ -89,7 +89,7 @@ class Player extends FlxSprite {
 	public var simulation:Simulation;
 	public var playerState:schema.PlayerState;
 
-	var pendingInputs:Array<schema.GameState.P_Input> = [];
+	var pendingInputs:Array<PInput.P_Input> = [];
 	var inputSeq:Int = 0;
 
 	public var inventory = new Inventory();
@@ -634,7 +634,7 @@ class Player extends FlxSprite {
 			var dirAngle = if (frozen) -1 else cardinalToAngle(moveDir);
 			// Hot mode speed boost (1.5x)
 			playerState.speed = if (hotModeActive) 150 else 100;
-			var inp:schema.GameState.P_Input = {
+			var inp:PInput.P_Input = {
 				seq: ++inputSeq,
 				dir: dirAngle,
 				buttons: 0,

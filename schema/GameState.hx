@@ -9,14 +9,6 @@ import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.schema.types.ArraySchema;
 import io.colyseus.serializer.schema.types.MapSchema;
 #end
-
-typedef P_Input = {
-	seq:Int,
-	dir:Int,
-	buttons:Int,
-	elapsed:Float
-};
-
 class GameState extends Schema {
 	public static inline var MSG_P_INPUT = "player_input";
 	#if server
@@ -37,7 +29,7 @@ class GameState extends Schema {
 	@:type("boolean") public var shopReady:Bool;
 
 	public var collision:CollisionMap;
-	public var inputQueue:Map<String, Array<P_Input>>;
+	public var inputQueue:Map<String, Array<Dynamic>>;
 
 	public function new() {
 		super();

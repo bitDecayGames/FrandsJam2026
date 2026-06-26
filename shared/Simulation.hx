@@ -1,6 +1,6 @@
 package;
 
-import schema.GameState.P_Input;
+import PInput.P_Input;
 import math.Vector;
 import schema.PlayerState;
 

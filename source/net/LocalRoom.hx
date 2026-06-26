@@ -1,13 +1,13 @@
 package net;
 
-import schema.GameState.P_Input;
 import schema.FishState;
+import schema.PlayerState;
+import schema.RoundState;
 
 /**
  * In-process game server for single-player / local mode.
  * Runs the same GameLogic as the Colyseus server, but with direct
  * function calls instead of websocket messages.
- * Created by NetworkManager.connect() when in local mode.
 **/
 class LocalRoom {
 	var logic:GameLogic;
@@ -20,11 +20,18 @@ class LocalRoom {
 
 		logic = new GameLogic();
 
-		// Wire broadcast — dispatches directly to NetworkManager signals
+		// Wire broadcast/send — dispatch directly to NetworkManager signals
 		logic.broadcast = (topic, data) -> dispatchMessage(topic, data);
 		logic.sendToClient = (_, topic, data) -> dispatchMessage(topic, data);
-		logic.onBushAdded = (x, y) -> net.onBushAdded.dispatch(x, y);
+
+		// Wire schema-like callbacks for fish/bush additions
 		logic.onFishAdded = (id, fish) -> net.onFishAdded.dispatch(id, fish);
+		logic.onFishRemoved = (id) -> {};
+		logic.onBushAdded = (id, x, y) -> net.onBushAdded.dispatch(x, y);
+		logic.onBushRemoved = (id) -> {};
+		logic.onPlayerAdded = (id, ps) -> {};
+		logic.onPlayerRemoved = (id) -> {};
+		logic.onRoundChanged = (round) -> net.onRoundUpdate.dispatch(round);
 
 		// Build collision map from level data (client-side asset loading)
 		var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
@@ -41,9 +48,9 @@ class LocalRoom {
 		net.onJoined.dispatch(sessionId);
 	}
 
-	/** Called each frame from NetworkManager.update() */
+	/** Called each frame */
 	public function update(elapsed:Float) {
-		logic.update(elapsed * 1000); // GameLogic expects ms
+		logic.update(elapsed * 1000);
 	}
 
 	/** Route a client message through GameLogic */
@@ -51,49 +58,53 @@ class LocalRoom {
 		logic.handleMessage(sessionId, topic, data);
 	}
 
-	public function getState():schema.GameState {
-		return logic.state;
+	public function getSimulation():Simulation {
+		return logic.simulation;
+	}
+
+	public function getCollision():CollisionMap {
+		return logic.collision;
+	}
+
+	public function getPlayerState():PlayerState {
+		return logic.players.get(sessionId);
 	}
 
 	/** Dispatch a "server" message to the local client's NetworkManager signals */
 	function dispatchMessage(topic:String, data:Dynamic) {
 		switch (topic) {
 			case "cast_start":
-				net.onCastStart.dispatch(data.sessionId, data.dir);
+				// single player — no remote players to notify
 			case "cast_line":
-				net.onCastLine.dispatch(data.sessionId, data.x, data.y, data.dir);
+				// single player — no remote players to notify
 			case "fish_caught":
 				net.onFishCaught.dispatch(data.sessionId, data.fishId, data.fishType);
 			case "line_pulled":
-				net.onLinePulled.dispatch(data.sessionId);
-			case "fish_despawn":
-				net.onFishDespawn.dispatch(data.id, data.respawnTime);
+				// single player — no remote players to notify
 			case "rock_splash":
-				net.onRockSplash.dispatch(data.x, data.y, data.big);
+				// handled locally
 			case "throw_rock":
-				var dest = flixel.math.FlxPoint.get(data.targetX, data.targetY);
-				net.onThrowRock.dispatch(data.sessionId, dest, data.big, data.dir);
-				dest.put();
+				// single player — no remote players to notify
 			case "fish_sold":
-				net.onFishSold.dispatch(data.sessionId, Std.int(data.fishType), Std.int(data.lengthCm), Std.int(data.value));
+				// single player — no remote players to notify
 			case "weed_burst":
-				net.onWeedBurst.dispatch(data.sessionId, Std.int(data.index));
+				// single player — no remote players to notify
 			case "world_items":
 				net.onWorldItems.dispatch(data);
 			case "item_pickup":
-				// In single player, no need to relay to other clients
+				// single player — no remote players to notify
 			case "bush_rustle":
-				// In single player, no need to relay
+				// single player — handled locally
 			case "bush_ignite":
-				// In single player, no need to relay
+				// single player — handled locally
 			case "weed_ignite":
-				// In single player, no need to relay
+				// single player — handled locally
 			case "worm_killed":
-				// In single player, no need to relay
+				// single player — handled locally
 			case "player_drown":
-				// In single player, no need to relay
+				// single player — handled locally
 			case "hot_pepper":
-				// In single player, no need to relay
+				// single player — handled locally
 			case "spawn_locations":
 				net.onSpawnLocations.dispatch(data);
 			case "timer_sync":

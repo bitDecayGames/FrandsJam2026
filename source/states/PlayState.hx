@@ -164,6 +164,10 @@ class PlayState extends FlxTransitionableState {
 			status: RoundState.STATUS_ACTIVE,
 		});
 
+		// Tell server we're ready — triggers world spawning, fish, timer, clouds
+		// Must be after loadLevel so player exists for spawn_locations
+		GameManager.ME.net.sendMessage("start_gameplay", {});
+
 		#if db
 		addDebugButtons();
 		#end
@@ -309,8 +313,6 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onGroundFishPickup.add(onRemoteGroundFishPickup);
 		GameManager.ME.net.onWormKilled.add(onRemoteWormKilled);
 		GameManager.ME.net.onCloudSync.add(onServerCloudSync);
-		// Tell server we're ready — triggers cloud sync, existing seagulls, and starts spawning
-		GameManager.ME.net.sendMessage("start_gameplay", {});
 		GameManager.ME.net.onWormSpawn.add(onServerWormSpawn);
 		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
@@ -397,14 +399,20 @@ class PlayState extends FlxTransitionableState {
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
 
-		// Wire up client-side prediction
-		player.simulation = simulation;
-		player.playerState = new schema.PlayerState();
-		player.playerState.x = player.x;
-		player.playerState.y = player.y;
-		player.playerState.speed = 100;
-		player.playerState.width = 16;
-		player.playerState.height = 8;
+		// Wire up client-side prediction — in local mode, use the server's own
+		// simulation and player state so they're always in sync (no reconciliation needed)
+		if (GameManager.ME.net.isLocal()) {
+			player.simulation = GameManager.ME.net.getLocalSimulation();
+			player.playerState = GameManager.ME.net.getLocalPlayerState();
+		} else {
+			player.simulation = simulation;
+			player.playerState = new schema.PlayerState();
+			player.playerState.x = player.x;
+			player.playerState.y = player.y;
+			player.playerState.speed = 100;
+			player.playerState.width = 16;
+			player.playerState.height = 8;
+		}
 
 		camera.follow(player, TOPDOWN);
 		ySortGroup.add(player);
