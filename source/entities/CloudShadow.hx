@@ -4,15 +4,12 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 
 class CloudShadow extends FlxSprite {
-	static inline var SPEED_MIN:Float = 8;
-	static inline var SPEED_MAX:Float = 16;
 	static inline var SHADOW_ALPHA:Float = 0.12;
-
-	// Margin beyond screen edge before respawning
 	static inline var MARGIN:Float = 64;
 
-	// Shared wind direction — call randomizeWind() once at the start of each round
 	public static var windAngle:Float = 0;
+
+	public var cloudId:Int = 0;
 
 	public static function randomizeWind() {
 		windAngle = FlxG.random.float(0, 2 * Math.PI);
@@ -21,79 +18,53 @@ class CloudShadow extends FlxSprite {
 	public function new() {
 		super();
 		loadGraphic(AssetPaths.cloudShadow__png);
-		var s = FlxG.random.float(1, 3);
-		scale.set(s, s);
-		updateHitbox();
 		alpha = SHADOW_ALPHA;
-		scrollFactor.set(0, 0);
-		setVelocityFromWind();
-		// Scatter across the full traversal path so some start on-screen
-		spawnScattered();
+		// world-space — no scrollFactor override, clouds are world objects
 	}
 
-	function setVelocityFromWind() {
-		var speed = FlxG.random.float(SPEED_MIN, SPEED_MAX);
-		velocity.x = Math.cos(windAngle) * speed;
-		velocity.y = Math.sin(windAngle) * speed;
-	}
-
-	/** Place at a random point along the full wind axis (upwind edge to downwind edge). **/
-	function spawnScattered() {
-		// Random t from 0 (upwind edge) to 1 (downwind edge)
-		placeAlongWindAxis(FlxG.random.float(0, 1));
-	}
-
-	/** Place at the upwind edge so it drifts across the full screen. **/
-	function spawnAtEdge() {
-		placeAlongWindAxis(0);
-	}
-
-	function placeAlongWindAxis(t:Float) {
-		var screenW = FlxG.width;
-		var screenH = FlxG.height;
-		var dx = Math.cos(windAngle);
-		var dy = Math.sin(windAngle);
-
-		// Upwind origin: the edge the shadow enters from
-		var startX:Float, startY:Float;
-		if (dx > 0)
-			startX = -width - MARGIN;
-		else
-			startX = screenW + MARGIN;
-		if (dy > 0)
-			startY = -height - MARGIN;
-		else
-			startY = screenH + MARGIN;
-
-		// Downwind destination: the edge the shadow exits at
-		var endX:Float, endY:Float;
-		if (dx > 0)
-			endX = screenW + MARGIN;
-		else
-			endX = -width - MARGIN;
-		if (dy > 0)
-			endY = screenH + MARGIN;
-		else
-			endY = -height - MARGIN;
-
-		// Interpolate along wind axis, randomize perpendicular offset
-		x = startX + (endX - startX) * t;
-		y = startY + (endY - startY) * t;
-
-		// Add random perpendicular spread so they aren't all in a line
-		var perpX = -dy;
-		var perpY = dx;
-		var spread = FlxG.random.float(-0.5, 0.5) * Math.max(screenW, screenH);
-		x += perpX * spread;
-		y += perpY * spread;
+	/** Create a cloud from server data. */
+	public static function fromServer(data:Dynamic):CloudShadow {
+		var c = new CloudShadow();
+		c.cloudId = Std.int(data.id);
+		c.scale.set(data.scale, data.scale);
+		c.updateHitbox();
+		c.setPosition(data.x, data.y);
+		c.velocity.set(data.velX, data.velY);
+		return c;
 	}
 
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
-		if (x < -width - MARGIN || x > FlxG.width + MARGIN || y < -height - MARGIN || y > FlxG.height + MARGIN) {
-			setVelocityFromWind();
-			spawnAtEdge();
+		// respawn at upwind edge when past world bounds
+		var bounds = FlxG.worldBounds;
+		if (x < bounds.x - width - MARGIN || x > bounds.right + MARGIN || y < bounds.y - height - MARGIN || y > bounds.bottom + MARGIN) {
+			respawnAtEdge();
 		}
+	}
+
+	function respawnAtEdge() {
+		var bounds = FlxG.worldBounds;
+		var dx = Math.cos(windAngle);
+		var dy = Math.sin(windAngle);
+
+		// place at upwind edge
+		if (dx > 0) {
+			x = bounds.x - width - MARGIN;
+		} else {
+			x = bounds.right + MARGIN;
+		}
+		if (dy > 0) {
+			y = bounds.y - height - MARGIN;
+		} else {
+			y = bounds.bottom + MARGIN;
+		}
+
+		// random perpendicular spread
+		var perpX = -dy;
+		var perpY = dx;
+		var spread = (Math.random() - 0.5) * Math.max(bounds.width, bounds.height);
+		x += perpX * spread;
+		y += perpY * spread;
 	}
 }

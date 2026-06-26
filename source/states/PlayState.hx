@@ -300,6 +300,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
 		GameManager.ME.net.onGroundFishSpawn.add(onRemoteGroundFishSpawn);
 		GameManager.ME.net.onGroundFishPickup.add(onRemoteGroundFishPickup);
+		GameManager.ME.net.onCloudSync.add(onServerCloudSync);
 		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
 		GameManager.ME.net.onSeagullDespawn.add(onServerSeagullDespawn);
@@ -477,13 +478,13 @@ class PlayState extends FlxTransitionableState {
 			FlxG.camera.shake(0.002, 0.1);
 		};
 
-		// Wind angle set by server via wind_angle message; fallback for local mode
+		// Clouds: server sends positions via cloud_sync; local mode creates them randomly
 		#if local
 		CloudShadow.randomizeWind();
-		#end
 		for (_ in 0...5) {
 			add(new CloudShadow());
 		}
+		#end
 
 		add(seagullGroup);
 
@@ -1084,6 +1085,15 @@ class PlayState extends FlxTransitionableState {
 		seagullTimer = FlxG.random.float(2.0, 6.0);
 		seagullGroup.add(new Seagull(FlxG.random.bool(), this, midGroundGroup, terrainLayer, fishSpawner));
 		#end
+	}
+
+	function onServerCloudSync(data:Dynamic) {
+		var cloudArray:Array<Dynamic> = data.clouds;
+		if (cloudArray != null) {
+			for (cd in cloudArray) {
+				add(CloudShadow.fromServer(cd));
+			}
+		}
 	}
 
 	function onServerSeagullSpawn(data:Dynamic) {

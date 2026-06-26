@@ -38,6 +38,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	var nextSeagullId:Int;
 	var seagullSpawnTimer:Float;
 	var windAngle:Float;
+	var clouds:Array<{id:Int, x:Float, y:Float, velX:Float, velY:Float, scale:Float}>;
 
 	static var FISH_SPEED:Float = 20;
 	static var FISH_ATTRACT_SPEED:Float = 40;
@@ -74,8 +75,21 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		nextSeagullId = 1;
 		seagullSpawnTimer = 3.0;
 
-		// Pick wind angle for clouds — sent to each client on join
+		// Pick wind angle and spawn clouds — sent to each client on join
 		windAngle = Math.random() * Math.PI * 2;
+		var worldW = state.collision.cols * state.collision.tileSize;
+		var worldH = state.collision.rows * state.collision.tileSize;
+		clouds = [];
+		for (i in 0...5) {
+			var s = 1.0 + Math.random() * 2.0;
+			var speed = 8 + Math.random() * 8;
+			var dx = Math.cos(windAngle) * speed;
+			var dy = Math.sin(windAngle) * speed;
+			// scatter across world
+			var cx = Math.random() * worldW;
+			var cy = Math.random() * worldH;
+			clouds.push({id: i, x: cx, y: cy, velX: dx, velY: dy, scale: s});
+		}
 
 		// Start fixed-tick simulation loop
 		this.setSimulationInterval(this.serverUpdate);
@@ -433,8 +447,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			trace('host set ${client.sessionId}');
 		}
 
-		// Send wind angle for cloud sync
-		client.send("wind_angle", {angle: windAngle});
+		// Send cloud data for sync (wind angle + positions)
+		client.send("cloud_sync", {angle: windAngle, clouds: clouds});
 
 		return null;
 	}

@@ -71,6 +71,7 @@ class NetworkManager {
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 	public var onLocalPlayerAck = new FlxTypedSignal<PlayerState->Void>();
+	public var onCloudSync = new FlxTypedSignal<Dynamic->Void>(); // {angle, clouds}
 	public var onSeagullSpawn = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, velX, velY, altitude}
 	public var onSeagullPoop = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, fallDist, birdVelX, hitWater}
 	public var onSeagullDespawn = new FlxTypedSignal<Dynamic->Void>(); // {id}
@@ -340,8 +341,9 @@ class NetworkManager {
 				onGroundFishPickup.dispatch(message.x, message.y);
 			});
 
-			onMsg("wind_angle", (message:Dynamic) -> {
+			onMsg("cloud_sync", (message:Dynamic) -> {
 				entities.CloudShadow.windAngle = message.angle;
+				onCloudSync.dispatch(message);
 			});
 
 			onMsg("seagull_spawn", (message:Dynamic) -> {
