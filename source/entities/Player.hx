@@ -630,10 +630,25 @@ class Player extends FlxSprite {
 			if (simulation != null && playerState != null) {
 				// Server-authoritative mode: send input packet, predict locally
 				var dirAngle = cardinalToAngle(inputDir);
+				var buttonMask = 0;
+				#if bot
+				// bot simulates A press: hold A for 0.5s every 6 seconds to cast
+				var castCycle = botTimer % 6.0;
+				if (castCycle >= 3.0 && castCycle < 3.5) {
+					buttonMask |= schema.PlayerState.BUTTON_A;
+				}
+				#else
+				if (SimpleController.pressed(A)) {
+					buttonMask |= schema.PlayerState.BUTTON_A;
+				}
+				if (SimpleController.pressed(B)) {
+					buttonMask |= schema.PlayerState.BUTTON_B;
+				}
+				#end
 				var inp:schema.GameState.P_Input = {
 					seq: ++inputSeq,
 					dir: dirAngle,
-					buttons: 0,
+					buttons: buttonMask,
 					elapsed: delta
 				};
 				pendingInputs.push(inp);

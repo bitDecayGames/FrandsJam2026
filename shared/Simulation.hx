@@ -37,7 +37,8 @@ class Simulation {
 			// trace('pState in: ${p.controlState}');
 			switch (p.controlState) {
 				case PlayerState.CONTROL_STATE_IDLE:
-					if (input.buttons & PlayerState.BUTTON_A != 0) {
+					if ((input.buttons & PlayerState.BUTTON_A) != 0) {
+						trace('[SIM] ${p.lastProcessedSeq}: IDLE -> CHARGING');
 						p.controlState = PlayerState.CONTROL_STATE_CHARGING;
 						return;
 					}
@@ -51,37 +52,31 @@ class Simulation {
 					vy = inDir.y * p.speed;
 					p.actionIntent = PlayerState.ACTION_RUN;
 				case PlayerState.CONTROL_STATE_CHARGING:
-					if (input.buttons & PlayerState.BUTTON_A == 0) {
-						trace('setting status to ${PlayerState.CONTROL_STATE_CASTING}');
+					if ((input.buttons & PlayerState.BUTTON_A) == 0) {
+						trace('[SIM] ${p.lastProcessedSeq}: CHARGING -> CASTING');
 						p.controlState = PlayerState.CONTROL_STATE_CASTING;
-						// TODO: check power and set destination for bobber
 					}
 				case PlayerState.CONTROL_STATE_CASTING:
 					if (!p.cd.has("CD_CAST")) {
 						p.cd.set("CD_CAST", 0.5, () -> {
-							trace('setting status to ${PlayerState.CONTROL_STATE_WAITING}');
-							p.controlState = p.controlState = PlayerState.CONTROL_STATE_WAITING;
+							trace('[SIM] CASTING -> WAITING');
+							p.controlState = PlayerState.CONTROL_STATE_WAITING;
 							p.cd.set("CD_XXX", 0.5);
 						});
 					}
-				// no direct control. Player must let bobber land
-				// TODO: actually do this timer within the simulation
-				//   that way server and client can agree
 
 				case PlayerState.CONTROL_STATE_WAITING:
-					if (!p.cd.has("CD_XXX") && input.buttons & PlayerState.BUTTON_A != 0) {
-						trace('setting status to ${PlayerState.CONTROL_STATE_RETURNING}');
+					if (!p.cd.has("CD_XXX") && (input.buttons & PlayerState.BUTTON_A) != 0) {
+						trace('[SIM] WAITING -> RETURNING');
 						p.controlState = PlayerState.CONTROL_STATE_RETURNING;
 					}
 				case PlayerState.CONTROL_STATE_RETURNING:
 					if (!p.cd.has("CD_CAST_RETURN")) {
 						p.cd.set("CD_CAST_RETURN", 0.5, () -> {
-							trace('setting status to ${PlayerState.CONTROL_STATE_IDLE}');
-							p.controlState = p.controlState = PlayerState.CONTROL_STATE_IDLE;
+							trace('[SIM] RETURNING -> IDLE');
+							p.controlState = PlayerState.CONTROL_STATE_IDLE;
 						});
 					}
-					// no direct control. Player must let bobber return.
-					// TODO: Should do some sort of timer thing just like casting
 			}
 			// trace('pState Out: ${p.controlState}');
 		}
