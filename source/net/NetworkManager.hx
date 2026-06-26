@@ -342,6 +342,7 @@ class NetworkManager {
 			});
 
 			onMsg("cloud_sync", (message:Dynamic) -> {
+				trace('[NetMan] cloud_sync received: angle=${message.angle}');
 				entities.CloudShadow.windAngle = message.angle;
 				onCloudSync.dispatch(message);
 			});

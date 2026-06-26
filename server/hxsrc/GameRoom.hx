@@ -154,6 +154,11 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			// frozen managed client-side
 		});
 
+		// Client requests cloud data after PlayState loads
+		onMessage("request_clouds", (client:Client, _) -> {
+			client.send("cloud_sync", {angle: windAngle, clouds: clouds});
+		});
+
 		// Ground fish: player inventory full, server computes landing position
 		onMessage("ground_fish_drop", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: ground_fish_drop at (${data.playerX}, ${data.playerY})');
@@ -447,8 +452,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			trace('host set ${client.sessionId}');
 		}
 
-		// Send cloud data for sync (wind angle + positions)
-		client.send("cloud_sync", {angle: windAngle, clouds: clouds});
+		// Cloud sync is requested by client after PlayState loads
+		// (can't send on join — onMsg handlers aren't registered yet)
 
 		return null;
 	}
