@@ -423,15 +423,8 @@ class PlayState extends FlxTransitionableState {
 		spawnWeeds();
 		spawnWorldItems(level);
 		#else
-		FlxTimer.wait(1, () -> {
-			if (NetworkManager.IS_HOST) {
-				spawnWeeds();
-				spawnWorldItems(level);
-				broadcastWorldItems();
-			} else {
-				QLog.notice('skipping spawn');
-			}
-		});
+		// host spawns world items after IS_HOST is confirmed set
+		waitForHostAndSpawn(level);
 		#end
 
 		waterLayer = level.waterGrid;
@@ -442,10 +435,6 @@ class PlayState extends FlxTransitionableState {
 		groundFishGroup.setWaterLayer(waterLayer);
 		#if local
 		spawnBushes();
-		#else
-		if (NetworkManager.IS_HOST) {
-			spawnBushes();
-		}
 		#end
 
 		// wire up pickup callbacks for network broadcast
@@ -480,23 +469,6 @@ class PlayState extends FlxTransitionableState {
 		shop = new Shop();
 		shop.spawnRandom(level, terrainLayer, 640, 480);
 		ySortGroup.add(shop);
-		#else
-		if (NetworkManager.IS_HOST) {
-			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
-			shop = new Shop();
-			shop.spawnRandom(level, terrainLayer, 640, 480);
-			ySortGroup.add(shop);
-			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
-		} else {
-			// Check if world state already arrived (e.g. late joiner)
-			var state = GameManager.ME.net.getState();
-			if (state != null && state.shopReady) {
-				placeShopAt(state.shopX, state.shopY);
-				for (_ => bush in state.bushes) {
-					placeBushAt(bush.x, bush.y);
-				}
-			}
-		}
 		#end
 
 		shopInterior = new BaitShopInterior();
@@ -584,6 +556,48 @@ class PlayState extends FlxTransitionableState {
 			}
 		}
 	}
+
+	#if !local
+	var hostSpawnAttempts:Int = 0;
+
+	function waitForHostAndSpawn(level:Level) {
+		hostSpawnAttempts++;
+		// Check host status from the server schema directly, not the deferred IS_HOST flag
+		var serverState = GameManager.ME.net.getState();
+		var hostId = serverState != null ? serverState.hostSessionId : null;
+		var myId = GameManager.ME.net.mySessionId;
+		var isHost = hostId != null && hostId != "" && myId == hostId;
+		QLog.notice('waitForHostAndSpawn attempt=$hostSpawnAttempts isHost=$isHost hostId=$hostId myId=$myId');
+
+		if (hostId == null || hostId == "") {
+			// host not assigned yet — retry
+			if (hostSpawnAttempts < 100) {
+				FlxTimer.wait(0.1, () -> waitForHostAndSpawn(level));
+			}
+			return;
+		}
+		if (isHost) {
+			spawnBushes();
+			spawnWeeds();
+			spawnWorldItems(level);
+			broadcastWorldItems();
+			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
+			shop = new Shop();
+			shop.spawnRandom(level, terrainLayer, 640, 480);
+			ySortGroup.add(shop);
+			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
+		} else {
+			// non-host: check if world state already arrived
+			var state = GameManager.ME.net.getState();
+			if (state != null && state.shopReady) {
+				placeShopAt(state.shopX, state.shopY);
+				for (_ => bush in state.bushes) {
+					placeBushAt(bush.x, bush.y);
+				}
+			}
+		}
+	}
+	#end
 
 	function broadcastWorldItems() {
 		var rocks:Array<{x:Float, y:Float, big:Bool}> = [];

@@ -45,7 +45,7 @@ start_server() {
     echo -e "\033[36m[watch]\033[0m starting colyseus server..."
     cd "$SERVER_DIR"
     haxe server.hxml 2>&1 | tail -3
-    node dist/server.js &
+    node dist/server.js > ../colyseus.log 2>&1 &
     SERVER_PID=$!
     cd ..
     sleep 1
@@ -80,13 +80,13 @@ build_and_launch() {
     cp -r export/hl/bin export/hl/bin_bot 2>/dev/null
 
     echo -e "\033[36m[watch]\033[0m launching player window..."
-    (cd export/hl/bin_player && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) &
+    (cd export/hl/bin_player && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) > game_player.log 2>&1 &
     PLAYER_PID=$!
 
     sleep 0.5
 
     echo -e "\033[36m[watch]\033[0m launching bot window..."
-    (cd export/hl/bin_bot && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) &
+    (cd export/hl/bin_bot && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" ./MyApplication) > game_bot.log 2>&1 &
     BOT_PID=$!
 
     # position windows side by side in center of primary monitor

@@ -41,3 +41,6 @@ dump/
 
 # local FMOD SDK for testing
 /sdk
+colyseus.log
+game_player.log
+game_bot.log
