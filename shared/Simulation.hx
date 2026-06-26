@@ -38,17 +38,36 @@ class Simulation {
 			switch (p.controlState) {
 				case PlayerState.CONTROL_STATE_IDLE:
 					if ((input.buttons & PlayerState.BUTTON_A) != 0) {
-						trace('[SIM] ${p.lastProcessedSeq}: IDLE -> CHARGING');
 						p.controlState = PlayerState.CONTROL_STATE_CHARGING;
+						p.castPower = 0;
+						p.castPowerDir = 1;
+						// record facing at cast start
+						if (input.dir >= 0) {
+							p.facing = dirToFacing(input.dir);
+						}
 					} else if (input.dir != -1) {
 						var inDir = Vector.fromAngle(input.dir);
 						vx = inDir.x * p.speed;
 						vy = inDir.y * p.speed;
 						p.actionIntent = PlayerState.ACTION_RUN;
+						p.facing = dirToFacing(input.dir);
 					}
 				case PlayerState.CONTROL_STATE_CHARGING:
+					// pulse cast power
+					p.castPower += p.castPowerDir * input.elapsed * 2.0;
+					if (p.castPower >= 1.0) {
+						p.castPower = 1.0;
+						p.castPowerDir = -1;
+					} else if (p.castPower <= 0.0) {
+						p.castPower = 0.0;
+						p.castPowerDir = 1;
+					}
 					if ((input.buttons & PlayerState.BUTTON_A) == 0) {
-						trace('[SIM] ${p.lastProcessedSeq}: CHARGING -> CASTING');
+						// released A — compute bobber target from facing + power
+						var facingDir = facingToVector(p.facing);
+						var castDist = p.castPower * 96;
+						p.castTargetX = p.x + facingDir.x * castDist + 4;
+						p.castTargetY = p.y + facingDir.y * castDist - 8;
 						p.controlState = PlayerState.CONTROL_STATE_CASTING;
 					}
 				case PlayerState.CONTROL_STATE_CASTING:
@@ -83,6 +102,35 @@ class Simulation {
 		p.lastProcessedSeq = lastSeq;
 
 		updatePlayerState(p);
+	}
+
+	/** Convert a 0-359 degree direction to a FACING constant. */
+	static function dirToFacing(dir:Int):Int {
+		if (dir < 0) {
+			return PlayerState.FACING_DOWN;
+		}
+		// 0=up, 45=NE, 90=right, 135=SE, 180=down, 225=SW, 270=left, 315=NW
+		if (dir >= 315 || dir < 45) {
+			return PlayerState.FACING_UP;
+		}
+		if (dir >= 45 && dir < 135) {
+			return PlayerState.FACING_RIGHT;
+		}
+		if (dir >= 135 && dir < 225) {
+			return PlayerState.FACING_DOWN;
+		}
+		return PlayerState.FACING_LEFT;
+	}
+
+	/** Convert a FACING constant to a unit vector. */
+	static function facingToVector(facing:Int):Vector {
+		return switch (facing) {
+			case PlayerState.FACING_UP: new Vector(0, -1);
+			case PlayerState.FACING_RIGHT: new Vector(1, 0);
+			case PlayerState.FACING_DOWN: new Vector(0, 1);
+			case PlayerState.FACING_LEFT: new Vector(-1, 0);
+			default: new Vector(0, 1);
+		};
 	}
 
 	function updatePlayerState(p:PlayerState) {

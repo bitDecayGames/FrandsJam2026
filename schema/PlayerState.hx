@@ -44,8 +44,12 @@ class PlayerState extends Schema {
 	@:type("string") public var actionIntent:String;
 	@:type("string") public var actionState:String;
 	@:type("uint8") public var facing:Int;
+	@:type("float32") public var castPower:Float;
+	@:type("float32") public var castTargetX:Float;
+	@:type("float32") public var castTargetY:Float;
 
 	public var cd:utils.Cooldowns;
+	public var castPowerDir:Float;
 
 	public function new() {
 		super();
@@ -65,6 +69,10 @@ class PlayerState extends Schema {
 		actionIntent = ACTION_IDLE;
 		actionState = ACTION_IDLE;
 		facing = FACING_DOWN;
+		castPower = 0;
+		castPowerDir = 1;
+		castTargetX = 0;
+		castTargetY = 0;
 		cd = new utils.Cooldowns();
 	}
 
@@ -86,6 +94,10 @@ class PlayerState extends Schema {
 		s.actionIntent = source.actionIntent;
 		s.actionState = source.actionState;
 		s.facing = source.facing;
+		s.castPower = source.castPower;
+		s.castPowerDir = source.castPowerDir;
+		s.castTargetX = source.castTargetX;
+		s.castTargetY = source.castTargetY;
 		return s;
 	}
 }
