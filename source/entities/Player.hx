@@ -578,7 +578,7 @@ class Player extends FlxSprite {
 			swapSkin();
 		}
 
-		if (FlxG.keys.justPressed.P) {
+		if (FlxG.keys.justPressed.P || FlxG.keys.justPressed.NUMPADTHREE) {
 			if (hotModeActive) {
 				deactivateHotMode();
 			} else {

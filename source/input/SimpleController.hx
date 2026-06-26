@@ -14,12 +14,12 @@ class SimpleController {
 	static var key_bindings:Array<Map<Button, Array<FlxKey>>> = [
 		// PLAYER ONE
 		[
-			UP => [FlxKey.UP, FlxKey.W],
-			DOWN => [FlxKey.DOWN, FlxKey.S],
-			LEFT => [FlxKey.LEFT, FlxKey.A],
-			RIGHT => [FlxKey.RIGHT, FlxKey.D],
-			A => [FlxKey.Z],
-			B => [FlxKey.X, FlxKey.B],
+			UP => [FlxKey.UP, FlxKey.W, FlxKey.NUMPADEIGHT],
+			DOWN => [FlxKey.DOWN, FlxKey.S, FlxKey.NUMPADFIVE],
+			LEFT => [FlxKey.LEFT, FlxKey.A, FlxKey.NUMPADFOUR],
+			RIGHT => [FlxKey.RIGHT, FlxKey.D, FlxKey.NUMPADSIX],
+			A => [FlxKey.Z, FlxKey.NUMPADONE],
+			B => [FlxKey.X, FlxKey.B, FlxKey.NUMPADTWO],
 			START => [FlxKey.ENTER],
 			BACK => [FlxKey.ESCAPE],
 		],

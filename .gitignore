@@ -35,3 +35,6 @@ dump/
 
 # claude
 .claude/settings.local.json
+
+# lime rebuild artifacts
+.rebuild
