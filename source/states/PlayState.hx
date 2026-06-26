@@ -477,7 +477,10 @@ class PlayState extends FlxTransitionableState {
 			FlxG.camera.shake(0.002, 0.1);
 		};
 
+		// Wind angle set by server via wind_angle message; fallback for local mode
+		#if local
 		CloudShadow.randomizeWind();
+		#end
 		for (_ in 0...5) {
 			add(new CloudShadow());
 		}

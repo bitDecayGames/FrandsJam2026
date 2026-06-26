@@ -37,6 +37,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	}>;
 	var nextSeagullId:Int;
 	var seagullSpawnTimer:Float;
+	var windAngle:Float;
 
 	static var FISH_SPEED:Float = 20;
 	static var FISH_ATTRACT_SPEED:Float = 40;
@@ -72,6 +73,9 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		seagulls = [];
 		nextSeagullId = 1;
 		seagullSpawnTimer = 3.0;
+
+		// Pick wind angle for clouds — sent to each client on join
+		windAngle = Math.random() * Math.PI * 2;
 
 		// Start fixed-tick simulation loop
 		this.setSimulationInterval(this.serverUpdate);
@@ -428,6 +432,9 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			state.hostSessionId = client.sessionId;
 			trace('host set ${client.sessionId}');
 		}
+
+		// Send wind angle for cloud sync
+		client.send("wind_angle", {angle: windAngle});
 
 		return null;
 	}

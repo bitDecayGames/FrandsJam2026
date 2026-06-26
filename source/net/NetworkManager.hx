@@ -340,6 +340,10 @@ class NetworkManager {
 				onGroundFishPickup.dispatch(message.x, message.y);
 			});
 
+			onMsg("wind_angle", (message:Dynamic) -> {
+				entities.CloudShadow.windAngle = message.angle;
+			});
+
 			onMsg("seagull_spawn", (message:Dynamic) -> {
 				onSeagullSpawn.dispatch(message);
 			});
