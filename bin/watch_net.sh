@@ -6,7 +6,7 @@
 
 SIGNAL=".rebuild"
 SERVER_DIR="server"
-PLAYER_BUILD="lime build hl -debug -Dplay -Ddb -Dforcelocal"
+PLAYER_BUILD="lime build hl -Dplay -Ddb -Dforcelocal"
 BOT_BUILD="lime build hl -Dplay -Dbot -Dforcelocal"
 GAME_BIN="export/hl/bin/FrandsJam"
 SERVER_PID=""

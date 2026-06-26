@@ -3,7 +3,7 @@
 # No Colyseus server needed. Usage: ./bin/watch_solo.sh
 
 SIGNAL=".rebuild"
-PLAYER_BUILD="lime build hl -Dlocal -Ddb"
+PLAYER_BUILD="lime build hl -Dplay_solo -Ddb"
 PLAYER_PID=""
 
 kill_pid() {

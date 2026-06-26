@@ -36,7 +36,7 @@ import openfl.ui.Keyboard;
 import openfl.utils.Assets;
 import states.MainMenuState;
 import states.SplashScreenState;
-#if (play || local)
+#if (play || local || play_solo)
 import states.LobbyState;
 #end
 #if credits
@@ -60,7 +60,7 @@ class Main extends Sprite {
 		new GameManager();
 
 		var startingState:Class<FlxState> = SplashScreenState;
-		#if (play || local)
+		#if (play || local || play_solo)
 		startingState = LobbyState;
 		#elseif credits
 		startingState = CreditsState;

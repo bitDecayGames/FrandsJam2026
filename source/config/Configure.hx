@@ -50,7 +50,7 @@ class Configure {
 	}
 
 	public static function getServerURL():String {
-		#if local
+		#if (local || play_solo)
 		return "local";
 		#elseif forcelocal
 		return "localhost";
