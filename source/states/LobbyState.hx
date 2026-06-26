@@ -38,6 +38,8 @@ class LobbyState extends FlxTransitionableState {
 	var _skinNameLabels:Array<FlxText> = [];
 	var _selectedSkinIndex:Int = -1; // -1 means no skin selected
 	var _localReady:Bool = false;
+	var _waitingForOtherPlayer:Bool = false;
+	var _autoReadySkin:Int = -1;
 
 	// Layout constants
 	static inline var SKIN_ICON_NATIVE:Int = 32; // native pixel size of icons.png frames
@@ -64,7 +66,7 @@ class LobbyState extends FlxTransitionableState {
 		_txtTitle = new FlxText();
 		_txtTitle.setPosition(FlxG.width / 2, 20);
 		_txtTitle.setFormat(Main.menuFont, 40, TEXT_COLOR, FlxTextAlign.CENTER);
-		_txtTitle.text = "Lobby";
+		_txtTitle.text = if (GameManager.ME.net.isLocal()) "Single Player" else "Multiplayer";
 		add(_txtTitle);
 
 		_txtRoomID = new FlxText();
@@ -144,29 +146,33 @@ class LobbyState extends FlxTransitionableState {
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
 
 			#if (bot || db)
-			// auto-setup: set name, pick first available skin, auto-ready
-			// bot waits longer so the player's skin choice syncs first
+			// auto-setup: pick skin and ready
 			var autoName = #if bot "bot" #else "player" #end;
-			var skinDelay:Float = #if bot 1.5 #else 0.0 #end;
 			GameManager.ME.net.sendMessage("player_name_changed", {name: autoName});
-			FlxTimer.wait(skinDelay, () -> {
-				_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
-				if (_selectedSkinIndex > -1) {
-					GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
-				}
-				FlxTimer.wait(0.5, () -> {
-					if (_selectedSkinIndex >= 0) {
-						GameManager.ME.mySkinIndex = _selectedSkinIndex;
-						GameManager.ME.net.sendMessage("player_ready", true);
-						_localReady = true;
-					}
-				});
-			});
+
+			if (GameManager.ME.net.isLocal()) {
+				// Single player: pick first skin and ready immediately
+				_selectedSkinIndex = 0;
+				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+				GameManager.ME.mySkinIndex = _selectedSkinIndex;
+				GameManager.ME.net.sendMessage("player_ready", true);
+				_localReady = true;
+			} else {
+				// Multiplayer: wait for another player to appear, then pick skin and ready
+				#if bot
+				// Bot always picks second skin (index 1)
+				var mySkin = 1;
+				#else
+				// Player picks first skin (index 0)
+				var mySkin = 0;
+				#end
+				_autoReadySkin = mySkin;
+				_waitingForOtherPlayer = true;
+			}
 			#else
 			if (_inputField.text != null && _inputField.text != "") {
 				GameManager.ME.net.sendMessage("player_name_changed", {name: _inputField.text});
 			}
-
 			_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
 			if (_selectedSkinIndex > -1) {
 				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
@@ -318,6 +324,22 @@ class LobbyState extends FlxTransitionableState {
 	override public function update(elapsed:Float):Void {
 		super.update(elapsed);
 		_txtTitle.x = FlxG.width / 2 - _txtTitle.width / 2;
+
+		// Auto-ready once both players are in the room
+		if (_waitingForOtherPlayer && !_localReady) {
+			// Check if another player has joined (sessions includes self + others)
+			if (GameManager.ME.sessions.length > 0) {
+				trace('LobbyState: other player detected, auto-selecting skin ${_autoReadySkin} and readying');
+				_waitingForOtherPlayer = false;
+				_selectedSkinIndex = _autoReadySkin;
+				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+				FlxTimer.wait(0.5, () -> {
+					GameManager.ME.mySkinIndex = _selectedSkinIndex;
+					GameManager.ME.net.sendMessage("player_ready", true);
+					_localReady = true;
+				});
+			}
+		}
 
 		// Check for clicks on skin sprites
 		if (FlxG.mouse.justPressed) {

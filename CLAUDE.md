@@ -127,11 +127,11 @@ Two HashLink gotchas this harness handles (and why):
 
 **Agent testing workflow:** See [docs/dev-loop.md](docs/dev-loop.md) for the full development iteration loop. Summary: edit code → `touch .rebuild` → wait ~15s → `tail` log files (`colyseus.log`, `game_player.log`, `game_bot.log`, `build.log`) → `touch .screenshot` for visual checks → iterate. Do NOT run headless HL instances.
 
-**Stale binary detection:** Both server and client print a compile-time build timestamp on startup (`BUILD: <timestamp>` in client logs, `SERVER BUILD: <timestamp>` in colyseus.log). After a rebuild, **always verify the following before testing or reporting results:**
-1. Check `build.log` for `[server-build]` errors and `server build failed` — the server build must succeed first
-2. Check `colyseus.log` for `SERVER BUILD: <timestamp>` — confirms server binary is fresh
-3. Check `game_player.log` and `game_bot.log` for `BUILD: <timestamp>` — confirms client binaries are fresh
-4. If any timestamp is missing or unchanged from a previous build, the binary is stale — do NOT proceed with testing
+**Build verification — MANDATORY after every `.rebuild`:**
+After triggering a rebuild, you MUST check `build.log` for compilation errors BEFORE doing anything else. Do not check screenshots, do not check game logs, do not report results until you have confirmed the build succeeded. The verification steps are:
+1. Check `build.log` for `build failed`, `error`, `Unknown identifier`, `has no field`, `Type not found` — if ANY appear, the build failed and you must fix the errors first
+2. Check build timestamps (`BUILD:` in game logs, `SERVER BUILD:` in colyseus.log) — confirms binaries are fresh
+3. Only THEN proceed to check game behavior via logs/screenshots
 
 Server build output is tee'd to `build.log` with `[server-build]` prefix (haxe produces no stdout on success, only on error). Macros: `Macros.getBuildTimestamp()` in client (`source/misc/Macros.hx`), `BuildInfo.timestamp()` in server (`server/hxsrc/Main.hx`).
 

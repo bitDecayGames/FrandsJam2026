@@ -1,41 +1,44 @@
-source/Main.hx:54: BUILD: 2026-06-26 14:38:48
+source/Main.hx:54: BUILD: 2026-06-26 14:57:01
 source/config/Configure.hx:34: No API_KEY compile flag found. Production metrics will not work.
 com/bitdecay/analytics/Bitlytics.hx:70: Bitlytics dev mode set to: true
 com/bitdecay/analytics/Bitlytics.hx:85: sender failed validation, this will not work in a prod build: "authToken is empty"
 com/bitdecay/analytics/Bitlytics.hx:95: sender sanity call failed. bitlytics will likely fail in prod : SysError(Failed to connect on 34.196.233.7:443)
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "lobby_music" yet to be implemented
 source/managers/GameManager.hx:109: GameMan: joined as local_player
-source/Main.hx:85: Build Hash: b2eba362a7
+source/Main.hx:85: Build Hash: 5d83f3d7b7
 source/managers/GameManager.hx:349: set status: lobby -> lobby
 source/managers/GameManager.hx:293: players ready: lobby -> active
 source/managers/GameManager.hx:349: set status: active -> active
 source/managers/GameManager.hx:377: switch state based on status active
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "Play song" yet to be implemented
 bitdecay/flixel/system/QuickLog.hx:19: WARN: Player: onAnimFrameChange animName is null
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 1: 306, 210 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 306, 210
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 2: 178, 194 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 178, 194
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 3: 386, 162 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 386, 162
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 4: 322, 242 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 322, 242
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 5: 642, 514 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 642, 514
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 6: 434, 498 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 434, 498
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 1: 354, 178 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 354, 178
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 2: 306, 258 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 306, 258
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 3: 338, 194 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 338, 194
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 4: 354, 258 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 354, 258
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 5: 530, 514 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 530, 514
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 6: 530, 530 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 530, 530
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "worm_emerge" yet to be implemented
 com/bitdecay/analytics/Bitlytics.hx:186: Formatted 2 analytics:
-sessionStarted,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=111,sessionID=80000000-b5b4-4600-aa24-f149240ebc08 value=1 94904160
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=111,sessionID=80000000-b5b4-4600-aa24-f149240ebc08 value=10 94914160
+sessionStarted,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=1 95997160
+sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=10 96007160
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "worm_burrow" yet to be implemented
-bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "poop_splat" yet to be implemented
-com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=111,sessionID=80000000-b5b4-4600-aa24-f149240ebc08 value=20 94924160
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "poop_water_splash" yet to be implemented
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "splash_small" yet to be implemented
 com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=111,sessionID=80000000-b5b4-4600-aa24-f149240ebc08 value=30 94934160
+sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=20 96017160
+bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "poop_splat" yet to be implemented
 com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=111,sessionID=80000000-b5b4-4600-aa24-f149240ebc08 value=31 94935160
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: I got me an event about 453 clicks having happened.
+sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=30 96027160
+com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
+sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=40 96037160
+com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
+sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=50 96047160
+com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
+sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=60 96057160

@@ -624,10 +624,13 @@ class GameLogic {
 			var closestBX:Float = 0;
 			var closestBY:Float = 0;
 			var hasBobbers = false;
+			// Fish sprite is ~16x8; use center for distance checks
+			var fcx = f.x + 8;
+			var fcy = f.y + 4;
 			for (sid => bpos in bobberPositions) {
 				hasBobbers = true;
-				var dx = bpos.x - f.x;
-				var dy = bpos.y - f.y;
+				var dx = bpos.x - fcx;
+				var dy = bpos.y - fcy;
 				var dist = Math.sqrt(dx * dx + dy * dy);
 				if (dist < closestDist) { closestDist = dist; closestSid = sid; closestBX = bpos.x; closestBY = bpos.y; }
 			}

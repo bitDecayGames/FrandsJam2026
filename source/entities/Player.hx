@@ -615,8 +615,7 @@ class Player extends FlxSprite {
 
 		// Gather input — always, even when frozen (simulation needs continuous seq numbers)
 		#if bot
-		botTimer += delta;
-		var inputDir:Cardinal = if (botTimer % 4.0 < 2.0) E else W;
+		var inputDir:Cardinal = NONE;
 		#else
 		var inputDir = InputCalculator.getInputCardinal(playerNum);
 		#end
@@ -1074,7 +1073,9 @@ class Player extends FlxSprite {
 						catchFish();
 					}
 				case LANDED:
-					if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
+					if (SimpleController.just_pressed(A)
+						|| SimpleController.pressed(UP) || SimpleController.pressed(DOWN)
+						|| SimpleController.pressed(LEFT) || SimpleController.pressed(RIGHT)) {
 						catchFish();
 					}
 				default:
@@ -1093,7 +1094,7 @@ class Player extends FlxSprite {
 						castStartPos = null;
 					}
 					castState = LANDED;
-					frozen = false;
+					frozen = true;
 					playMovementAnim(true);
 					TODO.sfx("bobber_land");
 					if (onBobberLanded != null)
