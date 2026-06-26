@@ -48,3 +48,4 @@ screenshots/
 .screenshot
 .pid_player
 .pid_bot
+build.log

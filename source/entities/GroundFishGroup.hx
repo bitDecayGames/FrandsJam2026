@@ -7,6 +7,8 @@ import flixel.group.FlxGroup.FlxTypedGroup;
 class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 	var waterLayer:levels.ldtk.WaterGrid;
 
+	public var onPickedUp:(Float, Float) -> Void;
+
 	public function new() {
 		super();
 	}
@@ -20,10 +22,14 @@ class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 	}
 
 	function handleOverlap(player:Player, fish:GroundFish) {
-		if (fish.landing)
+		if (fish.landing) {
 			return;
+		}
 		if (!player.inventory.isFull()) {
 			player.pickupItem(Fish(fish.fishSpriteIndex, fish.lengthCm));
+			if (onPickedUp != null) {
+				onPickedUp(fish.x, fish.y);
+			}
 			fish.kill();
 		}
 	}

@@ -293,6 +293,8 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
 		GameManager.ME.net.onTimerSync.add(onTimerSync);
 		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
+		GameManager.ME.net.onGroundFishSpawn.add(onRemoteGroundFishSpawn);
+		GameManager.ME.net.onGroundFishPickup.add(onRemoteGroundFishPickup);
 
 		// Fish may have been added to the schema before we subscribed
 		// (server spawns fish on room creation, before clients join PlayState).
@@ -439,6 +441,9 @@ class PlayState extends FlxTransitionableState {
 			remote.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onRemoteSplash);
 		}
 		groundFishGroup.setWaterLayer(waterLayer);
+		groundFishGroup.onPickedUp = (fx, fy) -> {
+			GameManager.ME.net.sendMessage("ground_fish_pickup", {x: fx, y: fy});
+		};
 		#if local
 		spawnBushes();
 		#end
@@ -745,15 +750,22 @@ class PlayState extends FlxTransitionableState {
 		if (catcherSessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
 				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
+					// tell server to compute and broadcast landing position
+					GameManager.ME.net.sendMessage("ground_fish_drop", {
+						playerX: player.x + 8,
+						playerY: player.y - 14,
+						fishType: player.caughtFishSpriteIndex,
+						lengthCm: player.caughtFishLengthCm
+					});
 				}
 				player.onFishDelivered = null;
 			};
 			player.catchFish(true, catcherSessionId, fishId, fishType);
 		} else {
 			var remote = remotePlayers.get(catcherSessionId);
-			if (remote != null)
+			if (remote != null) {
 				remote.catchFish(true, catcherSessionId, fishId, fishType);
+			}
 		}
 	}
 
@@ -834,7 +846,12 @@ class PlayState extends FlxTransitionableState {
 		if (sessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
 				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
+					GameManager.ME.net.sendMessage("ground_fish_drop", {
+						playerX: player.x + 8,
+						playerY: player.y - 14,
+						fishType: player.caughtFishSpriteIndex,
+						lengthCm: player.caughtFishLengthCm
+					});
 				}
 				player.onFishDelivered = null;
 			};
@@ -853,6 +870,38 @@ class PlayState extends FlxTransitionableState {
 			var remote = remotePlayers.get(sessionId);
 			if (remote != null)
 				remote.catchFish(false, sessionId, null);
+		}
+	}
+
+	function onRemoteGroundFishSpawn(data:Dynamic) {
+		var startX:Float = data.startX;
+		var startY:Float = data.startY;
+		var landX:Float = data.landX;
+		var landY:Float = data.landY;
+		var fishType:Int = Std.int(data.fishType);
+		var lengthCm:Int = Std.int(data.lengthCm);
+		trace('ground_fish_spawn received: start=($startX,$startY) land=($landX,$landY) type=$fishType');
+		groundFishGroup.add(new entities.GroundFish(startX, startY, landX, landY, fishType, lengthCm));
+	}
+
+	function onRemoteGroundFishPickup(px:Float, py:Float) {
+		// find the closest ground fish to the reported position and kill it
+		var closest:entities.GroundFish = null;
+		var closestDist = Math.POSITIVE_INFINITY;
+		for (fish in groundFishGroup) {
+			if (fish == null || !fish.alive) {
+				continue;
+			}
+			var dx = fish.x - px;
+			var dy = fish.y - py;
+			var dist = dx * dx + dy * dy;
+			if (dist < closestDist) {
+				closestDist = dist;
+				closest = fish;
+			}
+		}
+		if (closest != null) {
+			closest.kill();
 		}
 	}
 

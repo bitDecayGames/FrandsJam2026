@@ -125,12 +125,7 @@ Two HashLink gotchas this harness handles (and why):
 
 **Testing etiquette:** the bot window should ONLY walk left/right — do **not** inject input (xdotool, etc.) to puppeteer the ready/round flow. Gameplay-flow changes (round transitions, ready) can be compile-verified and traced against logs, but runtime-verifying them requires the human to drive two windows; ask them to test rather than automating input.
 
-**Agent testing workflow:** The user runs `./bin/watch_net.sh` on their host machine. The agent triggers rebuilds by running `touch .rebuild` (or via the Stop hook). The watcher rebuilds both clients, relaunches them, and streams logs to three files in the project root:
-- `colyseus.log` — Colyseus server output
-- `game_player.log` — player client output
-- `game_bot.log` — bot client output
-
-The agent reads these log files to verify behavior — do NOT run headless HL instances. The user's watcher provides the real runtime environment. The workflow is: edit code → `touch .rebuild` → wait ~15s → `tail` the log files → iterate.
+**Agent testing workflow:** See [docs/dev-loop.md](docs/dev-loop.md) for the full development iteration loop. Summary: edit code → `touch .rebuild` → wait ~15s → `tail` log files (`colyseus.log`, `game_player.log`, `game_bot.log`, `build.log`) → `touch .screenshot` for visual checks → iterate. Do NOT run headless HL instances.
 
 ## Code Generation Pipelines
 

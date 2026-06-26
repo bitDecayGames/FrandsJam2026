@@ -66,6 +66,8 @@ class NetworkManager {
 	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
 	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
 	public var onCastStart = new FlxTypedSignal<String->String->Void>(); // sessionId, dir
+	public var onGroundFishSpawn = new FlxTypedSignal<Dynamic->Void>(); // {startX, startY, landX, landY, fishType, lengthCm}
+	public var onGroundFishPickup = new FlxTypedSignal<Float->Float->Void>(); // x, y (approximate match)
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 	public var onLocalPlayerAck = new FlxTypedSignal<PlayerState->Void>();
@@ -325,6 +327,14 @@ class NetworkManager {
 			onMsg("timer_sync", (message:Dynamic) -> {
 				trace('[NetMan] timer_sync received: runTimeSec=${message.runTimeSec} totalSec=${message.totalSec}');
 				onTimerSync.dispatch(message.runTimeSec, message.totalSec);
+			});
+
+			onMsg("ground_fish_spawn", (message:Dynamic) -> {
+				onGroundFishSpawn.dispatch(message);
+			});
+
+			onMsg("ground_fish_pickup", (message:Dynamic) -> {
+				onGroundFishPickup.dispatch(message.x, message.y);
 			});
 			}); // end runInMainThread
 		});

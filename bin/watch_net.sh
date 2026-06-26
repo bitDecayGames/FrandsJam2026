@@ -60,7 +60,7 @@ build_and_launch() {
     start_server
 
     echo -e "\033[36m[watch]\033[0m building player..."
-    $PLAYER_BUILD 2>&1 | tail -5
+    $PLAYER_BUILD 2>&1 | tee build.log | tail -5
     if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
         echo -e "\033[31m[watch]\033[0m player build failed!"
         return
@@ -77,7 +77,7 @@ build_and_launch() {
     cp -r export/hl/bin export/hl/bin_player 2>/dev/null
 
     echo -e "\033[36m[watch]\033[0m building bot..."
-    $BOT_BUILD 2>&1 | tail -5
+    $BOT_BUILD 2>&1 | tee -a build.log | tail -5
     if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
         echo -e "\033[31m[watch]\033[0m bot build failed!"
         return

@@ -115,6 +115,31 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			// frozen managed client-side
 		});
 
+		// Ground fish: player inventory full, server computes landing position
+		onMessage("ground_fish_drop", (client:Client, data:Dynamic) -> {
+			trace('${client.sessionId}: ground_fish_drop at (${data.playerX}, ${data.playerY})');
+			var px:Float = data.playerX;
+			var py:Float = data.playerY;
+			// compute random landing offset (same logic as GroundFishGroup.addFish)
+			var angle = Math.random() * Math.PI * 2;
+			var dist = 16 + Math.random() * 16;
+			var landX = px + Math.cos(angle) * dist;
+			var landY = py + Math.sin(angle) * dist;
+			// broadcast to ALL clients (including sender) so everyone uses the same position
+			broadcast("ground_fish_spawn", {
+				startX: px,
+				startY: py,
+				landX: landX,
+				landY: landY,
+				fishType: data.fishType,
+				lengthCm: data.lengthCm
+			});
+		});
+
+		onMessage("ground_fish_pickup", (client:Client, data:Dynamic) -> {
+			broadcast("ground_fish_pickup", data, {except: client});
+		});
+
 		onMessage("player_name_changed", (client:Client, data:{
 			name:String,
 		}) -> {
