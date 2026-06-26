@@ -613,51 +613,46 @@ class Player extends FlxSprite {
 			}
 		}
 
-		if (frozen) {
+		// Gather input — always, even when frozen (simulation needs continuous seq numbers)
+		#if bot
+		botTimer += delta;
+		var inputDir:Cardinal = if (botTimer % 4.0 < 2.0) E else W;
+		#else
+		var inputDir = InputCalculator.getInputCardinal(playerNum);
+		#end
+		if (!frozen && (inputDir == N || inputDir == S || inputDir == E || inputDir == W)) {
+			lastInputDir = inputDir;
+		}
+
+		if (simulation != null && playerState != null) {
+			// Server-authoritative mode: send movement input, predict locally
+			var dirAngle = if (frozen) -1 else cardinalToAngle(inputDir);
+			var inp:schema.GameState.P_Input = {
+				seq: ++inputSeq,
+				dir: dirAngle,
+				buttons: 0,
+				elapsed: delta
+			};
+			pendingInputs.push(inp);
+			GameManager.ME.net.sendInput(inp);
+			simulation.tickPlayer(playerState, [inp], delta);
+			setPosition(playerState.x, playerState.y);
+			velocity.set(0, 0);
+		} else if (frozen) {
 			velocity.set();
 		} else {
-			#if bot
-			// bot mode: walk left and right on a timer
-			botTimer += delta;
-			var inputDir:Cardinal = if (botTimer % 4.0 < 2.0) E else W;
-			#else
-			var inputDir = InputCalculator.getInputCardinal(playerNum);
-			#end
-			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
-				lastInputDir = inputDir;
-			}
-
-			if (simulation != null && playerState != null) {
-				// Server-authoritative mode: send movement input, predict locally
-				// Cast/throw use separate messages, not P_Input
-				var dirAngle = if (frozen) -1 else cardinalToAngle(inputDir);
-				var inp:schema.GameState.P_Input = {
-					seq: ++inputSeq,
-					dir: dirAngle,
-					buttons: 0,
-					elapsed: delta
-				};
-				pendingInputs.push(inp);
-				GameManager.ME.net.sendInput(inp);
-				// predict locally using same simulation as server
-				simulation.tickPlayer(playerState, [inp], delta);
-				setPosition(playerState.x, playerState.y);
-				velocity.set(0, 0);
+			// Local/offline mode: direct velocity (existing behavior)
+			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
+			if (hotModeActive) {
+				var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
+				if (moveDir != NONE) {
+					moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
+				}
 			} else {
-				// Local/offline mode: direct velocity (existing behavior)
-				var moveSpeed = inShallowWater ? speed * 0.5 : speed;
-				// Timer already ticked in the shared hot mode block above; just apply the velocity boost
-				if (hotModeActive) {
-					var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
-					if (moveDir != NONE) {
-						moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
-					}
+				if (inputDir != NONE) {
+					inputDir.asVector(velocity).normalize().scale(moveSpeed);
 				} else {
-					if (inputDir != NONE) {
-						inputDir.asVector(velocity).normalize().scale(moveSpeed);
-					} else {
-						velocity.set();
-					}
+					velocity.set();
 				}
 			}
 		}
@@ -1170,12 +1165,12 @@ class Player extends FlxSprite {
 
 	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null, fishType:Int = 0) {
 		if (castState == LANDED || castState == CASTING) {
-			if (!isRemote && !hasFish) {
-				GameManager.ME.net.sendLinePulled();
-				GameManager.ME.net.sendMessage("cast_retract", {});
-			}
-			// Tell server the bobber is no longer in the water
 			if (!isRemote) {
+				if (!hasFish) {
+					GameManager.ME.net.sendLinePulled();
+				}
+				// Tell server to unfreeze player and clear bobber position
+				GameManager.ME.net.sendMessage("cast_retract", {});
 				GameManager.ME.net.sendMessage("bobber_retracted", {});
 			}
 			if (hasFish) {

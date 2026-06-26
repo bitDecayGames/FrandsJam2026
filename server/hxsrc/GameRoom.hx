@@ -86,7 +86,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		onMessage("cast_start", (client:Client, data:{dir:String}) -> {
 			var player:PlayerState = state.players.get(client.sessionId);
 			if (player == null) { return; }
-			player.frozen = true;
+			// frozen managed client-side
 			broadcast("cast_start", {sessionId: client.sessionId, dir: data.dir}, {except: client});
 		});
 
@@ -105,14 +105,14 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		onMessage("cast_retract", (client:Client, _) -> {
 			var player:PlayerState = state.players.get(client.sessionId);
 			if (player == null) { return; }
-			player.frozen = false;
+			// frozen managed client-side
 			// line_pulled is already handled below for backward compat
 		});
 
 		onMessage("cast_cancel", (client:Client, _) -> {
 			var player:PlayerState = state.players.get(client.sessionId);
 			if (player == null) { return; }
-			player.frozen = false;
+			// frozen managed client-side
 		});
 
 		onMessage("player_name_changed", (client:Client, data:{

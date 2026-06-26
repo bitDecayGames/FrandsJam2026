@@ -33,14 +33,12 @@ class Simulation {
 		for (input in inputs) {
 			lastSeq = input.seq;
 
-			// movement only when not frozen by cast/throw
-			if (!p.frozen) {
-				if (input.dir != -1) {
-					var inDir = Vector.fromAngle(input.dir);
-					vx = inDir.x * p.speed;
-					vy = inDir.y * p.speed;
-					p.facing = dirToFacing(input.dir);
-				}
+			// dir == -1 means no movement (player is frozen or no input)
+			if (input.dir != -1) {
+				var inDir = Vector.fromAngle(input.dir);
+				vx = inDir.x * p.speed;
+				vy = inDir.y * p.speed;
+				p.facing = dirToFacing(input.dir);
 			}
 		}
 
