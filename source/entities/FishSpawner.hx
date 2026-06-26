@@ -28,28 +28,7 @@ class FishSpawner extends FlxTypedGroup<WaterFish> {
 		this.net = net;
 	}
 
-	override public function update(elapsed:Float) {
-		super.update(elapsed);
-
-		// Keep fish spread out — if two get too close, one flees
-		var members = this.members;
-		for (i in 0...members.length) {
-			var a = members[i];
-			if (a == null || !a.alive)
-				continue;
-			for (j in (i + 1)...members.length) {
-				var b = members[j];
-				if (b == null || !b.alive)
-					continue;
-				var dx = a.x - b.x;
-				var dy = a.y - b.y;
-				if (dx * dx + dy * dy < SEPARATION_DIST * SEPARATION_DIST) {
-					a.fleeFrom(b.x, b.y);
-					b.fleeFrom(a.x, a.y);
-				}
-			}
-		}
-	}
+	// Separation logic removed — server handles fish AI and separation
 
 	public function spawn(level:Level) {
 		var layer = level.waterGrid;

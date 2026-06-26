@@ -63,6 +63,7 @@ class PlayState extends FlxTransitionableState {
 
 	var midGroundGroup = new FlxGroup();
 	var ySortGroup = new FlxGroup();
+	var serverFishGroup = new FlxGroup();
 	var bushGroup = new FlxTypedGroup<Bush>();
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
@@ -137,6 +138,7 @@ class PlayState extends FlxTransitionableState {
 		add(wadersPickup);
 		add(pepperPickup);
 		add(fishSpawner);
+		add(serverFishGroup);
 		add(wormGroup);
 		add(ySortGroup);
 		add(transitions);
@@ -324,8 +326,7 @@ class PlayState extends FlxTransitionableState {
 		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true, fishState.fishType);
 		remoteFish.set(fishId, newFish);
 		fishSpawner.fishMap.set(fishId, newFish);
-		// add directly to state — fishSpawner group doesn't render fish added after create()
-		add(newFish);
+		serverFishGroup.add(newFish);
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
 
