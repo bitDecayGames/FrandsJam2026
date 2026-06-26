@@ -75,13 +75,13 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		spawnFish();
 
 		// Initialize worm data
-		wormTimer = 3.0;
+		wormTimer = 999; // don't spawn until a client requests via "start_gameplay"
 		nextWormId = 1;
 
 		// Initialize seagull data
 		seagulls = [];
 		nextSeagullId = 1;
-		seagullSpawnTimer = 3.0;
+		seagullSpawnTimer = 999; // don't spawn until a client requests via "start_gameplay"
 
 		// Pick wind angle and spawn clouds — sent to each client on join
 		windAngle = Math.random() * Math.PI * 2;
@@ -162,9 +162,19 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			// frozen managed client-side
 		});
 
-		// Client requests cloud data after PlayState loads
-		onMessage("request_clouds", (client:Client, _) -> {
+		// Client signals PlayState is loaded — start spawning creatures
+		onMessage("start_gameplay", (client:Client, _) -> {
+			// send cloud data
 			client.send("cloud_sync", {angle: windAngle, clouds: clouds});
+			// send any existing seagulls
+			for (gull in seagulls) {
+				client.send("seagull_spawn", {id: gull.id, x: gull.x, y: gull.y, velX: gull.velX, velY: gull.velY, altitude: gull.altitude});
+			}
+			// start spawning if this is the first client ready
+			if (seagullSpawnTimer > 100) {
+				seagullSpawnTimer = 3.0;
+				wormTimer = 3.0;
+			}
 		});
 
 		// Ground fish: player inventory full, server computes landing position
@@ -972,7 +982,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		var grid = col.tileSize;
 
 		// try to find a valid spawn point (not solid, not shallow, not water)
-		for (_ in 0...10) {
+		for (_ in 0...50) {
 			var cx = Std.int(Math.random() * w);
 			var cy = Std.int(Math.random() * h);
 			if (col.isSolidAt(cx * grid + 1, cy * grid + 1)) {

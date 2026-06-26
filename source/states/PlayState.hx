@@ -303,8 +303,8 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onGroundFishPickup.add(onRemoteGroundFishPickup);
 		GameManager.ME.net.onWormKilled.add(onRemoteWormKilled);
 		GameManager.ME.net.onCloudSync.add(onServerCloudSync);
-		// Request cloud data from server (can't be sent on join — handlers not ready)
-		GameManager.ME.net.sendMessage("request_clouds", {});
+		// Tell server we're ready — triggers cloud sync, existing seagulls, and starts spawning
+		GameManager.ME.net.sendMessage("start_gameplay", {});
 		GameManager.ME.net.onWormSpawn.add(onServerWormSpawn);
 		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
