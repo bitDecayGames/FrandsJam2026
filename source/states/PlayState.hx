@@ -275,6 +275,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 		GameManager.ME.net.onTimerSync.remove(onTimerSync);
 		GameManager.ME.net.onLocalPlayerAck.remove(onServerAck);
+		GameManager.ME.net.onWormSpawn.remove(onServerWormSpawn);
 		GameManager.ME.net.onSeagullSpawn.remove(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.remove(onServerSeagullPoop);
 		GameManager.ME.net.onSeagullDespawn.remove(onServerSeagullDespawn);
@@ -300,9 +301,11 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
 		GameManager.ME.net.onGroundFishSpawn.add(onRemoteGroundFishSpawn);
 		GameManager.ME.net.onGroundFishPickup.add(onRemoteGroundFishPickup);
+		GameManager.ME.net.onWormKilled.add(onRemoteWormKilled);
 		GameManager.ME.net.onCloudSync.add(onServerCloudSync);
 		// Request cloud data from server (can't be sent on join — handlers not ready)
 		GameManager.ME.net.sendMessage("request_clouds", {});
+		GameManager.ME.net.onWormSpawn.add(onServerWormSpawn);
 		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
 		GameManager.ME.net.onSeagullDespawn.add(onServerSeagullDespawn);
@@ -1035,7 +1038,7 @@ class PlayState extends FlxTransitionableState {
 				TODO.sfx("worm_squish");
 				midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
 				worm.kill();
-				GameManager.ME.net.sendMessage("worm_killed", {});
+				GameManager.ME.net.sendMessage("worm_killed", {id: worm.wormId});
 				GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
 			});
 			if (shop != null && FlxG.overlap(shop, player)) {
@@ -1072,7 +1075,9 @@ class PlayState extends FlxTransitionableState {
 
 			updateSparkles(elapsed);
 			updateSeagulls(elapsed);
+			#if local
 			updateWorms(elapsed);
+			#end
 		}
 	}
 
@@ -1096,6 +1101,23 @@ class PlayState extends FlxTransitionableState {
 				add(CloudShadow.fromServer(cd));
 			}
 		}
+	}
+
+	function onRemoteWormKilled(sessionId:String, wormId:Int) {
+		for (worm in wormGroup) {
+			if (worm != null && worm.alive && worm.wormId == wormId) {
+				TODO.sfx("worm_squish");
+				midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
+				worm.kill();
+				break;
+			}
+		}
+	}
+
+	function onServerWormSpawn(data:Dynamic) {
+		var w = new Worm(data.srcX, data.srcY, data.destX, data.destY);
+		w.wormId = Std.int(data.id);
+		wormGroup.add(w);
 	}
 
 	function onServerSeagullSpawn(data:Dynamic) {

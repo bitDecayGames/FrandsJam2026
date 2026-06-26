@@ -56,7 +56,18 @@ ls screenshots/
 
 Screenshots are captured via `xdotool` + ImageMagick `import`. Requires both installed on the host. The watcher writes game PIDs to `.pid_player` and `.pid_bot` for the screenshot listener.
 
-### 6. Iterate
+### 6. Verify both clients are running
+After every rebuild, check that BOTH clients are alive — not just one:
+```bash
+grep -i "SIGNAL\|Uncaught\|Fatal\|longjmp" game_player.log | tail -3
+grep -i "SIGNAL\|Uncaught\|Fatal\|longjmp" game_bot.log | tail -3
+```
+If either shows a crash, investigate before continuing. Common crashes:
+- `SIGNAL 11` — segfault, often GPU buffer overflow from too many sprites
+- `Uncaught exception: Null access` — null field access, check stack trace
+- `longjmp` — threading issue, check Colyseus callback marshaling
+
+### 7. Iterate
 Go back to step 1. Fix issues found in logs/screenshots.
 
 ## Log Files

@@ -171,7 +171,7 @@ class GameManager {
 	}
 
 	/** Record a worm kill for the current round. */
-	public function recordWormKill(sessionId:String) {
+	public function recordWormKill(sessionId:String, wormId:Int = 0) {
 		while (wormKills.length <= currentRoundNumber) {
 			wormKills.push(new Map<String, Int>());
 		}

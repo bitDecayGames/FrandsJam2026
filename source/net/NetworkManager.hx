@@ -60,7 +60,7 @@ class NetworkManager {
 	public var onScoreChanged = new FlxTypedSignal<String->Int->Void>(); // sessionId, score
 	public var onFishSold = new FlxTypedSignal<String->Int->Int->Int->Void>(); // sessionId, fishType, lengthCm, value
 	public var onWeedBurst = new FlxTypedSignal<String->Int->Void>(); // sessionId, index
-	public var onWormKilled = new FlxTypedSignal<String->Void>(); // sessionId
+	public var onWormKilled = new FlxTypedSignal<String->Int->Void>(); // sessionId, wormId
 	public var onWorldItems = new FlxTypedSignal<Dynamic->Void>();
 	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
 	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
@@ -72,6 +72,7 @@ class NetworkManager {
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 	public var onLocalPlayerAck = new FlxTypedSignal<PlayerState->Void>();
 	public var onCloudSync = new FlxTypedSignal<Dynamic->Void>(); // {angle, clouds}
+	public var onWormSpawn = new FlxTypedSignal<Dynamic->Void>(); // {id, srcX, srcY, destX, destY}
 	public var onSeagullSpawn = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, velX, velY, altitude}
 	public var onSeagullPoop = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, fallDist, birdVelX, hitWater}
 	public var onSeagullDespawn = new FlxTypedSignal<Dynamic->Void>(); // {id}
@@ -303,7 +304,11 @@ class NetworkManager {
 
 			onMsg("worm_killed", (message:Dynamic) -> {
 				trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
-				onWormKilled.dispatch(message.sessionId);
+				onWormKilled.dispatch(message.sessionId, Std.int(message.id));
+			});
+
+			onMsg("worm_spawn", (message:Dynamic) -> {
+				onWormSpawn.dispatch(message);
 			});
 
 			onMsg("hot_pepper", (message:Dynamic) -> {

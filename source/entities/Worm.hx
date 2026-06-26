@@ -10,6 +10,7 @@ enum WormState {
 }
 
 class Worm extends FlxSprite {
+	public var wormId:Int = 0;
 	static inline var CRAWL_SPEED:Float = 20;
 	static inline var FRAME_W:Int = 32;
 	static inline var FRAME_H:Int = 8;

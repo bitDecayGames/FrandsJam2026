@@ -22,6 +22,10 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	var nextFishID:Int;
 	var ldtkRaw:Dynamic; // cached level data for flood-fill
 
+	// Worm spawning data
+	var wormTimer:Float;
+	var nextWormId:Int;
+
 	// Seagull AI data
 	var seagulls:Array<{
 		id:Int,
@@ -69,6 +73,10 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 		// Spawn server-owned fish
 		spawnFish();
+
+		// Initialize worm data
+		wormTimer = 3.0;
+		nextWormId = 1;
 
 		// Initialize seagull data
 		seagulls = [];
@@ -268,8 +276,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 		// sent when a player kills a worm
 		onMessage("worm_killed", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "worm_killed"');
-			broadcast("worm_killed", {sessionId: client.sessionId}, {except: client});
+			trace('${client.sessionId}: sent "worm_killed" id=${data.id}');
+			broadcast("worm_killed", {sessionId: client.sessionId, id: data.id}, {except: client});
 		});
 
 		// sent when a player activates or deactivates hot pepper mode
@@ -950,6 +958,63 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		}
 	}
 
+	/** Spawn worms on valid ground tiles at regular intervals. */
+	function updateWorms(t:Float) {
+		wormTimer -= t;
+		if (wormTimer > 0) {
+			return;
+		}
+		wormTimer = 2.5 + Math.random() * 2.0;
+
+		var col = state.collision;
+		var w = col.cols;
+		var h = col.rows;
+		var grid = col.tileSize;
+
+		// try to find a valid spawn point (not solid, not shallow, not water)
+		for (_ in 0...10) {
+			var cx = Std.int(Math.random() * w);
+			var cy = Std.int(Math.random() * h);
+			if (col.isSolidAt(cx * grid + 1, cy * grid + 1)) {
+				continue;
+			}
+			if (col.isShallowAt(cx * grid + 1, cy * grid + 1)) {
+				continue;
+			}
+			if (col.isSwimmableAt(cx, cy)) {
+				continue;
+			}
+
+			var srcX = cx * grid + Math.random() * grid;
+			var srcY = cy * grid + Math.random() * grid;
+
+			// pick destination 2-4 tiles left or right
+			var dir = if (Math.random() > 0.5) 1 else -1;
+			var dist = 2 + Std.int(Math.random() * 3);
+			var destX = srcX + dir * dist * grid;
+			var destY = srcY;
+
+			// check destination is valid
+			var destCx = Std.int(destX / grid);
+			var destCy = Std.int(destY / grid);
+			if (destCx < 0 || destCx >= w || destCy < 0 || destCy >= h) {
+				continue;
+			}
+			if (col.isSolidAt(destCx * grid + 1, destCy * grid + 1)) {
+				continue;
+			}
+			if (col.isShallowAt(destCx * grid + 1, destCy * grid + 1)) {
+				continue;
+			}
+			if (col.isSwimmableAt(destCx, destCy)) {
+				continue;
+			}
+
+			broadcast("worm_spawn", {id: nextWormId++, srcX: srcX, srcY: srcY, destX: destX, destY: destY});
+			break;
+		}
+	}
+
 	function serverUpdate(delta:Float) {
 		elapsedTime += delta / 1000;
 		var fixedStep = Simulation.FIXED_STEP;
@@ -978,5 +1043,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 
 		// Update server-side seagulls
 		updateSeagulls(t);
+
+		// Update server-side worms
+		updateWorms(t);
 	}
 }
