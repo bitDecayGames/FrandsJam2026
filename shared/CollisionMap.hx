@@ -17,6 +17,10 @@ class CollisionMap {
 	public static inline var FLAG_SHALLOW = 2;
 	public static inline var FLAG_SWIMMABLE = 4;
 	public static inline var FLAG_HAS_POLYGON = 8;
+	public static inline var FLAG_DIRT = 16;
+
+	// Tile IDs known to be dirt (from devTiles.png tileset analysis)
+	static var DIRT_TILE_IDS:Array<Int> = [3, 4];
 
 	public var cols(default, null):Int;
 	public var rows(default, null):Int;
@@ -105,6 +109,13 @@ class CollisionMap {
 				if (map.tilePolygons.exists(tileId)) {
 					flags |= FLAG_HAS_POLYGON;
 				}
+				// tag dirt tiles by their tile ID
+				for (dirtId in DIRT_TILE_IDS) {
+					if (tileId == dirtId) {
+						flags |= FLAG_DIRT;
+						break;
+					}
+				}
 				map.cellFlags[idx] = flags;
 			}
 		}
@@ -134,6 +145,14 @@ class CollisionMap {
 			return false;
 		}
 		return (cellFlags[cellIdx(col, row)] & FLAG_SHALLOW) != 0;
+	}
+
+	/** Returns true if the given grid cell is DIRT. **/
+	public function isDirtAt(col:Int, row:Int):Bool {
+		if (col < 0 || col >= cols || row < 0 || row >= rows) {
+			return false;
+		}
+		return (cellFlags[cellIdx(col, row)] & FLAG_DIRT) != 0;
 	}
 
 	/** Returns true if the given grid cell is SWIMMABLE. **/

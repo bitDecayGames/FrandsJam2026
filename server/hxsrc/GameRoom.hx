@@ -981,44 +981,46 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		var h = col.rows;
 		var grid = col.tileSize;
 
-		// try to find a valid spawn point (not solid, not shallow, not water)
+		// try to find a valid dirt spawn point
 		for (_ in 0...50) {
 			var cx = Std.int(Math.random() * w);
 			var cy = Std.int(Math.random() * h);
-			if (col.isSolidAt(cx * grid + 1, cy * grid + 1)) {
-				continue;
-			}
-			if (col.isShallowAt(cx * grid + 1, cy * grid + 1)) {
-				continue;
-			}
-			if (col.isSwimmableAt(cx, cy)) {
+			if (!col.isDirtAt(cx, cy)) {
 				continue;
 			}
 
 			var srcX = cx * grid + Math.random() * grid;
 			var srcY = cy * grid + Math.random() * grid;
 
-			// pick destination 2-4 tiles left or right
+			// pick destination 2-4 tiles left or right, must also be dirt
 			var dir = if (Math.random() > 0.5) 1 else -1;
 			var dist = 2 + Std.int(Math.random() * 3);
-			var destX = srcX + dir * dist * grid;
-			var destY = srcY;
-
-			// check destination is valid
-			var destCx = Std.int(destX / grid);
-			var destCy = Std.int(destY / grid);
+			var destCx = cx + dir * dist;
+			var destCy = cy;
 			if (destCx < 0 || destCx >= w || destCy < 0 || destCy >= h) {
 				continue;
 			}
-			if (col.isSolidAt(destCx * grid + 1, destCy * grid + 1)) {
+			if (!col.isDirtAt(destCx, destCy)) {
 				continue;
 			}
-			if (col.isShallowAt(destCx * grid + 1, destCy * grid + 1)) {
+
+			// verify path is all dirt
+			var pathOk = true;
+			var stepDir = if (dir > 0) 1 else -1;
+			var step = cx + stepDir;
+			while (step != destCx) {
+				if (!col.isDirtAt(step, cy)) {
+					pathOk = false;
+					break;
+				}
+				step += stepDir;
+			}
+			if (!pathOk) {
 				continue;
 			}
-			if (col.isSwimmableAt(destCx, destCy)) {
-				continue;
-			}
+
+			var destX = destCx * grid + Math.random() * grid;
+			var destY = destCy * grid + Math.random() * grid;
 
 			broadcast("worm_spawn", {id: nextWormId++, srcX: srcX, srcY: srcY, destX: destX, destY: destY});
 			break;
