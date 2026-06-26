@@ -378,6 +378,8 @@ class PlayState extends FlxTransitionableState {
 		player.playerState.speed = 100;
 		player.playerState.width = 16;
 		player.playerState.height = 8;
+		// tell server our spawn position so its PlayerState starts correctly
+		GameManager.ME.net.sendMessage("set_position", {x: player.x, y: player.y});
 		#end
 
 		camera.follow(player, TOPDOWN);

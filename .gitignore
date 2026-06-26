@@ -38,3 +38,6 @@ dump/
 
 # lime rebuild artifacts
 .rebuild
+
+# local FMOD SDK for testing
+/sdk

@@ -49,6 +49,16 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
+		// client tells server where it spawned so the server's PlayerState
+		// starts at the right position (server doesn't run Flixel spawn logic)
+		onMessage("set_position", (client:Client, data:{x:Float, y:Float}) -> {
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player != null) {
+				player.x = data.x;
+				player.y = data.y;
+			}
+		});
+
 		onMessage("player_name_changed", (client:Client, data:{
 			name:String,
 		}) -> {
