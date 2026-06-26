@@ -632,11 +632,7 @@ class Player extends FlxSprite {
 				var dirAngle = cardinalToAngle(inputDir);
 				var buttonMask = 0;
 				#if bot
-				// bot simulates A press: hold A for 0.5s every 6 seconds to cast
-				var castCycle = botTimer % 6.0;
-				if (castCycle >= 3.0 && castCycle < 3.5) {
-					buttonMask |= schema.PlayerState.BUTTON_A;
-				}
+				// bot doesn't cast — just walks for now
 				#else
 				if (SimpleController.pressed(A)) {
 					buttonMask |= schema.PlayerState.BUTTON_A;

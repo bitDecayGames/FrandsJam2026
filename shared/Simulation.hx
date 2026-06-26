@@ -40,17 +40,12 @@ class Simulation {
 					if ((input.buttons & PlayerState.BUTTON_A) != 0) {
 						trace('[SIM] ${p.lastProcessedSeq}: IDLE -> CHARGING');
 						p.controlState = PlayerState.CONTROL_STATE_CHARGING;
-						return;
+					} else if (input.dir != -1) {
+						var inDir = Vector.fromAngle(input.dir);
+						vx = inDir.x * p.speed;
+						vy = inDir.y * p.speed;
+						p.actionIntent = PlayerState.ACTION_RUN;
 					}
-
-					if (input.dir == -1) {
-						// no input direction provided
-						continue;
-					}
-					var inDir = Vector.fromAngle(input.dir);
-					vx = inDir.x * p.speed;
-					vy = inDir.y * p.speed;
-					p.actionIntent = PlayerState.ACTION_RUN;
 				case PlayerState.CONTROL_STATE_CHARGING:
 					if ((input.buttons & PlayerState.BUTTON_A) == 0) {
 						trace('[SIM] ${p.lastProcessedSeq}: CHARGING -> CASTING');
