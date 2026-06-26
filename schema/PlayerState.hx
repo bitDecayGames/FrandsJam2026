@@ -11,6 +11,23 @@ import io.colyseus.serializer.schema.types.MapSchema;
 #end
 
 class PlayerState extends Schema {
+	public static final CONTROL_STATE_IDLE = "idle";
+	public static final CONTROL_STATE_CHARGING = "charging";
+	public static final CONTROL_STATE_CASTING = "casting";
+	public static final CONTROL_STATE_WAITING = "waiting";
+	public static final CONTROL_STATE_RETURNING = "returning";
+
+	public static final BUTTON_A = 1 << 0;
+	public static final BUTTON_B = 1 << 1;
+
+	public static final ACTION_IDLE = "idle";
+	public static final ACTION_RUN = "run";
+
+	public static final FACING_UP = 1;
+	public static final FACING_RIGHT = 2;
+	public static final FACING_DOWN = 3;
+	public static final FACING_LEFT = 4;
+
 	@:type("float32") public var x:Float;
 	@:type("float32") public var y:Float;
 	@:type("float32") public var velocityX:Float;
@@ -19,6 +36,16 @@ class PlayerState extends Schema {
 	@:type("string") public var name:String;
 	@:type("int8") public var skinIndex:Int;
 	@:type("int32") public var score:Int;
+	@:type("int32") public var lastProcessedSeq:Int;
+	@:type("float32") public var speed:Float;
+	@:type("float32") public var width:Float;
+	@:type("float32") public var height:Float;
+	@:type("string") public var controlState:String;
+	@:type("string") public var actionIntent:String;
+	@:type("string") public var actionState:String;
+	@:type("uint8") public var facing:Int;
+
+	public var cd:utils.Cooldowns;
 
 	public function new() {
 		super();
@@ -30,5 +57,35 @@ class PlayerState extends Schema {
 		name = "";
 		skinIndex = -1;
 		score = 0;
+		lastProcessedSeq = 0;
+		speed = 100;
+		width = 16;
+		height = 8;
+		controlState = CONTROL_STATE_IDLE;
+		actionIntent = ACTION_IDLE;
+		actionState = ACTION_IDLE;
+		facing = FACING_DOWN;
+		cd = new utils.Cooldowns();
+	}
+
+	public static function copy(source:PlayerState):PlayerState {
+		var s = new PlayerState();
+		s.x = source.x;
+		s.y = source.y;
+		s.velocityX = source.velocityX;
+		s.velocityY = source.velocityY;
+		s.speed = source.speed;
+		s.width = source.width;
+		s.height = source.height;
+		s.name = source.name;
+		s.skinIndex = source.skinIndex;
+		s.score = source.score;
+		s.lastProcessedSeq = source.lastProcessedSeq;
+		s.ready = source.ready;
+		s.controlState = source.controlState;
+		s.actionIntent = source.actionIntent;
+		s.actionState = source.actionState;
+		s.facing = source.facing;
+		return s;
 	}
 }

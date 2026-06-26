@@ -10,7 +10,15 @@ import io.colyseus.serializer.schema.types.ArraySchema;
 import io.colyseus.serializer.schema.types.MapSchema;
 #end
 
+typedef P_Input = {
+	seq:Int,
+	dir:Int,
+	buttons:Int,
+	elapsed:Float
+};
+
 class GameState extends Schema {
+	public static inline var MSG_P_INPUT = "player_input";
 	#if server
 	// Maps and direct references seem to need slightly different type hits to compile properly
 	@:type({map: PlayerState}) public var players:MapSchema<PlayerState>;
@@ -29,6 +37,9 @@ class GameState extends Schema {
 	@:type("float32") public var shopY:Float;
 	@:type("boolean") public var shopReady:Bool;
 
+	public var collision:CollisionMap;
+	public var inputQueue:Map<String, Array<P_Input>>;
+
 	public function new() {
 		super();
 		players = new MapSchema<PlayerState>();
@@ -38,5 +49,6 @@ class GameState extends Schema {
 		shopX = 0;
 		shopY = 0;
 		shopReady = false;
+		inputQueue = new Map();
 	}
 }

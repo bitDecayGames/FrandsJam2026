@@ -9,6 +9,7 @@ import io.colyseus.Room;
 import io.colyseus.serializer.schema.Callbacks;
 import schema.BushState;
 import schema.GameState;
+import schema.GameState.P_Input;
 import schema.PlayerState;
 import schema.FishState;
 import schema.RoundState;
@@ -66,6 +67,7 @@ class NetworkManager {
 	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
+	public var onLocalPlayerAck = new FlxTypedSignal<PlayerState->Void>();
 
 	public static inline var roomName:String = "game_room";
 
@@ -157,6 +159,9 @@ class NetworkManager {
 			cb.onAdd(room.state, "players", (player:PlayerState, sessionId:String) -> {
 				playerDebugTrace('NetworkManager: player added $sessionId');
 				if (sessionId == mySessionId) {
+					cb.listen(player, "lastProcessedSeq", (_, _) -> {
+						onLocalPlayerAck.dispatch(player);
+					});
 					return;
 				}
 				onPlayerAdded.dispatch(sessionId, {state: player});
@@ -374,6 +379,11 @@ class NetworkManager {
 
 	public function sendBushRustle(index:Int, dirX:Float, dirY:Float) {
 		sendMessage("bush_rustle", {index: index, dirX: dirX, dirY: dirY});
+	}
+
+	public function sendInput(input:P_Input) {
+		#if local return; #end
+		sendMessage(GameState.MSG_P_INPUT, [input], true);
 	}
 
 	public function sendMove(x:Float, y:Float, velocityX:Float, velocityY:Float) {

@@ -1,4 +1,5 @@
 import schema.GameState;
+import schema.GameState.P_Input;
 import schema.BushState;
 import schema.FishState;
 import schema.PlayerState;
@@ -9,27 +10,42 @@ import colyseus.server.Room.RoomOf;
 import colyseus.server.Room.CloseCode;
 import haxe.extern.EitherType;
 import js.lib.Promise;
+import Ldtk.LdtkProject;
 
 class GameRoom extends RoomOf<GameState, Dynamic> {
+	var simulation:Simulation;
+	var elapsedTime:Float;
+
 	override public function onCreate(options:Dynamic):Void {
+		elapsedTime = 0;
 		maxClients = 6;
 		setState(new GameState());
 
+		// Build collision map from level data
+		var hitboxJson = sys.io.File.getContent("../assets/data/tile-hitboxes.json");
+		var ldtkProject = new LdtkProject();
+		var raw = ldtkProject.getLevel("Level_0");
+		state.collision = CollisionMap.fromLevel(raw, hitboxJson);
+		simulation = new Simulation(state.collision);
+		state.inputQueue = new Map();
+
+		// Start fixed-tick simulation loop
+		this.setSimulationInterval(this.serverUpdate);
+
 		trace('start room: ${roomId}:${roomName}');
 
-		// sent when a player moves
-		onMessage("move", (client:Client, data:{
-			x:Float,
-			y:Float,
-			velocityX:Float,
-			velocityY:Float
-		}) -> {
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.x = data.x;
-				player.y = data.y;
-				player.velocityX = data.velocityX;
-				player.velocityY = data.velocityY;
+		onMessage("player_input", (client:Client, data:Array<P_Input>) -> {
+			if (!state.players.has(client.sessionId)) {
+				return;
+			}
+			if (!state.inputQueue.exists(client.sessionId)) {
+				state.inputQueue.set(client.sessionId, []);
+			}
+			if (data == null) {
+				return;
+			}
+			for (input in (data : Array<P_Input>)) {
+				state.inputQueue.get(client.sessionId).push(input);
 			}
 		});
 
@@ -299,6 +315,12 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	override public function onJoin(client:Client, ?options:Dynamic):EitherType<Void, Promise<Dynamic>> {
 		trace('player joined: ${client.sessionId}');
 		state.players.set(client.sessionId, new PlayerState());
+		state.inputQueue.set(client.sessionId, []);
+		// Set player hitbox dimensions for simulation
+		var ps = state.players.get(client.sessionId);
+		ps.speed = 100;
+		ps.width = 16;
+		ps.height = 8;
 
 		// Set host
 		if (state.hostSessionId == null || state.hostSessionId == "") {
@@ -312,6 +334,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 	override public function onLeave(client:Client, ?code:CloseCode):EitherType<Void, Promise<Dynamic>> {
 		trace('player left: ${client.sessionId}');
 		trace('successful clear: ${state.players.delete(client.sessionId)}');
+		state.inputQueue.remove(client.sessionId);
 
 		// Clear/rotate host
 		if (client.sessionId == state.hostSessionId) {
@@ -335,5 +358,29 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		}
 
 		return null;
+	}
+
+	function serverUpdate(delta:Float) {
+		elapsedTime += delta / 1000;
+		var fixedStep = Simulation.FIXED_STEP;
+		while (elapsedTime >= fixedStep) {
+			elapsedTime -= fixedStep;
+			fixedTick(fixedStep);
+		}
+	}
+
+	function fixedTick(t:Float) {
+		for (id => p in state.players) {
+			var queue = state.inputQueue.get(id);
+			if (queue == null || queue.length == 0) {
+				p.velocityX = 0;
+				p.velocityY = 0;
+				continue;
+			}
+			for (inp in queue) {
+				simulation.tickPlayer(p, [inp], inp.elapsed);
+			}
+			queue.splice(0, queue.length);
+		}
 	}
 }

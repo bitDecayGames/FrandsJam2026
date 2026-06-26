@@ -52,6 +52,16 @@ class Player extends FlxSprite {
 
 	public var skinIndex:Int = 0;
 
+	public static function cardinalToAngle(dir:Cardinal):Int {
+		return switch (dir) {
+			case N: 0;
+			case E: 90;
+			case S: 180;
+			case W: 270;
+			default: -1;
+		};
+	}
+
 	var speed:Float = 100;
 	var playerNum = 0;
 
@@ -70,6 +80,13 @@ class Player extends FlxSprite {
 	static inline var DROWN_HIDE_DURATION:Float = 2.0;
 	static inline var DROWN_BLINK_RATE:Float = 0.15;
 	static inline var DROWN_BLINK_COUNT:Int = 3;
+
+	// Client-side prediction
+	public var simulation:Simulation;
+	public var playerState:schema.PlayerState;
+
+	var pendingInputs:Array<schema.GameState.P_Input> = [];
+	var inputSeq:Int = 0;
 
 	public var inventory = new Inventory();
 	public var score:Int = 0;
@@ -601,18 +618,36 @@ class Player extends FlxSprite {
 				lastInputDir = inputDir;
 			}
 
-			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
-			// Timer already ticked in the shared hot mode block above; just apply the velocity boost
-			if (hotModeActive) {
-				var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
-				if (moveDir != NONE) {
-					moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
-				}
+			if (simulation != null && playerState != null) {
+				// Server-authoritative mode: send input packet, predict locally
+				var dirAngle = cardinalToAngle(inputDir);
+				var inp:schema.GameState.P_Input = {
+					seq: ++inputSeq,
+					dir: dirAngle,
+					buttons: 0,
+					elapsed: delta
+				};
+				pendingInputs.push(inp);
+				GameManager.ME.net.sendInput(inp);
+				// predict locally using same simulation as server
+				simulation.tickPlayer(playerState, [inp], delta);
+				setPosition(playerState.x, playerState.y);
+				velocity.set(0, 0);
 			} else {
-				if (inputDir != NONE) {
-					inputDir.asVector(velocity).normalize().scale(moveSpeed);
+				// Local/offline mode: direct velocity (existing behavior)
+				var moveSpeed = inShallowWater ? speed * 0.5 : speed;
+				// Timer already ticked in the shared hot mode block above; just apply the velocity boost
+				if (hotModeActive) {
+					var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
+					if (moveDir != NONE) {
+						moveDir.asVector(velocity).normalize().scale(moveSpeed * 1.5);
+					}
 				} else {
-					velocity.set();
+					if (inputDir != NONE) {
+						inputDir.asVector(velocity).normalize().scale(moveSpeed);
+					} else {
+						velocity.set();
+					}
 				}
 			}
 		}
@@ -652,8 +687,6 @@ class Player extends FlxSprite {
 		updateReticle();
 
 		clampToWorldBounds();
-
-		GameManager.ME.net.sendMove(x, y, velocity.x, velocity.y);
 	}
 
 	function clampToWorldBounds() {
@@ -1293,6 +1326,26 @@ class Player extends FlxSprite {
 
 		frozen = false;
 		velocity.set(0, 0);
+	}
+
+	public function reconcileFromServer(serverState:schema.PlayerState) {
+		var ack = serverState.lastProcessedSeq;
+		// drop all inputs the server has already processed
+		while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
+			pendingInputs.shift();
+		}
+		// snap to server-authoritative position
+		playerState.x = serverState.x;
+		playerState.y = serverState.y;
+		playerState.velocityX = serverState.velocityX;
+		playerState.velocityY = serverState.velocityY;
+		// re-apply unacknowledged inputs for prediction
+		if (simulation != null) {
+			for (inp in pendingInputs) {
+				simulation.tickPlayer(playerState, [inp], inp.elapsed);
+			}
+		}
+		setPosition(playerState.x, playerState.y);
 	}
 
 	private function cleanupNetwork() {

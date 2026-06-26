@@ -30,6 +30,7 @@
 
 	<set name="BUILD_DIR" value="export" />
 	<classpath name="source" />
+	<classpath name="shared" />
 	<classpath name="tools" />
 	<assets path="assets" />
 

@@ -96,6 +96,7 @@ class PlayState extends FlxTransitionableState {
 	var mainCameraBounds:FlxRect;
 
 	var ldtk = new LdtkProject();
+	var simulation:Simulation;
 
 	var round:RoundManager;
 
@@ -268,6 +269,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 		GameManager.ME.net.onTimerSync.remove(onTimerSync);
+		GameManager.ME.net.onLocalPlayerAck.remove(onServerAck);
 	}
 
 	function setupNetwork() {
@@ -286,6 +288,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
 		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
 		GameManager.ME.net.onTimerSync.add(onTimerSync);
+		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -330,6 +333,11 @@ class PlayState extends FlxTransitionableState {
 		mainWorldBounds = FlxRect.get();
 		mainWorldBounds.copyFrom(FlxG.worldBounds);
 
+		// Build collision map for client-side prediction
+		var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
+		var col = CollisionMap.fromLevel(cast level.raw, hitboxJson);
+		simulation = new Simulation(col);
+
 		// pick random spawn points for all players
 		var allSessionIds = [GameManager.ME.net.mySessionId];
 		for (_ => seshID in GameManager.ME.sessions) {
@@ -360,6 +368,18 @@ class PlayState extends FlxTransitionableState {
 		player.sessionId = GameManager.ME.net.mySessionId;
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
+
+		// Wire up client-side prediction (only in networked mode)
+		#if !local
+		player.simulation = simulation;
+		player.playerState = new schema.PlayerState();
+		player.playerState.x = player.x;
+		player.playerState.y = player.y;
+		player.playerState.speed = 100;
+		player.playerState.width = 16;
+		player.playerState.height = 8;
+		#end
+
 		camera.follow(player, TOPDOWN);
 		ySortGroup.add(player);
 
@@ -819,6 +839,10 @@ class PlayState extends FlxTransitionableState {
 		timerRunSec = runTimeSec;
 		timerTotalSec = totalSec;
 		timerSynced = true;
+	}
+
+	function onServerAck(serverState:schema.PlayerState) {
+		player.reconcileFromServer(serverState);
 	}
 
 	function updateTimerHUD(elapsed:Float) {
