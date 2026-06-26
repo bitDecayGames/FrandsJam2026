@@ -78,9 +78,8 @@ class CollisionMap {
 		}
 
 		// Grab the tileset so we can call getAllTags — same trick as LdtkTilemap.hx
-		// Use Dynamic to avoid type conflicts between client (levels.ldtk.Ldtk) and server (shared Ldtk)
-		@:privateAccess
-		var tileset:Dynamic = layer.untypedTileset;
+		// Use Reflect since layer is Dynamic and untypedTileset is private
+		var tileset:Dynamic = Reflect.getProperty(layer, "untypedTileset");
 
 		// Populate per-cell flag and tileId data
 		for (row in 0...(layer.cHei : Int)) {
