@@ -628,23 +628,13 @@ class Player extends FlxSprite {
 			}
 
 			if (simulation != null && playerState != null) {
-				// Server-authoritative mode: send input packet, predict locally
-				var dirAngle = cardinalToAngle(inputDir);
-				var buttonMask = 0;
-				#if bot
-				// bot doesn't cast — just walks for now
-				#else
-				if (SimpleController.pressed(A)) {
-					buttonMask |= schema.PlayerState.BUTTON_A;
-				}
-				if (SimpleController.pressed(B)) {
-					buttonMask |= schema.PlayerState.BUTTON_B;
-				}
-				#end
+				// Server-authoritative mode: send movement input, predict locally
+				// Cast/throw use separate messages, not P_Input
+				var dirAngle = if (frozen) -1 else cardinalToAngle(inputDir);
 				var inp:schema.GameState.P_Input = {
 					seq: ++inputSeq,
 					dir: dirAngle,
-					buttons: buttonMask,
+					buttons: 0,
 					elapsed: delta
 				};
 				pendingInputs.push(inp);
@@ -945,7 +935,8 @@ class Player extends FlxSprite {
 		var targetY = y + reticleDir.y * castDist - 8;
 		reticleDir.put();
 		castTarget = FlxPoint.get(targetX, targetY);
-		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
+		// tell server the cast details — server validates and broadcasts to other clients
+		GameManager.ME.net.sendMessage("cast_release", {power: castPower, dir: getDirSuffix(), targetX: castTarget.x, targetY: castTarget.y});
 		FmodManager.PlaySoundOneShot(FmodSFX.FishingRodCast);
 		spawnBobberArc();
 	}
@@ -978,6 +969,23 @@ class Player extends FlxSprite {
 		sendAnimUpdate("cast_" + castDirSuffix, true);
 	}
 
+	public function remoteStartCharge(dir:String) {
+		castDirSuffix = dir;
+		lastInputDir = switch (dir) {
+			case "up": N;
+			case "down": S;
+			case "left": W;
+			case "right": E;
+			default: S;
+		};
+		castState = CHARGING;
+		frozen = true;
+		sendAnimUpdate("cast_" + castDirSuffix, false);
+		if (animation.curAnim != null) {
+			animation.curAnim.pause();
+		}
+	}
+
 	public function remoteStartCast(targetX:Float, targetY:Float, dir:String) {
 		// Clean up any bobber still retracting from a previous catch
 		if (castBobber != null) {
@@ -1008,7 +1016,6 @@ class Player extends FlxSprite {
 					if (SimpleController.just_pressed(A)) {
 						castState = CHARGING;
 						frozen = true;
-						// FmodManager.PlaySoundAndAssignId(FmodSFX.FishingRodCharge2, fishingRodChargeSound);
 						castDirSuffix = getDirSuffix();
 						sendAnimUpdate("cast_" + castDirSuffix, false);
 						if (animation.curAnim != null) {
@@ -1017,11 +1024,13 @@ class Player extends FlxSprite {
 						castPower = 0;
 						castPowerDir = 1;
 						var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
-						powerBarBg.setPosition(x - 8, y + 20 + barWy);
-						powerBarFill.setPosition(x - 8, y + 20 + barWy);
+						powerBarBg.setPosition(x - 8, y + 8 + barWy);
+						powerBarFill.setPosition(x - 8, y + 8 + barWy);
 						powerBarBg.visible = true;
 						powerBarFill.visible = true;
 						powerBarFill.scale.x = 0;
+						// tell server we started charging
+						GameManager.ME.net.sendMessage("cast_start", {dir: castDirSuffix});
 					}
 				case CHARGING:
 					castPower += castPowerDir * elapsed * 2.0;
@@ -1032,14 +1041,12 @@ class Player extends FlxSprite {
 						castPower = 0;
 						castPowerDir = 1;
 					}
-					// FmodManager.SetEventParameterOnSound(fishingRodChargeSound, "PitchShift", castPower);
 					powerBarFill.scale.x = castPower;
 					var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
 					powerBarBg.setPosition(x - 8, y + 8 + barWy);
 					powerBarFill.setPosition(x - 8, y + 8 + barWy);
 
 					if (SimpleController.just_released(A)) {
-						// FmodManager.StopSoundImmediately(fishingRodChargeSound);
 						powerBarBg.visible = false;
 						powerBarFill.visible = false;
 
@@ -1047,6 +1054,7 @@ class Player extends FlxSprite {
 							castState = IDLE;
 							frozen = false;
 							playMovementAnim(true);
+							GameManager.ME.net.sendMessage("cast_cancel", {});
 						} else {
 							startCast();
 						}
@@ -1160,6 +1168,7 @@ class Player extends FlxSprite {
 		if (castState == LANDED || castState == CASTING) {
 			if (!isRemote && !hasFish) {
 				GameManager.ME.net.sendLinePulled();
+				GameManager.ME.net.sendMessage("cast_retract", {});
 			}
 			if (hasFish) {
 				TODO.sfx("fish_caught");

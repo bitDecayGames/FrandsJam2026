@@ -65,6 +65,7 @@ class NetworkManager {
 	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
 	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
 	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
+	public var onCastStart = new FlxTypedSignal<String->String->Void>(); // sessionId, dir
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 	public var onLocalPlayerAck = new FlxTypedSignal<PlayerState->Void>();
@@ -207,6 +208,11 @@ class NetworkManager {
 					return;
 				}
 				onPlayerRemoved.dispatch(sessionId);
+			});
+
+			onMsg("cast_start", (message:{sessionId:String, dir:String}) -> {
+				trace('[NetMan] cast_start => ${message.sessionId} dir:${message.dir}');
+				onCastStart.dispatch(message.sessionId, message.dir);
 			});
 
 			onMsg("cast_line", (message:{

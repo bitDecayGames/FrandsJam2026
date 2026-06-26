@@ -59,6 +59,39 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
+		// --- Cast system: server validates and broadcasts state changes ---
+		onMessage("cast_start", (client:Client, data:{dir:String}) -> {
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player == null) { return; }
+			player.frozen = true;
+			broadcast("cast_start", {sessionId: client.sessionId, dir: data.dir}, {except: client});
+		});
+
+		onMessage("cast_release", (client:Client, data:{power:Float, dir:String, targetX:Float, targetY:Float}) -> {
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player == null) { return; }
+			// server validates and broadcasts — existing cast_line message for backward compat
+			broadcast("cast_line", {
+				sessionId: client.sessionId,
+				x: data.targetX,
+				y: data.targetY,
+				dir: data.dir
+			}, {except: client});
+		});
+
+		onMessage("cast_retract", (client:Client, _) -> {
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player == null) { return; }
+			player.frozen = false;
+			// line_pulled is already handled below for backward compat
+		});
+
+		onMessage("cast_cancel", (client:Client, _) -> {
+			var player:PlayerState = state.players.get(client.sessionId);
+			if (player == null) { return; }
+			player.frozen = false;
+		});
+
 		onMessage("player_name_changed", (client:Client, data:{
 			name:String,
 		}) -> {

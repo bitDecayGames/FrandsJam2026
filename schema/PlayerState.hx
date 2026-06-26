@@ -11,18 +11,6 @@ import io.colyseus.serializer.schema.types.MapSchema;
 #end
 
 class PlayerState extends Schema {
-	public static final CONTROL_STATE_IDLE = "idle";
-	public static final CONTROL_STATE_CHARGING = "charging";
-	public static final CONTROL_STATE_CASTING = "casting";
-	public static final CONTROL_STATE_WAITING = "waiting";
-	public static final CONTROL_STATE_RETURNING = "returning";
-
-	public static final BUTTON_A = 1 << 0;
-	public static final BUTTON_B = 1 << 1;
-
-	public static final ACTION_IDLE = "idle";
-	public static final ACTION_RUN = "run";
-
 	public static final FACING_UP = 1;
 	public static final FACING_RIGHT = 2;
 	public static final FACING_DOWN = 3;
@@ -40,16 +28,8 @@ class PlayerState extends Schema {
 	@:type("float32") public var speed:Float;
 	@:type("float32") public var width:Float;
 	@:type("float32") public var height:Float;
-	@:type("string") public var controlState:String;
-	@:type("string") public var actionIntent:String;
-	@:type("string") public var actionState:String;
 	@:type("uint8") public var facing:Int;
-	@:type("float32") public var castPower:Float;
-	@:type("float32") public var castTargetX:Float;
-	@:type("float32") public var castTargetY:Float;
-
-	public var cd:utils.Cooldowns;
-	public var castPowerDir:Float;
+	@:type("boolean") public var frozen:Bool;
 
 	public function new() {
 		super();
@@ -65,15 +45,8 @@ class PlayerState extends Schema {
 		speed = 100;
 		width = 16;
 		height = 8;
-		controlState = CONTROL_STATE_IDLE;
-		actionIntent = ACTION_IDLE;
-		actionState = ACTION_IDLE;
 		facing = FACING_DOWN;
-		castPower = 0;
-		castPowerDir = 1;
-		castTargetX = 0;
-		castTargetY = 0;
-		cd = new utils.Cooldowns();
+		frozen = false;
 	}
 
 	public static function copy(source:PlayerState):PlayerState {
@@ -90,14 +63,8 @@ class PlayerState extends Schema {
 		s.score = source.score;
 		s.lastProcessedSeq = source.lastProcessedSeq;
 		s.ready = source.ready;
-		s.controlState = source.controlState;
-		s.actionIntent = source.actionIntent;
-		s.actionState = source.actionState;
 		s.facing = source.facing;
-		s.castPower = source.castPower;
-		s.castPowerDir = source.castPowerDir;
-		s.castTargetX = source.castTargetX;
-		s.castTargetY = source.castTargetY;
+		s.frozen = source.frozen;
 		return s;
 	}
 }

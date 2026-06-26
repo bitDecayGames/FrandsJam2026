@@ -255,6 +255,7 @@ class PlayState extends FlxTransitionableState {
 		super.destroy();
 		GameManager.ME.net.onPlayerRemoved.remove(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.remove(onFishAdded);
+		GameManager.ME.net.onCastStart.remove(onRemoteCastStart);
 		GameManager.ME.net.onCastLine.remove(onRemoteCastLine);
 		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
@@ -275,6 +276,7 @@ class PlayState extends FlxTransitionableState {
 	function setupNetwork() {
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.add(onFishAdded);
+		GameManager.ME.net.onCastStart.add(onRemoteCastStart);
 		GameManager.ME.net.onCastLine.add(onRemoteCastLine);
 		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
@@ -338,28 +340,19 @@ class PlayState extends FlxTransitionableState {
 		var col = CollisionMap.fromLevel(level.raw, hitboxJson);
 		simulation = new Simulation(col);
 
-		// pick random spawn points for all players
+		// static spawn points near top-left for easy testing
 		var allSessionIds = [GameManager.ME.net.mySessionId];
 		for (_ => seshID in GameManager.ME.sessions) {
 			allSessionIds.push(seshID);
 		}
-		var spawnPoints = level.getRandomSpawnPoints(allSessionIds.length);
-
-		// build a map of sessionId -> {x, y} before we consume the points
 		var spawnMap = new Map<String, {x:Float, y:Float}>();
 		for (i in 0...allSessionIds.length) {
-			if (i < spawnPoints.length) {
-				spawnMap.set(allSessionIds[i], {x: spawnPoints[i].x, y: spawnPoints[i].y});
-			}
-		}
-		// return pooled points
-		for (pt in spawnPoints) {
-			pt.put();
+			spawnMap.set(allSessionIds[i], {x: 100.0 + i * 40, y: 100.0});
 		}
 
 		var localPos = spawnMap.get(GameManager.ME.net.mySessionId);
-		var lx = localPos != null ? localPos.x : level.spawnPoint.x;
-		var ly = localPos != null ? localPos.y : level.spawnPoint.y;
+		var lx = localPos != null ? localPos.x : 100;
+		var ly = localPos != null ? localPos.y : 100;
 		player = new Player(lx, ly, this);
 		if (GameManager.ME.mySkinIndex >= 0) {
 			player.skinIndex = GameManager.ME.mySkinIndex;
@@ -788,6 +781,13 @@ class PlayState extends FlxTransitionableState {
 			if (pos != null) {
 				remote.setPosition(pos.x, pos.y);
 			}
+		}
+	}
+
+	function onRemoteCastStart(sessionId:String, dir:String) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteStartCharge(dir);
 		}
 	}
 

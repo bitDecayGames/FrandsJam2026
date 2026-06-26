@@ -39,10 +39,13 @@ kill_games() {
 }
 
 start_server() {
+    # kill old server if running
     if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
-        return
+        echo -e "\033[33m[watch]\033[0m stopping old server (pid $SERVER_PID)"
+        kill "$SERVER_PID" 2>/dev/null
+        wait "$SERVER_PID" 2>/dev/null
     fi
-    echo -e "\033[36m[watch]\033[0m starting colyseus server..."
+    echo -e "\033[36m[watch]\033[0m building and starting colyseus server..."
     cd "$SERVER_DIR"
     haxe server.hxml 2>&1 | tail -3
     node dist/server.js > ../colyseus.log 2>&1 &
@@ -53,6 +56,9 @@ start_server() {
 }
 
 build_and_launch() {
+    # rebuild and restart server (schema may have changed)
+    start_server
+
     echo -e "\033[36m[watch]\033[0m building player..."
     $PLAYER_BUILD 2>&1 | tail -5
     if [[ ${PIPESTATUS[0]} -ne 0 ]]; then

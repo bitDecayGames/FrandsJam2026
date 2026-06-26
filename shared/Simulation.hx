@@ -6,6 +6,7 @@ import schema.PlayerState;
 
 /**
  * Deterministic movement simulation — identical on client (prediction) and server (authority).
+ * Only handles movement + collision. Cast/throw/gameplay use server-validated messages.
  * tickPlayer() mutates the PlayerState in place.
 **/
 class Simulation {
@@ -18,90 +19,37 @@ class Simulation {
 	}
 
 	/**
-	 * Advance one player by one fixed step given a batch of inputs for that step.
-	 * Last input in the batch wins for direction (client sends one input per frame;
-	 * server may accumulate several between ticks).
+	 * Advance one player by processing a batch of inputs.
+	 * Only handles movement — direction + collision resolution.
 	**/
 	public function tickPlayer(p:PlayerState, inputs:Array<P_Input>, elapsed:Float = 0):Void {
-		p.cd.update(elapsed);
 		if (inputs == null || inputs.length == 0) {
 			return;
 		}
 		var vx:Float = 0;
 		var vy:Float = 0;
 		var lastSeq = p.lastProcessedSeq;
-		p.actionIntent = PlayerState.ACTION_IDLE;
+
 		for (input in inputs) {
 			lastSeq = input.seq;
 
-			// trace('pState in: ${p.controlState}');
-			switch (p.controlState) {
-				case PlayerState.CONTROL_STATE_IDLE:
-					if ((input.buttons & PlayerState.BUTTON_A) != 0) {
-						p.controlState = PlayerState.CONTROL_STATE_CHARGING;
-						p.castPower = 0;
-						p.castPowerDir = 1;
-						// record facing at cast start
-						if (input.dir >= 0) {
-							p.facing = dirToFacing(input.dir);
-						}
-					} else if (input.dir != -1) {
-						var inDir = Vector.fromAngle(input.dir);
-						vx = inDir.x * p.speed;
-						vy = inDir.y * p.speed;
-						p.actionIntent = PlayerState.ACTION_RUN;
-						p.facing = dirToFacing(input.dir);
-					}
-				case PlayerState.CONTROL_STATE_CHARGING:
-					// pulse cast power
-					p.castPower += p.castPowerDir * input.elapsed * 2.0;
-					if (p.castPower >= 1.0) {
-						p.castPower = 1.0;
-						p.castPowerDir = -1;
-					} else if (p.castPower <= 0.0) {
-						p.castPower = 0.0;
-						p.castPowerDir = 1;
-					}
-					if ((input.buttons & PlayerState.BUTTON_A) == 0) {
-						// released A — compute bobber target from facing + power
-						var facingDir = facingToVector(p.facing);
-						var castDist = p.castPower * 96;
-						p.castTargetX = p.x + facingDir.x * castDist + 4;
-						p.castTargetY = p.y + facingDir.y * castDist - 8;
-						p.controlState = PlayerState.CONTROL_STATE_CASTING;
-					}
-				case PlayerState.CONTROL_STATE_CASTING:
-					if (!p.cd.has("CD_CAST")) {
-						p.cd.set("CD_CAST", 0.5, () -> {
-							trace('[SIM] CASTING -> WAITING');
-							p.controlState = PlayerState.CONTROL_STATE_WAITING;
-							p.cd.set("CD_XXX", 0.5);
-						});
-					}
-
-				case PlayerState.CONTROL_STATE_WAITING:
-					if (!p.cd.has("CD_XXX") && (input.buttons & PlayerState.BUTTON_A) != 0) {
-						trace('[SIM] WAITING -> RETURNING');
-						p.controlState = PlayerState.CONTROL_STATE_RETURNING;
-					}
-				case PlayerState.CONTROL_STATE_RETURNING:
-					if (!p.cd.has("CD_CAST_RETURN")) {
-						p.cd.set("CD_CAST_RETURN", 0.5, () -> {
-							trace('[SIM] RETURNING -> IDLE');
-							p.controlState = PlayerState.CONTROL_STATE_IDLE;
-						});
-					}
+			// movement only when not frozen by cast/throw
+			if (!p.frozen) {
+				if (input.dir != -1) {
+					var inDir = Vector.fromAngle(input.dir);
+					vx = inDir.x * p.speed;
+					vy = inDir.y * p.speed;
+					p.facing = dirToFacing(input.dir);
+				}
 			}
-			// trace('pState Out: ${p.controlState}');
 		}
+
 		var res = collision.resolveAABB(p.x, p.y, p.width, p.height, vx * elapsed, vy * elapsed);
 		p.x = res.x;
 		p.y = res.y;
 		p.velocityX = if (res.hitX) 0 else vx;
 		p.velocityY = if (res.hitY) 0 else vy;
 		p.lastProcessedSeq = lastSeq;
-
-		updatePlayerState(p);
 	}
 
 	/** Convert a 0-359 degree direction to a FACING constant. */
@@ -109,7 +57,6 @@ class Simulation {
 		if (dir < 0) {
 			return PlayerState.FACING_DOWN;
 		}
-		// 0=up, 45=NE, 90=right, 135=SE, 180=down, 225=SW, 270=left, 315=NW
 		if (dir >= 315 || dir < 45) {
 			return PlayerState.FACING_UP;
 		}
@@ -122,88 +69,11 @@ class Simulation {
 		return PlayerState.FACING_LEFT;
 	}
 
-	/** Convert a FACING constant to a unit vector. */
-	static function facingToVector(facing:Int):Vector {
-		return switch (facing) {
-			case PlayerState.FACING_UP: new Vector(0, -1);
-			case PlayerState.FACING_RIGHT: new Vector(1, 0);
-			case PlayerState.FACING_DOWN: new Vector(0, 1);
-			case PlayerState.FACING_LEFT: new Vector(-1, 0);
-			default: new Vector(0, 1);
-		};
-	}
-
-	function updatePlayerState(p:PlayerState) {
-		if (p.actionIntent == PlayerState.ACTION_RUN) {
-			if (p.velocityX != 0 && p.velocityY != 0) {
-				p.actionState = PlayerState.ACTION_RUN;
-			} else {
-				p.actionState = PlayerState.ACTION_IDLE;
-			}
-		} else {
-			p.actionState = PlayerState.ACTION_IDLE;
-		}
-	}
-
 	/**
-	 * Picks `count` random walkable tile positions (not water, not shallow, not solid).
-	 * Returns pixel positions at tile centers.
+	 * Picks `count` random walkable tile positions.
+	 * TODO: Implement real spawn logic from LDTK data.
 	 */
 	public function getRandomSpawnPoints(count:Int):Array<Vector> {
-		return [
-			for (i in 0...count) {
-				new Vector(20 + i * 30, 20 + i * 30);
-			}
-		];
-
-		// TODO: Implement real spawn logic
-		// var layer = waterGrid;
-		// var cols = layer.cWid;
-		// var rows = layer.cHei;
-		// var gridSize = layer.gridSize;
-
-		// // build candidate list of walkable tiles
-		// var candidates = new Array<Int>();
-		// for (cy in 0...rows) {
-		// 	for (cx in 0...cols) {
-		// 		// skip water tiles
-		// 		if (layer.getInt(cx, cy) == 1) {
-		// 			continue;
-		// 		}
-		// 		var tileX = cx * gridSize + gridSize / 2;
-		// 		var tileY = cy * gridSize + gridSize / 2;
-		// 		// skip shallow and solid tiles
-		// 		if (terrainLayer.isShallowAt(tileX, tileY)) {
-		// 			continue;
-		// 		}
-		// 		if (terrainLayer.isSolidAt(tileX, tileY)) {
-		// 			continue;
-		// 		}
-		// 		candidates.push(cx + cy * cols);
-		// 	}
-		// }
-
-		// if (candidates.length == 0) {
-		// 	QLog.error("Level: no walkable tiles found for spawn points, falling back to LDTK spawn");
-		// 	return [FlxPoint.get(spawnPoint.x, spawnPoint.y)];
-		// }
-
-		// var results = new Array<FlxPoint>();
-		// for (_ in 0...count) {
-		// 	if (candidates.length == 0) {
-		// 		break;
-		// 	}
-		// 	var idx = FlxG.random.int(0, candidates.length - 1);
-		// 	var linearIdx = candidates[idx];
-		// 	// remove to avoid duplicates
-		// 	candidates[idx] = candidates[candidates.length - 1];
-		// 	candidates.pop();
-
-		// 	var cx = linearIdx % cols;
-		// 	var cy = Std.int(linearIdx / cols);
-		// 	results.push(FlxPoint.get(cx * gridSize + gridSize / 2, cy * gridSize + gridSize / 2));
-		// }
-
-		// return results;
+		return [for (i in 0...count) new Vector(20 + i * 30, 20 + i * 30)];
 	}
 }
