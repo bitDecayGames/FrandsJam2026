@@ -26,6 +26,7 @@ class NetworkManager {
 
 	var client:Client;
 	var room:Room<GameState>;
+	var localRoom:LocalRoom;
 
 	public var mySessionId:String = "";
 
@@ -83,6 +84,10 @@ class NetworkManager {
 	public function new() {}
 
 	public function disconnect() {
+		if (localRoom != null) {
+			localRoom = null;
+			return;
+		}
 		if (room == null) {
 			return;
 		}
@@ -91,7 +96,13 @@ class NetworkManager {
 	}
 
 	public function connect(host:String, port:Int) {
-		#if local return; #end
+		if (host == null || host == "" || host == "local") {
+			// In-process local server — no network needed
+			if (localRoom == null) {
+				localRoom = new LocalRoom(this);
+			}
+			return;
+		}
 		var addr = '${Configure.getServerProtocol()}$host:$port';
 		trace('attempting to connect to: ${addr}');
 		if (client == null) {
@@ -384,6 +395,7 @@ class NetworkManager {
 	// sendTimerSync removed — server now originates timer_sync broadcasts
 
 	public function getState():GameState {
+		if (localRoom != null) { return localRoom.getState(); }
 		return room != null ? room.state : null;
 	}
 
@@ -418,12 +430,10 @@ class NetworkManager {
 	}
 
 	public function sendInput(input:P_Input) {
-		#if local return; #end
 		sendMessage(GameState.MSG_P_INPUT, [input], true);
 	}
 
 	public function sendMove(x:Float, y:Float, velocityX:Float, velocityY:Float) {
-		#if local return; #end
 		sendMessage("move", {
 			x: x,
 			y: y,
@@ -433,7 +443,10 @@ class NetworkManager {
 	}
 
 	public function sendMessage(topic:String, msg:Dynamic, mute:Bool = false) {
-		#if local return; #end
+		if (localRoom != null) {
+			localRoom.sendMessage(topic, msg);
+			return;
+		}
 		if (room == null) {
 			if (!mute) {
 				QLog.notice('[NetMan]: !!Skipping message on topic "$topic": ${msg}');
@@ -446,8 +459,11 @@ class NetworkManager {
 		room.send(topic, msg);
 	}
 
-	public function update() {
-		// Schema changes are marshaled to the main thread by Colyseus'
+	public function update(elapsed:Float = 0) {
+		if (localRoom != null) {
+			localRoom.update(elapsed);
+		}
+		// In networked mode, schema changes are marshaled to the main thread by Colyseus'
 		// enableMainLoopProcessing() (upstream Callbacks.get); our own callbacks
 		// hop via runOnMain(). Nothing to poll here.
 	}

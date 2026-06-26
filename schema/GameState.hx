@@ -50,4 +50,5 @@ class GameState extends Schema {
 		shopReady = false;
 		inputQueue = new Map();
 	}
+
 }

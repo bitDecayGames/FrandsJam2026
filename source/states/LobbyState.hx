@@ -132,9 +132,7 @@ class LobbyState extends FlxTransitionableState {
 		// Create skin selection sprites
 		createSkinSelection();
 
-		#if !local
 		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		#end
 		FlxTimer.wait(0.5, () -> {
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
 

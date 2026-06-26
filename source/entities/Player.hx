@@ -109,11 +109,11 @@ class Player extends FlxSprite {
 		if (inShallowWater) {
 			if (hotModeActive && inventory.hasWaders()) {
 				hotModeActive = false;
-				#if !local
+
 				if (!isRemote) {
 					GameManager.ME.net.sendHotPepper(false);
 				}
-				#end
+
 			}
 			offset.y -= SHALLOW_WATER_OFFSET;
 			clipRect = flixel.math.FlxRect.get(0, 0, 48, 28);
@@ -544,11 +544,11 @@ class Player extends FlxSprite {
 			hotModeTimer -= delta;
 			if (hotModeTimer <= 0) {
 				hotModeActive = false;
-				#if !local
+
 				if (!isRemote) {
 					GameManager.ME.net.sendHotPepper(false);
 				}
-				#end
+
 			} else {
 				fireEmitTimer += delta;
 				if (fireEmitTimer >= 0.03) {
@@ -1267,22 +1267,22 @@ class Player extends FlxSprite {
 			hotModeActive = true;
 			hotModeTimer = duration;
 			TODO.sfx("hot_mode_activate");
-			#if !local
+
 			if (!isRemote) {
 				GameManager.ME.net.sendHotPepper(true);
 			}
-			#end
+
 		}
 	}
 
 	public function deactivateHotMode() {
 		if (hotModeActive) {
 			hotModeActive = false;
-			#if !local
+
 			if (!isRemote) {
 				GameManager.ME.net.sendHotPepper(false);
 			}
-			#end
+
 		}
 	}
 

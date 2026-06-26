@@ -337,7 +337,6 @@ class GameManager {
 
 	public function setStatus(status:String, ?currentRound:Int = -1) {
 		roundStatus = status;
-		#if !local
 		if (currentRound >= 0 && currentRound != currentRoundNumber) {
 			trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRound}');
 			currentRoundNumber = currentRound;
@@ -353,7 +352,6 @@ class GameManager {
 				totalRounds: totalRounds,
 			});
 		}
-		#end
 	}
 
 	private function reset() {

@@ -50,7 +50,9 @@ class Configure {
 	}
 
 	public static function getServerURL():String {
-		#if forcelocal
+		#if local
+		return "local";
+		#elseif forcelocal
 		return "localhost";
 		#elseif sys
 		return Sys.getEnv("SERVER_URL");

@@ -144,14 +144,10 @@ class PlayState extends FlxTransitionableState {
 		add(ySortGroup);
 		add(transitions);
 
-		#if !local
 		setupNetwork();
 		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		// Fish are now spawned and managed server-side; no need for fishSpawner.setNet()
-		#end
 
 		loadLevel("Level_0");
-
 
 		if (round != null) {
 			round.initialize(this);
@@ -164,11 +160,9 @@ class PlayState extends FlxTransitionableState {
 		timerHUD.scrollFactor.set(0, 0);
 		add(timerHUD);
 
-		#if !local
 		GameManager.ME.net.sendMessage("round_update", {
 			status: RoundState.STATUS_ACTIVE,
 		});
-		#end
 
 		#if db
 		addDebugButtons();
@@ -403,8 +397,7 @@ class PlayState extends FlxTransitionableState {
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
 
-		// Wire up client-side prediction (only in networked mode)
-		#if !local
+		// Wire up client-side prediction
 		player.simulation = simulation;
 		player.playerState = new schema.PlayerState();
 		player.playerState.x = player.x;
@@ -412,8 +405,6 @@ class PlayState extends FlxTransitionableState {
 		player.playerState.speed = 100;
 		player.playerState.width = 16;
 		player.playerState.height = 8;
-		// server computes spawn positions — no set_position needed
-		#end
 
 		camera.follow(player, TOPDOWN);
 		ySortGroup.add(player);
@@ -438,12 +429,8 @@ class PlayState extends FlxTransitionableState {
 			ySortGroup.add(remote);
 		}
 
-		#if local
-		spawnWeeds();
-		spawnWorldItems(level);
-		#end
-		// In networked mode, world items and spawn locations come from server
-		// via onRemoteWorldItems and onSpawnLocations (already wired in setupNetwork)
+		// World items, fish, bushes, spawn locations all come from the server
+		// (real or local in-process) via start_gameplay -> onRemoteWorldItems / onBushAdded
 
 		waterLayer = level.waterGrid;
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
@@ -454,10 +441,6 @@ class PlayState extends FlxTransitionableState {
 		groundFishGroup.onPickedUp = (fx, fy) -> {
 			GameManager.ME.net.sendMessage("ground_fish_pickup", {x: fx, y: fy});
 		};
-		#if local
-		spawnBushes();
-		#end
-		// In networked mode, bushes arrive via schema onAdd -> onRemoteBushAdded
 
 		// wire up pickup callbacks for network broadcast
 		rockGroup.onPickup = (type, idx) -> {
@@ -480,22 +463,9 @@ class PlayState extends FlxTransitionableState {
 			FlxG.camera.shake(0.002, 0.1);
 		};
 
-		// Clouds: server sends positions via cloud_sync; local mode creates them randomly
-		#if local
-		CloudShadow.randomizeWind();
-		for (_ in 0...5) {
-			add(new CloudShadow());
-		}
-		#end
+		// Clouds come from server (real or local) via cloud_sync
 
 		add(seagullGroup);
-
-		#if local
-		// shop disabled for now
-		// shop = new Shop();
-		// shop.spawnRandom(level, terrainLayer, 640, 480);
-		// ySortGroup.add(shop);
-		#end
 
 		// shopInterior = new BaitShopInterior();
 		// midGroundGroup.add(shopInterior.tilemap);
@@ -540,47 +510,6 @@ class PlayState extends FlxTransitionableState {
 			return "grass";
 		}
 		return "";
-	}
-
-	function spawnWorldItems(level:Level) {
-		rockGroup.spawn(level);
-		// Fish are now spawned server-side; clients receive them via schema onAdd
-		wadersPickup.spawn(level, terrainLayer);
-		pepperPickup.spawn(level, terrainLayer);
-	}
-
-	function spawnBushes() {
-		var bounds = FlxG.worldBounds;
-		for (_ in 0...5) {
-			for (_ in 0...20) {
-				var bx = FlxG.random.float(bounds.x, bounds.right - 32);
-				var by = FlxG.random.float(bounds.y, bounds.bottom - 32);
-				if (classifyGround(terrainLayer.sampleColorAt(bx, by)) == "grass") {
-					var bush = new Bush(bx, by, this);
-					bush.groundGroup = midGroundGroup;
-					bushGroup.add(bush);
-					ySortGroup.add(bush);
-					break;
-				}
-			}
-		}
-	}
-
-	function spawnWeeds() {
-		var bounds = FlxG.worldBounds;
-		for (_ in 0...20) {
-			for (_ in 0...20) {
-				var wx = FlxG.random.float(bounds.x, bounds.right - 8);
-				var wy = FlxG.random.float(bounds.y, bounds.bottom - 8);
-				var ground = classifyGround(terrainLayer.sampleColorAt(wx, wy));
-				if (ground == "grass" || ground == "dirt") {
-					var weed = new entities.Weed(wx, wy, this);
-					weed.groundGroup = midGroundGroup;
-					weedGroup.add(weed);
-					break;
-				}
-			}
-		}
 	}
 
 	function onRemoteWorldItems(data:Dynamic) {
@@ -741,9 +670,7 @@ class PlayState extends FlxTransitionableState {
 			simulation.entityRects.push({x: bx + 2, y: by + 2, w: 10.0, h: 2.0});
 			bush.onDeath = () -> {
 				removeEntityRect(rectIdx);
-				#if !local
 				GameManager.ME.net.sendMessage("bush_dead", {index: rectIdx});
-				#end
 			};
 		}
 	}
@@ -768,13 +695,10 @@ class PlayState extends FlxTransitionableState {
 		var myPos:Dynamic = Reflect.field(message, myId);
 		if (myPos != null) {
 			player.setPosition(myPos.x, myPos.y);
-			#if !local
-			// sync prediction state so reconciliation starts from the right spot
 			if (player.playerState != null) {
 				player.playerState.x = myPos.x;
 				player.playerState.y = myPos.y;
 			}
-			#end
 		}
 		for (seshID => remote in remotePlayers) {
 			var pos:Dynamic = Reflect.field(message, seshID);
@@ -937,9 +861,7 @@ class PlayState extends FlxTransitionableState {
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
-		#if !local
-		GameManager.ME.net.update();
-		#end
+		GameManager.ME.net.update(elapsed);
 
 		updateTimerHUD(elapsed);
 
@@ -960,9 +882,7 @@ class PlayState extends FlxTransitionableState {
 				} else {
 					add(new Splash(player.x + player.width / 2, player.y + player.height, true));
 					player.drown();
-					#if !local
 					GameManager.ME.net.sendMessage("player_drown", {x: player.x, y: player.y});
-					#end
 				}
 			}
 		}
@@ -1049,24 +969,7 @@ class PlayState extends FlxTransitionableState {
 			pepperPickup.checkPickup(player);
 
 			updateSparkles(elapsed);
-			updateSeagulls(elapsed);
-			#if local
-			updateWorms(elapsed);
-			#end
 		}
-	}
-
-	function updateSeagulls(elapsed:Float) {
-		// In networked mode, seagull spawning is server-driven via messages.
-		// Only spawn locally in #if local mode.
-		#if local
-		seagullTimer -= elapsed;
-		if (seagullTimer > 0) {
-			return;
-		}
-		seagullTimer = FlxG.random.float(2.0, 6.0);
-		seagullGroup.add(new Seagull(FlxG.random.bool(), this, midGroundGroup, terrainLayer, fishSpawner));
-		#end
 	}
 
 	function onServerCloudSync(data:Dynamic) {
