@@ -3,7 +3,7 @@
 # Usage: ./bin/watch_rebuild.sh
 
 SIGNAL=".rebuild"
-BUILD_CMD="lime test hl -Dplay -Dlocal -Dfullscreen -Ddb"
+BUILD_CMD="lime test hl -Dplay -Ddb"
 GAME_PID=""
 
 kill_game() {

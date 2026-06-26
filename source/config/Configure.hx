@@ -50,7 +50,9 @@ class Configure {
 	}
 
 	public static function getServerURL():String {
-		#if sys
+		#if forcelocal
+		return "localhost";
+		#elseif sys
 		return Sys.getEnv("SERVER_URL");
 		#end
 
@@ -75,7 +77,9 @@ class Configure {
 	}
 
 	public static function getServerPort():Int {
-		#if sys
+		#if forcelocal
+		return 2567;
+		#elseif sys
 		return Std.parseInt(Sys.getEnv("SERVER_PORT"));
 		#end
 
@@ -96,7 +100,9 @@ class Configure {
 	}
 
 	public static function getServerProtocol():String {
-		#if sys
+		#if forcelocal
+		return "ws://";
+		#elseif sys
 		return Sys.getEnv("SERVER_PROTOCOL");
 		#end
 

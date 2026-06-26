@@ -142,7 +142,7 @@ class PlayState extends FlxTransitionableState {
 
 		#if !local
 		setupNetwork();
-		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
+		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
 		fishSpawner.setNet(GameManager.ME.net);
 		#end
 
@@ -173,7 +173,7 @@ class PlayState extends FlxTransitionableState {
 
 	#if db
 	function addDebugButtons() {
-		var labels = ["Rock", "Big Rock", "Pepper", "Waders"];
+		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round"];
 		var btnW = 60;
 		var btnH = 16;
 		var margin = 4;
@@ -212,7 +212,7 @@ class PlayState extends FlxTransitionableState {
 		if (mx < startX || mx > startX + btnW) {
 			return;
 		}
-		for (i in 0...4) {
+		for (i in 0...5) {
 			var by = startY + i * (btnH + margin);
 			if (my >= by && my < by + btnH) {
 				switch (i) {
@@ -232,6 +232,17 @@ class PlayState extends FlxTransitionableState {
 						} else {
 							player.inventory.add(Waders);
 						}
+					case 4:
+						// end round: set timer to 1 second from end
+						if (round != null) {
+							for (goal in round.getGoals()) {
+								if (Std.isOfType(goal, goals.TimedGoal)) {
+									goal.runTimeSec = timerTotalSec - 1;
+								}
+							}
+						}
+						timerRunSec = timerTotalSec - 1;
+						GameManager.ME.net.sendTimerSync(timerRunSec, timerTotalSec);
 				}
 				return;
 			}
@@ -839,6 +850,10 @@ class PlayState extends FlxTransitionableState {
 
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
+
+		#if !local
+		GameManager.ME.net.update();
+		#end
 
 		updateTimerHUD(elapsed);
 

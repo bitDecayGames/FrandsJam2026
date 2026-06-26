@@ -60,6 +60,7 @@ class Player extends FlxSprite {
 
 	var hotModeTimer:Float = 0;
 	var fireEmitTimer:Float = 0;
+	var botTimer:Float = 0;
 	var drownTimer:Float = 0;
 	var drownBlinkTimer:Float = 0;
 	var drownBlinksLeft:Int = 0;
@@ -589,7 +590,13 @@ class Player extends FlxSprite {
 		if (frozen) {
 			velocity.set();
 		} else {
+			#if bot
+			// bot mode: walk left and right on a timer
+			botTimer += delta;
+			var inputDir:Cardinal = if (botTimer % 4.0 < 2.0) E else W;
+			#else
 			var inputDir = InputCalculator.getInputCardinal(playerNum);
+			#end
 			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
 				lastInputDir = inputDir;
 			}

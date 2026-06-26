@@ -96,6 +96,9 @@ class NetworkManager {
 				return;
 			}
 
+			// The joinOrCreate callback fires from the websocket background thread.
+			// Defer all setup to the main thread to avoid crashing HashLink.
+			runOnMain(() -> {
 			room = joinedRoom;
 
 			mySessionId = room.sessionId;
@@ -105,18 +108,22 @@ class NetworkManager {
 			var cb = Callbacks.get(room);
 
 			cb.listen("hostSessionId", (val:String, prev:String) -> {
+				trace('NetworkManager: hostSessionId callback FIRED');
 				var prevIsHost = IS_HOST;
 				IS_HOST = val == mySessionId;
 				trace('[NetMan] host changed ${prev} -> ${val}. IS_HOST: ${IS_HOST}');
 				onHostChanged.dispatch(IS_HOST, prevIsHost);
 			});
 
-			cb.listen("round", (round:RoundState) -> {
+			trace('NetworkManager: hostSessionId listener registered');
+
+			cb.listen("round", (round:RoundState, _:RoundState) -> {
 				trace('RoundState: ${round}');
 				onRoundUpdate.dispatch(round);
 			});
+			trace('NetworkManager: round listener registered');
 
-			room.onMessage("players_ready", (message) -> {
+			onMsg("players_ready", (message) -> {
 				trace('players ready');
 				onPlayersReady.dispatch();
 			});
@@ -197,7 +204,7 @@ class NetworkManager {
 				onPlayerRemoved.dispatch(sessionId);
 			});
 
-			room.onMessage("cast_line", (message:{
+			onMsg("cast_line", (message:{
 				sessionId:String,
 				x:Float,
 				y:Float,
@@ -209,31 +216,31 @@ class NetworkManager {
 				onCastLine.dispatch(message.sessionId, message.x, message.y, message.dir);
 			});
 
-			room.onMessage("fish_caught", (message:Dynamic) -> {
+			onMsg("fish_caught", (message:Dynamic) -> {
 				trace('[NetMan] fish_caught => sessionId:${message.sessionId} fishId:${message.fishId} fishType:${message.fishType}');
 				var ft:Int = message.fishType != null ? Std.int(message.fishType) : 0;
 				onFishCaught.dispatch(message.sessionId, message.fishId, ft);
 			});
-			room.onMessage("fish_pocketed", (message) -> {
+			onMsg("fish_pocketed", (message) -> {
 				trace('[NetMan] fish_pocketed => sessionId:${message.sessionId} fishId:${message.fishId}');
 				onFishPocketed.dispatch(message.sessionId, message.fishId);
 			});
-			room.onMessage("fish_banked", (message) -> {
+			onMsg("fish_banked", (message) -> {
 				trace('[NetMan] fish_banked => sessionId:${message.sessionId} fishId:${message.fishId}');
 				onFishBanked.dispatch(message.sessionId, message.fishId);
 			});
 
-			room.onMessage("line_pulled", (message) -> {
+			onMsg("line_pulled", (message) -> {
 				trace('[NetMan] line_pulled => sessionId:${message.sessionId}');
 				onLinePulled.dispatch(message.sessionId);
 			});
 
-			room.onMessage("fish_despawn", (message:{id:String, respawnTime:Float}) -> {
+			onMsg("fish_despawn", (message:{id:String, respawnTime:Float}) -> {
 				trace('[NetMan] fish_despawn => fishId:${message.id} respawnTime:${message.respawnTime}');
 				onFishDespawn.dispatch(message.id, message.respawnTime);
 			});
 
-			room.onMessage("rock_splash", (message:Dynamic) -> {
+			onMsg("rock_splash", (message:Dynamic) -> {
 				var sx:Float = message.x;
 				var sy:Float = message.y;
 				var sbig:Bool = message.big;
@@ -241,7 +248,7 @@ class NetworkManager {
 				onRockSplash.dispatch(sx, sy, sbig);
 			});
 
-			room.onMessage("throw_rock", (message:Dynamic) -> {
+			onMsg("throw_rock", (message:Dynamic) -> {
 				trace('[NetMan] throw_rock => sessionId:${message.sessionId} target:(${message.targetX},${message.targetY}) big:${message.big} dir:${message.dir}');
 
 				var dest = FlxPoint.get(message.targetX, message.targetY);
@@ -249,62 +256,63 @@ class NetworkManager {
 				dest.put();
 			});
 
-			room.onMessage("fish_sold", (message:Dynamic) -> {
+			onMsg("fish_sold", (message:Dynamic) -> {
 				trace('[NetMan] fish_sold => sessionId:${message.sessionId} fishType:${message.fishType} lengthCm:${message.lengthCm} value:${message.value}');
 				onFishSold.dispatch(message.sessionId, Std.int(message.fishType), Std.int(message.lengthCm), Std.int(message.value));
 			});
 
-			room.onMessage("weed_burst", (message:Dynamic) -> {
+			onMsg("weed_burst", (message:Dynamic) -> {
 				trace('[NetMan] weed_burst => sessionId:${message.sessionId} index:${message.index}');
 				onWeedBurst.dispatch(message.sessionId, Std.int(message.index));
 			});
 
-			room.onMessage("world_items", (message:Dynamic) -> {
+			onMsg("world_items", (message:Dynamic) -> {
 				trace('[NetMan] world_items received');
 				onWorldItems.dispatch(message);
 			});
 
-			room.onMessage("item_pickup", (message:Dynamic) -> {
+			onMsg("item_pickup", (message:Dynamic) -> {
 				trace('[NetMan] item_pickup => sessionId:${message.sessionId} itemType:${message.itemType} index:${message.index}');
 				onItemPickup.dispatch(message.sessionId, message.itemType, Std.int(message.index));
 			});
 
-			room.onMessage("bush_rustle", (message:Dynamic) -> {
+			onMsg("bush_rustle", (message:Dynamic) -> {
 				trace('[NetMan] bush_rustle => index:${message.index} dir:(${message.dirX},${message.dirY})');
 				onBushRustle.dispatch(Std.int(message.index), message.dirX, message.dirY);
 			});
 
-			room.onMessage("worm_killed", (message:Dynamic) -> {
+			onMsg("worm_killed", (message:Dynamic) -> {
 				trace('[NetMan] worm_killed => sessionId:${message.sessionId}');
 				onWormKilled.dispatch(message.sessionId);
 			});
 
-			room.onMessage("hot_pepper", (message:Dynamic) -> {
+			onMsg("hot_pepper", (message:Dynamic) -> {
 				trace('[NetMan] hot_pepper => sessionId:${message.sessionId} isStart:${message.isStart}');
 				onHotPepper.dispatch(message.sessionId, message.isStart == true);
 			});
 
-			room.onMessage("spawn_locations", (message:Dynamic) -> {
+			onMsg("spawn_locations", (message:Dynamic) -> {
 				trace('[NetMan] spawn_locations received');
 				onSpawnLocations.dispatch(message);
 			});
 
-			room.onMessage("kicked", (_) -> {
+			onMsg("kicked", (_) -> {
 				trace('[NetMan] we got kicked!');
 				room.leave(true);
 				room = null;
 				onKicked.dispatch();
 			});
 
-			room.onMessage("player_kicked", (message:{sessionId:String}) -> {
+			onMsg("player_kicked", (message:{sessionId:String}) -> {
 				trace('[NetMan] player_kicked => ${message.sessionId}');
 				onPlayerRemoved.dispatch(message.sessionId);
 			});
 
-			room.onMessage("timer_sync", (message:Dynamic) -> {
+			onMsg("timer_sync", (message:Dynamic) -> {
 				trace('[NetMan] timer_sync received: runTimeSec=${message.runTimeSec} totalSec=${message.totalSec}');
 				onTimerSync.dispatch(message.runTimeSec, message.totalSec);
 			});
+			}); // end runInMainThread
 		});
 	}
 
@@ -393,9 +401,30 @@ class NetworkManager {
 	}
 
 	public function update() {
+		// Schema changes are marshaled to the main thread by Colyseus'
+		// enableMainLoopProcessing() (upstream Callbacks.get); our own callbacks
+		// hop via runOnMain(). Nothing to poll here.
+	}
+
+	// Colyseus invokes every callback (joinOrCreate, onMessage, schema listeners)
+	// from its websocket background thread. Touching HaxeFlixel / render state off
+	// the main thread crashes HashLink with a longjmp or segfault, so we bounce any
+	// game-touching work to the main thread first. On non-sys targets (html5) there
+	// is no background thread — the callback already runs on the main loop — so we
+	// just run inline. Lime pumps the main thread's event loop every frame
+	// (NativeApplication.updateTimer -> Thread.current().events.progress).
+	inline function runOnMain(f:Void->Void):Void {
 		#if sys
-		// colyseus-hx polls internally via the connection thread; no manual recv needed
+		haxe.MainLoop.runInMainThread(f);
+		#else
+		f();
 		#end
+	}
+
+	// Wrap room.onMessage so the handler body runs on the main thread. Mirrors
+	// Room.onMessage's own Dynamic->Void signature so every call site is unchanged.
+	function onMsg(type:Dynamic, handler:Dynamic->Void):Void {
+		room.onMessage(type, (m:Dynamic) -> runOnMain(() -> handler(m)));
 	}
 
 	private function playerDebugTrace(value:Dynamic, ?params:Array<Dynamic>) {

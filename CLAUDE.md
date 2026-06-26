@@ -81,6 +81,10 @@ Simple array-based inventory with `MAX_SLOTS = 4`. Supports `add()`, `remove()`,
 ### Networking (source/net/NetworkManager.hx)
 Colyseus-based multiplayer. `NetworkManager` manages client connection, room joining, and message passing. Signals: `onJoined`, `onPlayerAdded`, `onPlayerChanged`, `onPlayerRemoved`, `onFishAdded`, `onFishMove`. `IS_HOST` determines whether this client spawns fish/rocks. The `sendMessage()` method has an optional `mute` parameter to suppress per-frame logging (used by `sendMove()`). In `-Dlocal` mode, all methods early-return as no-ops and `IS_HOST` defaults to `true`.
 
+**HARD RULE: never modify the Colyseus library.** The vendored Colyseus SDK under `.haxelib/colyseus/` (and the global haxelib copy) must remain byte-identical to official upstream (`github.com/colyseus/colyseus-haxe`) — no patches, no local hacks, not even "small" ones. `Callbacks.enableMainLoopProcessing()` is genuine upstream code, not a custom addition. Any thread-safety, marshaling, or behavior fix belongs in **our** code (`NetworkManager.hx`), never inside the SDK. If a fix seems to require editing Colyseus, find another way.
+
+**Thread marshaling:** On HashLink (`sys`), Colyseus runs its websocket on a background thread (`Connection.hx` spawns it), so every callback — `joinOrCreate`, `room.onMessage`, and schema listeners — fires off the main thread. Touching HaxeFlixel/render state from that thread crashes HL (`longjmp causes uninitialized stack frame`, then a segfault). NetworkManager hops every callback back to the main thread: schema changes via upstream `enableMainLoopProcessing()` (queues + `haxe.MainLoop.add`), and our own callbacks via `runOnMain()` (wraps `haxe.MainLoop.runInMainThread` on sys, runs inline on html5). All `room.onMessage` registrations go through the `onMsg()` wrapper, never `room.onMessage` directly. Lime pumps the main thread's event loop each frame (`NativeApplication.updateTimer` → `Thread.current().events.progress()`), which is what drains these. The `bin/watch_net.sh` workflow also renames `ssl.hdll` → `ssl.hdll.bak` to dodge a separate SSL-related longjmp on `ws://` connections.
+
 PlayState manages remote players (`remotePlayers` map) and remote fish (`remoteFish` map). Remote players are `Player` instances with `isRemote = true` that skip input processing and are driven by network events.
 
 ### Round/Game Management (source/managers/)
@@ -88,8 +92,38 @@ PlayState manages remote players (`remotePlayers` map) and remote fish (`remoteF
 
 **RoundManager** (`RoundManager.hx`) — manages a single round's goals. Signals completion when all goals (or any goal, depending on `allGoalsRequired`) are met. `initialize(state)` is called after PlayState creates to set up round-specific behavior.
 
+**Round status sync (read before touching round/lobby transitions).** The authoritative round status lives in the server's `RoundState` schema (`lobby` → `active` → `post_round` → … → `end_game`). Flow: only the **host** drives transitions; `GameManager.setStatus()` sets local `roundStatus` and (if host) sends a `round_update` message; the server applies it and broadcasts the schema; **every** client's `round` schema listener calls `GameManager.sync()` which sets local `roundStatus` and calls `switchStateBasedOnStatus()` (which `FlxG.switchState`s to LobbyState/PlayState/etc).
+
+Server-side `round_update` semantics (`server/hxsrc/GameRoom.hx`) — critical and non-obvious:
+- The server builds a **brand-new `RoundState` object for every `round_update`** (so the schema `round` ref changes and the client `round` listener fires every time), copying current values then overriding only the fields present in the message.
+- It only changes `status` **and resets every player's `ready` flag to false** when the message includes a non-null `status`.
+- `totalRounds` and `currentRound` are **sticky** server-side — once set they persist across messages that omit them.
+
+Consequences that bit us (don't regress these):
+- **Send exactly ONE `round_update` per transition.** Two messages = two schema mutations; if the first is tagged with the old status (e.g. `lobby`) while the host has already advanced itself to `active` locally, `sync()` drags the host backward → infinite `lobby ⇄ active` oscillation that kicks players back to character select.
+- `GameManager.init()` (only ever called from `playersReady()`, host + lobby) sets up round data **locally and must NOT broadcast** — `setStatus()` carries `totalRounds` so the single status-transition message propagates metadata. (Earlier bug: `init()` broadcast `status:lobby`/metadata, producing the duplicate mutation above.)
+- Known remaining smell (not yet hit since the double-send was removed): `LobbyState.create()` schedules `FlxTimer.wait(2, () -> setStatus(LOBBY))`; that timer is global and can fire after you've left the lobby. If oscillation ever reappears, guard this so it only broadcasts while actually in the lobby.
+
 ### Analytics & Storage (source/helpers/)
 Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence for achievements and metrics.
+
+## Local Multiplayer Testing
+
+**Server** (Node.js Colyseus, `server/`): build with `cd server && haxe server.hxml`, run with `node dist/server.js` (listens on `ws://localhost:2567`). It's a long-running process — start it once in the background; do not block on it.
+
+**Client builds** connect to that server with `play` + `forcelocal`:
+- `lime build hl -Dplay -Dforcelocal` — a player you control.
+- add `-Dbot` for the auto-walking second window, `-Ddb` for in-game debug buttons.
+
+**`bin/watch_net.sh`** is the all-in-one harness: starts the server, builds a player window + a bot window, and rebuilds/relaunches on the `.rebuild` signal file. To pick up source changes you must trigger a rebuild (e.g. `touch .rebuild`) — it watches `.rebuild`, not the source tree.
+
+Two HashLink gotchas this harness handles (and why):
+- **`ssl.hdll` longjmp:** the script renames `export/hl/bin/ssl.hdll` → `ssl.hdll.bak` before launching. Merely *loading* `ssl.hdll` causes a `longjmp causes uninitialized stack frame` crash on `ws://` (non-TLS) connections. Local builds don't need SSL, so removing the lib avoids it. A fresh `lime build` regenerates `ssl.hdll`, so re-rename after rebuilding if you launch the binary manually.
+- **Stale-binary copy bug (fixed):** the script copies the build into `export/hl/bin_player` / `bin_bot` and launches from there. `cp -r src dest` *nests* into `dest/` when `dest` already exists, so it used to launch a stale top-level binary forever (symptom: your fix "doesn't take" and the crash/behavior is identical every run — check the trace **line numbers** against your working tree to detect this). The script now `rm -rf`s the dest first and checks `${PIPESTATUS[0]}` (not `$?`, which was reading `tail`'s exit) so failed builds abort instead of relaunching stale binaries.
+
+**Running a client by hand** (what the harness does): `cd export/hl/bin && rm -f ssl.hdll && LD_LIBRARY_PATH="$(pwd):$LD_LIBRARY_PATH" DISPLAY=:0 ./MyApplication`. There is a real X display (`:0`) on the dev machine, so windowed HL builds run directly.
+
+**Testing etiquette:** the bot window should ONLY walk left/right — do **not** inject input (xdotool, etc.) to puppeteer the ready/round flow. Gameplay-flow changes (round transitions, ready) can be compile-verified and traced against logs, but runtime-verifying them requires the human to drive two windows; ask them to test rather than automating input.
 
 ## Code Generation Pipelines
 
@@ -112,6 +146,10 @@ Analytics.hx reports events to Bitlytics. Storage.hx handles local persistence f
 - `dev_analytics` — dev mode analytics
 - `llm_bridge` — enable LLM debug bridge (`window.__debug` API for Playwright introspection)
 - `local` — fully offline mode: `NetworkManager.IS_HOST` defaults to `true`, `connect()`/`sendMove()`/`sendMessage()` are no-ops (early return). Fish/rocks spawn immediately (no 10s network delay). PlayState skips `setupNetwork()` and `fishSpawner.setNet()`. Call-site code does **not** need `#if !local` guards — NetworkManager handles it internally.
+- `play` — start directly in `LobbyState` (real networked multiplayer: connect → character select → ready → round). This is the flag for testing multiplayer. Without it the game boots to `SplashScreenState`.
+- `forcelocal` — point the networked client at the **local** Colyseus dev server: `Configure` hardcodes `ws://localhost:2567`, overriding `config.json` and the `SERVER_URL`/`SERVER_PORT`/`SERVER_PROTOCOL` env/defines. NOT the same as `local` (which removes networking entirely). `forcelocal` is still a real client — use it with `play` to test against a local server. The `#if forcelocal` branches in `Configure.hx` come *before* `#elseif sys`, so they correctly win on native builds.
+- `db` — enables in-game debug buttons/tools in `PlayState` (spawn rock/pepper/waders, etc.). Used by `watch_net.sh`. Only touches `PlayState`, nothing network-related.
+- `bot` — makes the local `Player` ignore input and just walk left/right on a timer (`Player.hx`, `#if bot`). Used for the second window in `watch_net.sh`. The bot does NOT auto-play (no casting/throwing/readying) — when testing, the bot window should ONLY walk left/right.
 - `rocks` — debug flag: fills player inventory with `MAX_SLOTS` rocks at construction time
 
 ## Conventions

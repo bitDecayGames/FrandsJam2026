@@ -137,6 +137,23 @@ class LobbyState extends FlxTransitionableState {
 		#end
 		FlxTimer.wait(2, () -> {
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
+
+			#if (bot || db)
+			// auto-setup: set name, pick first available skin, auto-ready
+			var autoName = #if bot "bot" #else "player" #end;
+			GameManager.ME.net.sendMessage("player_name_changed", {name: autoName});
+			_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
+			if (_selectedSkinIndex > -1) {
+				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
+			}
+			FlxTimer.wait(1, () -> {
+				if (_selectedSkinIndex >= 0) {
+					GameManager.ME.mySkinIndex = _selectedSkinIndex;
+					GameManager.ME.net.sendMessage("player_ready", true);
+					_localReady = true;
+				}
+			});
+			#else
 			if (_inputField.text != null && _inputField.text != "") {
 				GameManager.ME.net.sendMessage("player_name_changed", {name: _inputField.text});
 			}
@@ -145,6 +162,7 @@ class LobbyState extends FlxTransitionableState {
 			if (_selectedSkinIndex > -1) {
 				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
 			}
+			#end
 		});
 	}
 
