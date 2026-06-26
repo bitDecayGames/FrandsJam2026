@@ -335,7 +335,7 @@ class PlayState extends FlxTransitionableState {
 
 		// Build collision map for client-side prediction
 		var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
-		var col = CollisionMap.fromLevel(cast level.raw, hitboxJson);
+		var col = CollisionMap.fromLevel(level.raw, hitboxJson);
 		simulation = new Simulation(col);
 
 		// pick random spawn points for all players

@@ -1,6 +1,5 @@
 package;
 
-import Ldtk.Enum_TileTags;
 import haxe.ds.Vector;
 
 private typedef Vec2 = {x:Float, y:Float};
@@ -46,7 +45,7 @@ class CollisionMap {
 	 * Pass the JSON text in from the caller so the caller can use the right
 	 * platform API (#if server / #else) to load the file.
 	**/
-	public static function fromLevel(raw:Ldtk.Ldtk_Level, hitboxJson:String):CollisionMap {
+	public static function fromLevel(raw:Dynamic, hitboxJson:String):CollisionMap {
 		var layer = raw.l_Terrain;
 		var gs = layer.gridSize;
 		var map = new CollisionMap(layer.cWid, layer.cHei, gs);
@@ -79,30 +78,29 @@ class CollisionMap {
 		}
 
 		// Grab the tileset so we can call getAllTags — same trick as LdtkTilemap.hx
+		// Use Dynamic to avoid type conflicts between client (levels.ldtk.Ldtk) and server (shared Ldtk)
 		@:privateAccess
-		var tileset:ldtk.Tileset = layer.untypedTileset;
-		var taggedTileset:{getAllTags:(Int) -> Array<Enum_TileTags>} = cast tileset;
+		var tileset:Dynamic = layer.untypedTileset;
 
 		// Populate per-cell flag and tileId data
-		for (row in 0...layer.cHei) {
-			for (col in 0...layer.cWid) {
-				var idx = row * layer.cWid + col;
+		for (row in 0...(layer.cHei : Int)) {
+			for (col in 0...(layer.cWid : Int)) {
+				var idx = row * (layer.cWid : Int) + col;
 				if (!layer.hasAnyTileAt(col, row)) {
 					continue;
 				}
-				var tileId = layer.getTileStackAt(col, row)[0].tileId;
+				var tileId:Int = layer.getTileStackAt(col, row)[0].tileId;
 				map.cellTileIds[idx] = tileId;
-				var tags = taggedTileset.getAllTags(tileId);
+				var tags:Array<Dynamic> = tileset.getAllTags(tileId);
 				var flags = 0;
 				for (tag in tags) {
-					switch (tag) {
-						case SOLID:
-							flags |= FLAG_SOLID;
-						case SHALLOW:
-							flags |= FLAG_SHALLOW;
-						case SWIMMABLE:
-							flags |= FLAG_SWIMMABLE;
-						case _:
+					var tagName = Std.string(tag);
+					if (tagName == "SOLID") {
+						flags |= FLAG_SOLID;
+					} else if (tagName == "SHALLOW") {
+						flags |= FLAG_SHALLOW;
+					} else if (tagName == "SWIMMABLE") {
+						flags |= FLAG_SWIMMABLE;
 					}
 				}
 				if (map.tilePolygons.exists(tileId)) {
