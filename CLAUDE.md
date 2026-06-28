@@ -135,6 +135,8 @@ After triggering a rebuild, you MUST check `build.log` for compilation errors BE
 
 Server build output is tee'd to `build.log` with `[server-build]` prefix (haxe produces no stdout on success, only on error). Macros: `Macros.getBuildTimestamp()` in client (`source/misc/Macros.hx`), `BuildInfo.timestamp()` in server (`server/hxsrc/Main.hx`).
 
+**IMPORTANT: There is NO Docker file sync issue.** If the build timestamp hasn't changed, the cause is ALWAYS a compilation error — check `build.log` for errors. Do NOT blame Docker file sync, do NOT use `cp/mv` workarounds. The files are always in sync. If the binary didn't update, the build failed.
+
 ## Code Generation Pipelines
 
 **Events:** Edit `assets/data/events/types.json` → run `./bin/generate_events.sh` → generates `source/events/gen/Event.hx`

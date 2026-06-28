@@ -34,6 +34,10 @@
 	<classpath name="tools" />
 	<assets path="assets" />
 
+	<!-- Suppress deprecation warnings from third-party libraries -->
+	<haxeflag name="-w" value="-WDeprecated" />
+	<haxeflag name="-w" value="-WDeprecatedEnumAbstract" />
+
 	<!-- _______________________________ Libraries _______________________________ -->
 
 	<haxelib name="flixel" />

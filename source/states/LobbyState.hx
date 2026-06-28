@@ -2,281 +2,484 @@ package states;
 
 import bitdecay.flixel.spacial.Align;
 import flixel.text.FlxInputText;
-import goals.PersonalFishCountGoal;
-import goals.TimedGoal;
-import rounds.Round;
 import config.Configure;
 import flixel.util.FlxTimer;
+import flixel.util.FlxSort;
 import schema.RoundState;
 import managers.GameManager;
 import net.NetworkManager;
+import net.NetworkManager.PlayerUpdateData;
 import flixel.addons.transition.FlxTransitionableState;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.text.FlxText;
 import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
+import flixel.group.FlxGroup;
+import flixel.math.FlxRect;
 import entities.Player;
+import levels.ldtk.Level;
+import levels.ldtk.BDTilemap;
+import states.MainMenuState;
 import todo.TODO;
+import misc.Macros;
 import ui.MenuBuilder;
 
 using states.FlxStateExt;
 
 class LobbyState extends FlxTransitionableState {
-	var _btnDone:FlxButton;
+	// World
+	var terrainLayer:BDTilemap;
+	var midGroundGroup = new FlxGroup();
+	var ySortGroup = new FlxGroup();
+	var labelsGroup = new FlxGroup(); // rendered above ySortGroup
+	var collisionMap:CollisionMap;
+
+	// Players
+	var player:Player;
+	var remotePlayers:Map<String, Player> = new Map();
+
+	// Name + ready labels above each player
+	var localNameLabel:FlxText;
+	var localReadyLabel:FlxText;
+	var remoteNameLabels:Map<String, FlxText> = new Map();
+	var remoteReadyLabels:Map<String, FlxText> = new Map();
+
+	// Player list HUD (top-left)
+	var playerListGroup = new FlxGroup();
+	var playerListEntries:Array<FlxText> = [];
+	var _txtPlayerCount:FlxText;
+
+	// HUD
+	var _btnReady:FlxButton;
+	var _btnChangeSkin:FlxButton;
 	var _txtReady:FlxText;
-	var _txtRoomID:FlxText;
-
 	var _txtTitle:FlxText;
+	var _txtCountdown:FlxText;
 	var _inputField:FlxInputText;
-	var _txtOtherHeader:FlxText;
-	var _kickRows:Array<{label:FlxText, btn:FlxButton, sessionId:String}> = [];
+	var _localReady:Bool = false;
+	var _playerName:String = "Player";
 
-	// Skin selection
+	// Countdown
+	var _countdownActive:Bool = false;
+	var _countdownTimer:Float = 0;
+
+	// Skin select overlay
+	var _skinOverlayVisible:Bool = false;
+	var _skinOverlayGroup = new FlxGroup();
 	var _skinSprites:Array<FlxSprite> = [];
 	var _skinBorders:Array<FlxSprite> = [];
 	var _skinNameLabels:Array<FlxText> = [];
-	var _selectedSkinIndex:Int = -1; // -1 means no skin selected
-	var _localReady:Bool = false;
-	var _waitingForOtherPlayer:Bool = false;
-	var _autoReadySkin:Int = -1;
+	var _skinCloseLabel:FlxText;
 
 	// Layout constants
-	static inline var SKIN_ICON_NATIVE:Int = 32; // native pixel size of icons.png frames
-	static inline var SKIN_SIZE:Int = 64; // displayed size (2x scale)
+	static inline var SKIN_ICON_NATIVE:Int = 32;
+	static inline var SKIN_SIZE:Int = 64;
 	static inline var SKIN_PADDING:Int = 12;
 	static inline var BORDER_THICKNESS:Int = 2;
-	static inline var MAX_REMOTE_PLAYERS:Int = 5;
-	static inline var KICK_BTN_W:Int = 80;
-	static inline var ROW_H:Int = 22;
+	static inline var MAX_PLAYERS:Int = 6;
 
-	// Title screen colors
-	static var BG_COLOR:FlxColor = 0xff73efe8; // turquoise
-	static var TEXT_COLOR:FlxColor = 0xff2b4e95; // dark navy
-
-	public function new() {
-		super();
-	}
+	// Collision for prediction
+	var simulation:Simulation;
 
 	override public function create():Void {
 		super.create();
 		TODO.sfx("lobby_music");
-		bgColor = BG_COLOR;
 
-		_txtTitle = new FlxText();
-		_txtTitle.setPosition(FlxG.width / 2, 20);
-		_txtTitle.setFormat(Main.menuFont, 40, TEXT_COLOR, FlxTextAlign.CENTER);
-		_txtTitle.text = if (GameManager.ME.net.isLocal()) "Single Player" else "Multiplayer";
-		add(_txtTitle);
+		// Load the Lobby level
+		var level = new Level("Lobby");
+		terrainLayer = level.terrainLayer;
+		midGroundGroup.add(terrainLayer);
+		midGroundGroup.add(level.tileColliders);
+		midGroundGroup.add(level.shallowTileColliders);
+		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
 
-		_txtRoomID = new FlxText();
-		_txtRoomID.setPosition(10, 10);
-		_txtRoomID.setFormat(Main.menuFont, 12, TEXT_COLOR);
-		_txtRoomID.text = "Room ID: ";
-		add(_txtRoomID);
+		add(midGroundGroup);
+		add(ySortGroup);
+		add(labelsGroup); // labels render above sprites
 
-		// Ready button at the bottom center — starts disabled
-		_btnDone = MenuBuilder.createTextButton("Ready", clickReady);
-		_btnDone.setPosition(FlxG.width / 2 - _btnDone.width / 2, FlxG.height - _btnDone.height - 40);
-		_btnDone.updateHitbox();
-		_btnDone.active = false;
-		_btnDone.alpha = 0.3;
-		add(_btnDone);
+		// Build collision map
+		var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
+		collisionMap = CollisionMap.fromLevel(level.raw, hitboxJson);
+		simulation = new Simulation(collisionMap);
 
-		// Large green "READY" text — hidden until the player clicks Ready
-		_txtReady = new FlxText();
-		_txtReady.setFormat(Main.menuFont, 24, TEXT_COLOR, FlxTextAlign.CENTER);
-		_txtReady.text = "READY";
-		_txtReady.setPosition(FlxG.width / 2 - _txtReady.width / 2, _btnDone.y);
-		_txtReady.visible = false;
-		add(_txtReady);
-
-		// Input field centered directly above the Ready button
-		_inputField = new FlxInputText(0, 0, 200, FlxG.save.data.name, 20, TEXT_COLOR, FlxColor.WHITE);
-		_inputField.maxChars = 20;
-		_inputField.setPosition(FlxG.width / 2 - _inputField.width / 2, _btnDone.y - _inputField.height - 8);
-		_inputField.onTextChange.add(updatePlayerName);
-		add(_inputField);
-
-		var _txtNameLabel = new FlxText();
-		_txtNameLabel.setFormat(Main.menuFont, 12, TEXT_COLOR);
-		_txtNameLabel.text = "Enter your name:";
-		_txtNameLabel.setPosition(FlxG.width / 2 - _txtNameLabel.width / 2, _inputField.y - _txtNameLabel.height - 4);
-		add(_txtNameLabel);
-
-		// Header label for the other players section
-		_txtOtherHeader = new FlxText(0, 0, 0, "Other Players:", 16);
-		_txtOtherHeader.setFormat(Main.menuFont, 16, TEXT_COLOR);
-		_txtOtherHeader.visible = false;
-		add(_txtOtherHeader);
-
-		// Pre-create kick rows (up to MAX_REMOTE_PLAYERS)
-		for (i in 0...MAX_REMOTE_PLAYERS) {
-			var label = new FlxText(0, 0, 150, "", 12);
-			label.setFormat(Main.menuFont, 12, TEXT_COLOR);
-			label.visible = false;
-			add(label);
-
-			var capturedI = i;
-			var btn = new FlxButton(0, 0, "Kick");
-			btn.onUp.callback = () -> kickPlayer(capturedI);
-			btn.onOver.callback = () -> btn.color = FlxColor.GRAY;
-			btn.onOut.callback = () -> btn.color = FlxColor.WHITE;
-			btn.visible = false;
-			add(btn);
-
-			_kickRows.push({label: label, btn: btn, sessionId: ""});
-		}
-
-		GameManager.ME.net.onKicked.addOnce(handleKicked);
-		GameManager.ME.net.onPlayerRemoved.add(onRemotePlayerRemoved);
-
-		// Create skin selection sprites
-		createSkinSelection();
-
+		// Connect
 		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
 
-		// Wait for the room to be joined before sending messages.
-		// In local mode, onJoined fires synchronously during connect().
-		// In networked mode, it fires async after joinOrCreate completes.
-		// If already connected (re-entering lobby after a round), run immediately.
+		// Random walkable spawn
+		var spawn = pickRandomSpawn();
+		var lx = spawn.x;
+		var ly = spawn.y;
+
+		player = new Player(lx, ly, this);
+		player.sessionId = GameManager.ME.net.mySessionId;
+		player.terrainLayer = terrainLayer;
+		player.groundEffectsGroup = midGroundGroup;
+
+		// Random available skin
+		var skinIdx = getRandomAvailableSkinIndex();
+		player.skinIndex = skinIdx;
+		player.swapSkin();
+		GameManager.ME.mySkinIndex = skinIdx;
+
+		// Prediction
+		if (GameManager.ME.net.isLocal()) {
+			player.simulation = GameManager.ME.net.getLocalSimulation();
+			player.playerState = GameManager.ME.net.getLocalPlayerState();
+		} else {
+			player.simulation = simulation;
+			player.playerState = new schema.PlayerState();
+			player.playerState.x = lx;
+			player.playerState.y = ly;
+			player.playerState.speed = 100;
+			player.playerState.width = 16;
+			player.playerState.height = 8;
+		}
+
+		FlxG.camera.follow(player, TOPDOWN);
+		FlxG.camera.setScrollBoundsRect(
+			FlxG.worldBounds.x, FlxG.worldBounds.y,
+			FlxG.worldBounds.width, FlxG.worldBounds.height, true
+		);
+		ySortGroup.add(player);
+
+		// Name and ready labels above local player
+		localNameLabel = makeNameLabel(_playerName);
+		localReadyLabel = makeReadyIndicator();
+		labelsGroup.add(localNameLabel);
+		labelsGroup.add(localReadyLabel);
+
+		// Enter key defocuses name field
+		FlxG.stage.addEventListener(openfl.events.KeyboardEvent.KEY_DOWN, (e:openfl.events.KeyboardEvent) -> {
+			if (e.keyCode == 13 && _inputField != null && _inputField.hasFocus) {
+				_inputField.endFocus();
+			}
+		});
+
+		// Wire network signals
+		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
+		GameManager.ME.net.onPlayerChanged.add(onPlayerChanged);
+		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
+		GameManager.ME.net.onSkinChanged.add(onSkinChanged);
+		GameManager.ME.net.onPlayerNameChanged.add(onNameChanged);
+		GameManager.ME.net.onPlayerReadyChanged.add(onReadyChanged);
+		GameManager.ME.net.onKicked.addOnce(handleKicked);
+
+		createHUD();
+
+		// Name from compile flag or saved session
+		var compileName = Macros.getDefine("player_name");
+		if (compileName != null && compileName != "") {
+			var name = compileName;
+			if (name.indexOf("=") >= 0) {
+				name = name.substr(0, Std.int(name.length / 2));
+			}
+			_playerName = name;
+		} else if (FlxG.save.data.name != null && FlxG.save.data.name != "") {
+			_playerName = FlxG.save.data.name;
+		}
+		_inputField.text = _playerName;
+		localNameLabel.text = _playerName;
+
+		// On join
 		var alreadyConnected = GameManager.ME.net.mySessionId != "";
-		var onReady = (_:Dynamic) -> {
-			trace('LobbyState: room ready, starting lobby setup');
+		var onJoin = (_:Dynamic) -> {
+			trace('LobbyState: room joined');
+			player.sessionId = GameManager.ME.net.mySessionId;
+			GameManager.ME.net.sendMessage("set_position", {x: lx, y: ly});
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
-
-			#if (bot || db)
-			// auto-setup: pick skin and ready
-			var autoName = #if bot "bot" #else "player" #end;
-			GameManager.ME.net.sendMessage("player_name_changed", {name: autoName});
-
-			if (GameManager.ME.net.isLocal()) {
-				// Single player: pick first skin and ready immediately
-				_selectedSkinIndex = 0;
-				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
-				GameManager.ME.mySkinIndex = _selectedSkinIndex;
-				GameManager.ME.net.sendMessage("player_ready", true);
-				_localReady = true;
-			} else {
-				// Multiplayer: wait for another player to appear, then pick skin and ready
-				#if bot
-				// Bot always picks second skin (index 1)
-				var mySkin = 1;
-				#else
-				// Player picks first skin (index 0)
-				var mySkin = 0;
-				#end
-				_autoReadySkin = mySkin;
-				_waitingForOtherPlayer = true;
-			}
-			#else
-			if (_inputField.text != null && _inputField.text != "") {
-				GameManager.ME.net.sendMessage("player_name_changed", {name: _inputField.text});
-			}
-			_selectedSkinIndex = GameManager.ME.getFirstAvailableSkinIndex();
-			if (_selectedSkinIndex > -1) {
-				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
-			}
-			#end
+			GameManager.ME.net.sendMessage("player_name_changed", {name: _playerName});
+			GameManager.ME.net.sendMessage("skin_changed", {skinIndex: skinIdx});
+			updatePlayerList();
 		};
 		if (alreadyConnected) {
-			onReady(null);
+			onJoin(null);
 		} else {
-			GameManager.ME.net.onJoined.add(onReady);
+			GameManager.ME.net.onJoined.add(onJoin);
 		}
 	}
 
-	private function createSkinSelection():Void {
+	function pickRandomSpawn():{x:Float, y:Float} {
+		var w = collisionMap.cols;
+		var h = collisionMap.rows;
+		var grid = collisionMap.tileSize;
+		for (_ in 0...100) {
+			var cx = FlxG.random.int(0, w - 1);
+			var cy = FlxG.random.int(0, h - 1);
+			if (collisionMap.isWalkableAt(cx, cy)) {
+				return {x: cx * grid + grid / 2.0, y: cy * grid + grid / 2.0};
+			}
+		}
+		for (cy in 0...h) {
+			for (cx in 0...w) {
+				if (collisionMap.isWalkableAt(cx, cy)) {
+					return {x: cx * grid + grid / 2.0, y: cy * grid + grid / 2.0};
+				}
+			}
+		}
+		return {x: 100.0, y: 100.0};
+	}
+
+	function getRandomAvailableSkinIndex():Int {
+		var gm = GameManager.ME;
+		var available:Array<Int> = [];
+		for (i in 0...Player.SKINS.length) {
+			var taken = false;
+			for (sessionId => skinIdx in gm.skins) {
+				if (skinIdx == i) { taken = true; break; }
+			}
+			if (!taken) { available.push(i); }
+		}
+		if (available.length == 0) { return FlxG.random.int(0, Player.SKINS.length - 1); }
+		return available[FlxG.random.int(0, available.length - 1)];
+	}
+
+	function makeNameLabel(name:String):FlxText {
+		var label = new FlxText(0, 0, 100, name);
+		label.setFormat(null, 8, FlxColor.WHITE, FlxTextAlign.CENTER);
+		label.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
+		label.letterSpacing = 1;
+		return label;
+	}
+
+	function makeReadyIndicator():FlxText {
+		var label = new FlxText(0, 0, 100, "");
+		label.setFormat(null, 7, FlxColor.GREEN, FlxTextAlign.CENTER);
+		label.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
+		label.letterSpacing = 1;
+		label.visible = false;
+		return label;
+	}
+
+	function makeHudText(x:Int, y:Int, text:String, color:FlxColor):FlxText {
+		var t = new FlxText(x, y, 300, text);
+		t.setFormat(null, 10, color);
+		t.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
+		t.scrollFactor.set(0, 0);
+		t.letterSpacing = 1;
+		return t;
+	}
+
+	function createHUD() {
+		// Title
+		_txtTitle = new FlxText(0, 8, FlxG.width);
+		_txtTitle.setFormat(null, 16, FlxColor.WHITE, FlxTextAlign.CENTER);
+		_txtTitle.text = if (GameManager.ME.net.isLocal()) "Single Player" else "Multiplayer Lobby";
+		_txtTitle.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
+		_txtTitle.letterSpacing = 1;
+		_txtTitle.scrollFactor.set(0, 0);
+		add(_txtTitle);
+
+		// Player count (top-right)
+		_txtPlayerCount = new FlxText(0, 8, FlxG.width - 8);
+		_txtPlayerCount.setFormat(null, 10, FlxColor.WHITE, FlxTextAlign.RIGHT);
+		_txtPlayerCount.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
+		_txtPlayerCount.letterSpacing = 1;
+		_txtPlayerCount.scrollFactor.set(0, 0);
+		_txtPlayerCount.text = "Players: 1/${MAX_PLAYERS}";
+		add(_txtPlayerCount);
+
+		// Bottom bar
+		var bottomY = FlxG.height - 28;
+
+		_btnChangeSkin = MenuBuilder.createTextButton("Character", toggleSkinOverlay);
+		_btnChangeSkin.setPosition(8, bottomY);
+		_btnChangeSkin.scrollFactor.set(0, 0);
+		add(_btnChangeSkin);
+
+		_btnReady = MenuBuilder.createTextButton("Ready", clickReady);
+		_btnReady.setPosition(FlxG.width - _btnReady.width - 8, bottomY);
+		_btnReady.scrollFactor.set(0, 0);
+		add(_btnReady);
+
+		var inputLeft = _btnChangeSkin.x + _btnChangeSkin.width + 8;
+		var inputRight = _btnReady.x - 8;
+		var inputWidth = Std.int(inputRight - inputLeft);
+		_inputField = new FlxInputText(Std.int(inputLeft), Std.int(bottomY + 2), inputWidth, _playerName, 14, FlxColor.BLACK, FlxColor.WHITE);
+		_inputField.maxChars = 20;
+		_inputField.scrollFactor.set(0, 0);
+		_inputField.onTextChange.add((text, _) -> onNameInputChanged(text));
+		add(_inputField);
+
+		// "READY" text
+		_txtReady = new FlxText(0, 0, FlxG.width);
+		_txtReady.setFormat(null, 24, FlxColor.GREEN, FlxTextAlign.CENTER);
+		_txtReady.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
+		_txtReady.letterSpacing = 1;
+		_txtReady.text = "READY!";
+		_txtReady.setPosition(0, FlxG.height - 60);
+		_txtReady.scrollFactor.set(0, 0);
+		_txtReady.visible = false;
+		add(_txtReady);
+
+		// Countdown text (center of screen)
+		_txtCountdown = new FlxText(0, 0, FlxG.width);
+		_txtCountdown.setFormat(null, 48, FlxColor.YELLOW, FlxTextAlign.CENTER);
+		_txtCountdown.setBorderStyle(SHADOW, FlxColor.BLACK, 2, 2);
+		_txtCountdown.letterSpacing = 2;
+		_txtCountdown.setPosition(0, FlxG.height / 2 - 30);
+		_txtCountdown.scrollFactor.set(0, 0);
+		_txtCountdown.visible = false;
+		add(_txtCountdown);
+
+		// Player list
+		add(playerListGroup);
+
+		// Skin overlay
+		createSkinOverlay();
+	}
+
+	function updatePlayerCount() {
+		var count = 1 + Lambda.count(remotePlayers);
+		_txtPlayerCount.text = 'Players: ${count}/${MAX_PLAYERS}';
+	}
+
+	function updatePlayerList() {
+		for (entry in playerListEntries) {
+			playerListGroup.remove(entry);
+			entry.destroy();
+		}
+		playerListEntries = [];
+
+		var gm = GameManager.ME;
+		var y = 30;
+
+		// Local player
+		var readyStr = _localReady ? " [READY]" : "";
+		var entry = makeHudText(8, y, '${_playerName}${readyStr}', _localReady ? FlxColor.GREEN : FlxColor.WHITE);
+		playerListGroup.add(entry);
+		playerListEntries.push(entry);
+		y += 16;
+
+		// Remote players
+		for (sessionId => _ in remotePlayers) {
+			var name = gm.names.get(sessionId);
+			if (name == null || name == "") { name = "???"; }
+			var ready = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
+			var rStr = ready ? " [READY]" : "";
+			var e = makeHudText(8, y, '${name}${rStr}', ready ? FlxColor.GREEN : FlxColor.WHITE);
+			playerListGroup.add(e);
+			playerListEntries.push(e);
+			y += 16;
+		}
+
+		updatePlayerCount();
+	}
+
+	function onNameInputChanged(text:String) {
+		_playerName = text;
+		localNameLabel.text = _playerName;
+		GameManager.ME.net.sendMessage("player_name_changed", {name: _playerName});
+		FlxG.save.data.name = _playerName;
+		FlxG.save.flush();
+		updatePlayerList();
+	}
+
+	function createSkinOverlay() {
+		var overlay = new FlxSprite();
+		overlay.makeGraphic(FlxG.width, FlxG.height, FlxColor.fromRGB(0, 0, 0, 180));
+		overlay.scrollFactor.set(0, 0);
+		_skinOverlayGroup.add(overlay);
+
+		// "Click to close" label at top
+		_skinCloseLabel = new FlxText(0, 20, FlxG.width, "Click a character to select  -  Click outside to close");
+		_skinCloseLabel.setFormat(null, 10, FlxColor.GRAY, FlxTextAlign.CENTER);
+		_skinCloseLabel.letterSpacing = 1;
+		_skinCloseLabel.scrollFactor.set(0, 0);
+		_skinOverlayGroup.add(_skinCloseLabel);
+
 		var numSkins = Player.SKINS.length;
 		var cols = 4;
-		var nameHeight = 12; // vertical space reserved above each icon for name labels
-		var rowGap = nameHeight + SKIN_PADDING; // extra gap between rows so row-2 names don't overlap row-1 icons
 		var totalWidth = cols * SKIN_SIZE + (cols - 1) * SKIN_PADDING;
 		var startX = Std.int((FlxG.width - totalWidth) / 2);
-		// vertically center the two rows (each row = nameHeight + SKIN_SIZE) in the screen
-		var totalHeight = SKIN_SIZE + rowGap + nameHeight + SKIN_SIZE;
-		var gridStartY = Std.int(FlxG.height / 2 - totalHeight / 2);
-		var borderedSize = SKIN_SIZE + BORDER_THICKNESS * 2;
+		var totalHeight = SKIN_SIZE * 2 + SKIN_PADDING;
+		var startY = Std.int((FlxG.height - totalHeight) / 2);
 
 		for (i in 0...numSkins) {
 			var col = i % cols;
 			var row = Std.int(i / cols);
 			var slotX = startX + col * (SKIN_SIZE + SKIN_PADDING);
-			var skinY = gridStartY + row * (SKIN_SIZE + rowGap + nameHeight);
+			var slotY = startY + row * (SKIN_SIZE + SKIN_PADDING);
 
-			// Border sprite (initially transparent)
+			var borderedSize = SKIN_SIZE + BORDER_THICKNESS * 2;
 			var border = new FlxSprite();
 			border.makeGraphic(borderedSize, borderedSize, FlxColor.TRANSPARENT);
-			border.setPosition(slotX - BORDER_THICKNESS, skinY - BORDER_THICKNESS);
-			add(border);
+			border.setPosition(slotX - BORDER_THICKNESS, slotY - BORDER_THICKNESS);
+			border.scrollFactor.set(0, 0);
+			_skinOverlayGroup.add(border);
 			_skinBorders.push(border);
 
-			// Black background behind each skin icon
-			var skinBg = new FlxSprite();
-			skinBg.makeGraphic(SKIN_SIZE, SKIN_SIZE, FlxColor.BLACK);
-			skinBg.setPosition(slotX, skinY);
-			add(skinBg);
+			var bg = new FlxSprite();
+			bg.makeGraphic(SKIN_SIZE, SKIN_SIZE, FlxColor.BLACK);
+			bg.setPosition(slotX, slotY);
+			bg.scrollFactor.set(0, 0);
+			_skinOverlayGroup.add(bg);
 
-			// Skin preview sprite — use the icons sheet (frame i = skin i), scaled 2x
 			var skinSprite = new FlxSprite();
 			skinSprite.loadGraphic(AssetPaths.icons__png, true, SKIN_ICON_NATIVE, SKIN_ICON_NATIVE);
 			skinSprite.animation.add("icon", [i]);
 			skinSprite.animation.play("icon");
 			skinSprite.scale.set(SKIN_SIZE / SKIN_ICON_NATIVE, SKIN_SIZE / SKIN_ICON_NATIVE);
 			skinSprite.updateHitbox();
-			skinSprite.setPosition(slotX, skinY);
-			add(skinSprite);
+			skinSprite.setPosition(slotX, slotY);
+			skinSprite.scrollFactor.set(0, 0);
+			_skinOverlayGroup.add(skinSprite);
 			_skinSprites.push(skinSprite);
 
-			// Name label above each skin
-			var nameLabel = new FlxText();
-			nameLabel.setFormat(Main.menuFont, 12, TEXT_COLOR, FlxTextAlign.CENTER);
-			nameLabel.text = "";
-			nameLabel.setPosition(slotX + SKIN_SIZE / 2, skinY - nameHeight);
-			Align.center(nameLabel, skinSprite, X);
-			Align.stack(nameLabel, skinSprite, UP, 2);
-			add(nameLabel);
+			// Name label below each skin icon showing who owns it
+			var nameLabel = new FlxText(slotX, slotY + SKIN_SIZE + 2, SKIN_SIZE, "");
+			nameLabel.setFormat(null, 7, FlxColor.WHITE, FlxTextAlign.CENTER);
+			nameLabel.letterSpacing = 1;
+			nameLabel.scrollFactor.set(0, 0);
+			_skinOverlayGroup.add(nameLabel);
 			_skinNameLabels.push(nameLabel);
 		}
 
-		// No skin selected by default — all borders start transparent
+		_skinOverlayGroup.visible = false;
+		add(_skinOverlayGroup);
 		refreshBorders();
 	}
 
-	private function selectSkin(index:Int):Void {
-		// Can't change skin after readying up
-		if (_localReady) {
-			return;
+	function toggleSkinOverlay() {
+		if (_localReady) { return; }
+		_skinOverlayVisible = !_skinOverlayVisible;
+		_skinOverlayGroup.visible = _skinOverlayVisible;
+		if (_skinOverlayVisible) {
+			refreshBorders();
 		}
-
-		// Don't allow selecting a skin that another player already has
-		if (isSkinTakenByOther(index)) {
-			return;
-		}
-
-		// Toggle off if clicking the already-selected skin
-		if (_selectedSkinIndex == index) {
-			_selectedSkinIndex = -1;
-		} else {
-			_selectedSkinIndex = index;
-		}
-
-		// Send skin selection to server
-		GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
-
-		// Enable/disable Ready button based on skin selection
-		if (_selectedSkinIndex >= 0) {
-			_btnDone.active = true;
-			_btnDone.alpha = 1.0;
-		} else {
-			_btnDone.active = false;
-			_btnDone.alpha = 0.3;
-		}
-
-		refreshBorders();
 	}
 
-	private function isSkinTakenByOther(index:Int):Bool {
+	function clickReady() {
+		if (_localReady) { return; }
+		_localReady = true;
+		_btnReady.visible = false;
+		_btnChangeSkin.visible = false;
+		_inputField.visible = false;
+		_skinOverlayGroup.visible = false;
+		_skinOverlayVisible = false;
+		_txtReady.visible = true;
+		localReadyLabel.text = "READY";
+		localReadyLabel.visible = true;
+		GameManager.ME.mySkinIndex = player.skinIndex;
+		GameManager.ME.net.sendMessage("player_ready", true);
+		trace('LobbyState: player ready with skin ${player.skinIndex}');
+		updatePlayerList();
+	}
+
+	function selectSkin(index:Int) {
+		if (_localReady) { return; }
+		if (isSkinTakenByOther(index)) { return; }
+
+		player.skinIndex = index;
+		player.swapSkin();
+		GameManager.ME.mySkinIndex = index;
+		GameManager.ME.net.sendMessage("skin_changed", {skinIndex: index});
+		refreshBorders();
+		_skinOverlayVisible = false;
+		_skinOverlayGroup.visible = false;
+	}
+
+	function isSkinTakenByOther(index:Int):Bool {
 		var gm = GameManager.ME;
 		for (sessionId => skinIdx in gm.skins) {
 			if (sessionId != gm.mySessionId && skinIdx == index) {
@@ -286,212 +489,214 @@ class LobbyState extends FlxTransitionableState {
 		return false;
 	}
 
-	private function refreshBorders():Void {
-		var borderedSize = SKIN_SIZE + BORDER_THICKNESS * 2;
-
-		for (i in 0..._skinBorders.length) {
-			if (i == _selectedSkinIndex) {
-				// Bright green border for the local player's selection
-				_skinBorders[i].makeGraphic(borderedSize, borderedSize, TEXT_COLOR);
-				// Cut out the interior to make it a border frame
-				var pixels = _skinBorders[i].pixels;
-				for (py in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-					for (px in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-						pixels.setPixel32(px, py, FlxColor.TRANSPARENT);
-					}
-				}
-				_skinBorders[i].dirty = true;
-			} else if (isSkinTakenByOther(i)) {
-				// Dim border for skins taken by other players
-				_skinBorders[i].makeGraphic(borderedSize, borderedSize, FlxColor.fromRGB(80, 80, 80));
-				var pixels = _skinBorders[i].pixels;
-				for (py in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-					for (px in BORDER_THICKNESS...BORDER_THICKNESS + SKIN_SIZE) {
-						pixels.setPixel32(px, py, FlxColor.TRANSPARENT);
-					}
-				}
-				_skinBorders[i].dirty = true;
-			} else {
-				_skinBorders[i].makeGraphic(borderedSize, borderedSize, FlxColor.TRANSPARENT);
-			}
-		}
-	}
-
-	private function updatePlayerName(text:String, change:FlxInputTextChange) {
-		GameManager.ME.net.sendMessage("player_name_changed", {name: text});
-	}
-
-	override public function update(elapsed:Float):Void {
-		super.update(elapsed);
-		_txtTitle.x = FlxG.width / 2 - _txtTitle.width / 2;
-
-		// Auto-ready once both players are in the room
-		if (_waitingForOtherPlayer && !_localReady) {
-			// Check if another player has joined (sessions includes self + others)
-			if (GameManager.ME.sessions.length > 0) {
-				trace('LobbyState: other player detected, auto-selecting skin ${_autoReadySkin} and readying');
-				_waitingForOtherPlayer = false;
-				_selectedSkinIndex = _autoReadySkin;
-				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: _selectedSkinIndex});
-				FlxTimer.wait(0.5, () -> {
-					GameManager.ME.mySkinIndex = _selectedSkinIndex;
-					GameManager.ME.net.sendMessage("player_ready", true);
-					_localReady = true;
-				});
-			}
-		}
-
-		// Check for clicks on skin sprites
-		if (FlxG.mouse.justPressed) {
-			for (i in 0..._skinSprites.length) {
-				var sprite = _skinSprites[i];
-				if (FlxG.mouse.x >= sprite.x && FlxG.mouse.x < sprite.x + SKIN_SIZE && FlxG.mouse.y >= sprite.y && FlxG.mouse.y < sprite.y + SKIN_SIZE) {
-					selectSkin(i);
-					break;
-				}
-			}
-		}
-
-		updateNameLabels();
-
-		@:privateAccess(NetworkManager)
-		{
-			if (GameManager.ME.net.room != null) {
-				_txtRoomID.text = 'Room ID: ${GameManager.ME.net.room.roomId}';
-			}
-		}
-	}
-
-	private function updateNameLabels():Void {
+	function getSkinOwnerName(index:Int):String {
 		var gm = GameManager.ME;
-
-		// Clear all name labels first
-		for (label in _skinNameLabels) {
-			label.text = "";
-		}
-
-		// Place the local player's name above their selected skin
-		if (_selectedSkinIndex >= 0) {
-			var localName = (_inputField.text != null && _inputField.text != "") ? _inputField.text : "You";
-			_skinNameLabels[_selectedSkinIndex].text = localName;
-			_skinNameLabels[_selectedSkinIndex].x = _skinSprites[_selectedSkinIndex].x + SKIN_SIZE / 2 - _skinNameLabels[_selectedSkinIndex].width / 2;
-		}
-
-		// Place other players' names above their selected skins
+		if (player.skinIndex == index) { return _playerName; }
 		for (sessionId => skinIdx in gm.skins) {
-			if (sessionId == gm.mySessionId) {
-				continue;
-			}
-			if (skinIdx >= 0 && skinIdx < _skinNameLabels.length) {
+			if (sessionId != gm.mySessionId && skinIdx == index) {
 				var name = gm.names.get(sessionId);
-				if (name == null || name == "") {
-					name = "???";
-				}
-				if (_skinNameLabels[skinIdx].text != "") {
-					_skinNameLabels[skinIdx].text = _skinNameLabels[skinIdx].text + "\n" + name;
-				} else {
-					_skinNameLabels[skinIdx].text = name;
-				}
-				_skinNameLabels[skinIdx].x = _skinSprites[skinIdx].x + SKIN_SIZE / 2 - _skinNameLabels[skinIdx].width / 2;
+				return (name != null && name != "") ? name : "???";
 			}
 		}
+		return "";
+	}
 
-		// Refresh borders since other players' skins may have changed
-		refreshBorders();
+	function refreshBorders() {
+		var gm = GameManager.ME;
+		for (i in 0..._skinBorders.length) {
+			var border = _skinBorders[i];
+			var mine = (player.skinIndex == i);
+			var taken = isSkinTakenByOther(i);
 
-		// Build the kick rows for all other players
-		var others:Array<String> = [];
-		for (sessionId in gm.sessions) {
-			if (sessionId != gm.mySessionId) {
-				others.push(sessionId);
-			}
-		}
-
-		var sectionRight = FlxG.width - 10;
-		var sectionBottom = FlxG.height - 10;
-		var headerH = 28;
-		var sectionH = others.length > 0 ? (others.length * ROW_H + headerH) : 0;
-
-		_txtOtherHeader.visible = others.length > 0;
-		if (others.length > 0) {
-			_txtOtherHeader.x = sectionRight - _txtOtherHeader.width;
-			_txtOtherHeader.y = sectionBottom - sectionH;
-		}
-
-		for (i in 0...MAX_REMOTE_PLAYERS) {
-			var row = _kickRows[i];
-			if (i < others.length) {
-				var sessionId = others[i];
-				var name = gm.names.get(sessionId);
-				if (name == null || name == "") {
-					name = "???";
-				}
-				var isReady = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
-
-				row.sessionId = sessionId;
-				row.label.text = name + (isReady ? " (READY)" : "");
-
-				var rowY = sectionBottom - sectionH + headerH + i * ROW_H;
-				row.btn.x = sectionRight - KICK_BTN_W;
-				row.btn.y = rowY;
-				row.btn.visible = true;
-
-				row.label.x = row.btn.x - row.label.width - 4;
-				row.label.y = rowY + 6; // vertically center the text in the row
-				row.label.visible = true;
+			if (mine) {
+				border.makeGraphic(Std.int(border.width), Std.int(border.height), FlxColor.GREEN);
+			} else if (taken) {
+				border.makeGraphic(Std.int(border.width), Std.int(border.height), FlxColor.RED);
 			} else {
-				row.label.visible = false;
-				row.btn.visible = false;
-				row.sessionId = "";
+				border.makeGraphic(Std.int(border.width), Std.int(border.height), FlxColor.TRANSPARENT);
+			}
+
+			// Update name label under each skin
+			if (i < _skinNameLabels.length) {
+				_skinNameLabels[i].text = getSkinOwnerName(i);
 			}
 		}
 	}
 
-	private function onRemotePlayerRemoved(sessionId:String):Void {
-		updateNameLabels();
-	}
+	// --- Network callbacks ---
 
-	private function kickPlayer(rowIndex:Int):Void {
-		var row = _kickRows[rowIndex];
-		if (row.sessionId != "") {
-			GameManager.ME.net.sendKick(row.sessionId);
+	function onPlayerAdded(sessionId:String, data:PlayerUpdateData) {
+		if (sessionId == GameManager.ME.net.mySessionId) { return; }
+		if (remotePlayers.exists(sessionId)) { return; }
+
+		var rx = data.state.x;
+		var ry = data.state.y;
+		var remote = new Player(rx, ry, this);
+		remote.isRemote = true;
+		remote.terrainLayer = terrainLayer;
+		remote.groundEffectsGroup = midGroundGroup;
+		remote.setNetwork(sessionId);
+
+		var skinIdx = GameManager.ME.skins.get(sessionId);
+		if (skinIdx != null && skinIdx >= 0) {
+			remote.skinIndex = skinIdx;
+			remote.swapSkin();
 		}
+
+		remotePlayers.set(sessionId, remote);
+		ySortGroup.add(remote);
+
+		// Name and ready labels for remote
+		var name = GameManager.ME.names.get(sessionId);
+		var nameLabel = makeNameLabel(name != null ? name : "");
+		remoteNameLabels.set(sessionId, nameLabel);
+		labelsGroup.add(nameLabel);
+
+		var readyLabel = makeReadyIndicator();
+		remoteReadyLabels.set(sessionId, readyLabel);
+		labelsGroup.add(readyLabel);
+
+		trace('LobbyState: remote player added $sessionId');
+		refreshBorders();
+		updatePlayerList();
 	}
 
-	private function handleKicked():Void {
+	function onPlayerChanged(sessionId:String, data:PlayerUpdateData) {
+		if (sessionId == GameManager.ME.net.mySessionId) { return; }
+		var remote = remotePlayers.get(sessionId);
+		if (remote == null) { return; }
+		remote.setPosition(data.state.x, data.state.y);
+	}
+
+	function onPlayerRemoved(sessionId:String) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			ySortGroup.remove(remote);
+			remote.destroy();
+			remotePlayers.remove(sessionId);
+		}
+		var label = remoteNameLabels.get(sessionId);
+		if (label != null) { labelsGroup.remove(label); label.destroy(); remoteNameLabels.remove(sessionId); }
+		var rlabel = remoteReadyLabels.get(sessionId);
+		if (rlabel != null) { labelsGroup.remove(rlabel); rlabel.destroy(); remoteReadyLabels.remove(sessionId); }
+		refreshBorders();
+		updatePlayerList();
+	}
+
+	function onSkinChanged(sessionId:String, skinIdx:Int) {
+		if (sessionId == GameManager.ME.net.mySessionId) { return; }
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null && skinIdx >= 0) {
+			remote.skinIndex = skinIdx;
+			remote.swapSkin();
+		}
+		refreshBorders();
+	}
+
+	function onNameChanged(sessionId:String, name:String) {
+		if (sessionId == GameManager.ME.net.mySessionId) { return; }
+		var label = remoteNameLabels.get(sessionId);
+		if (label != null) { label.text = name; }
+		updatePlayerList();
+		refreshBorders();
+	}
+
+	function onReadyChanged(sessionId:String, ready:Bool) {
+		// Update remote ready indicator
+		var rlabel = remoteReadyLabels.get(sessionId);
+		if (rlabel != null) {
+			rlabel.text = ready ? "READY" : "";
+			rlabel.visible = ready;
+		}
+		updatePlayerList();
+	}
+
+	function handleKicked() {
 		FlxG.switchState(() -> new MainMenuState());
 	}
 
-	function clickReady():Void {
-		if (_selectedSkinIndex < 0) {
-			return;
+	function positionLabelAbovePlayer(p:Player, nameLabel:FlxText, readyLabel:FlxText) {
+		var cx = p.x - p.offset.x + p.frameWidth / 2;
+		var topY = p.y - p.offset.y;
+		nameLabel.setPosition(cx - nameLabel.width / 2, topY - 10);
+		if (readyLabel != null) {
+			readyLabel.setPosition(cx - readyLabel.width / 2, topY - 20);
+		}
+	}
+
+	override public function update(elapsed:Float):Void {
+		GameManager.ME.net.update(elapsed);
+
+		// Freeze player while typing
+		if (_inputField != null && _inputField.visible) {
+			player.frozen = _inputField.hasFocus;
 		}
 
-		FlxG.save.data.name = _inputField.text;
-		FlxG.save.flush();
-		GameManager.ME.mySkinIndex = _selectedSkinIndex;
-		GameManager.ME.net.sendMessage("player_ready", true);
+		super.update(elapsed);
 
-		// Hide button, show green READY text
-		_localReady = true;
-		_btnDone.visible = false;
-		_btnDone.active = false;
-		_txtReady.visible = true;
-		_txtReady.x = FlxG.width / 2 - _txtReady.width / 2;
+		FlxG.collide(midGroundGroup, player);
+
+		// Position labels above players
+		positionLabelAbovePlayer(player, localNameLabel, localReadyLabel);
+		for (sessionId => remote in remotePlayers) {
+			var nLabel = remoteNameLabels.get(sessionId);
+			var rLabel = remoteReadyLabels.get(sessionId);
+			if (nLabel != null) {
+				positionLabelAbovePlayer(remote, nLabel, rLabel);
+			}
+		}
+
+		// Y-sort
+		ySortGroup.sort((order, a, b) -> {
+			if (a == null || b == null) { return 0; }
+			var objA:flixel.FlxObject = cast a;
+			var objB:flixel.FlxObject = cast b;
+			return FlxSort.byValues(order, objA.y + objA.height, objB.y + objB.height);
+		});
+
+		// Skin overlay clicks
+		if (_skinOverlayVisible && FlxG.mouse.justPressed) {
+			var pos = FlxG.mouse.getViewPosition();
+			var clicked = false;
+			for (i in 0..._skinSprites.length) {
+				var s = _skinSprites[i];
+				if (pos.x >= s.x && pos.x < s.x + SKIN_SIZE && pos.y >= s.y && pos.y < s.y + SKIN_SIZE) {
+					selectSkin(i);
+					clicked = true;
+					break;
+				}
+			}
+			pos.put();
+			if (!clicked) { toggleSkinOverlay(); }
+		}
+
+		// Countdown
+		if (_countdownActive) {
+			_countdownTimer -= elapsed;
+			var secs = Math.ceil(_countdownTimer);
+			if (secs <= 0) {
+				_txtCountdown.visible = false;
+				_countdownActive = false;
+				// Game starts via playersReady in GameManager
+			} else {
+				_txtCountdown.text = '${secs}';
+				_txtCountdown.visible = true;
+			}
+		}
+
+		// Auto-ready only for explicit single player
+		#if play_solo
+		if (!_localReady) { clickReady(); }
+		#end
 	}
 
-	override public function destroy():Void {
-		GameManager.ME.net.onPlayerRemoved.remove(onRemotePlayerRemoved);
+	override function destroy() {
+		GameManager.ME.net.onPlayerAdded.remove(onPlayerAdded);
+		GameManager.ME.net.onPlayerChanged.remove(onPlayerChanged);
+		GameManager.ME.net.onPlayerRemoved.remove(onPlayerRemoved);
+		GameManager.ME.net.onSkinChanged.remove(onSkinChanged);
+		GameManager.ME.net.onPlayerNameChanged.remove(onNameChanged);
+		GameManager.ME.net.onPlayerReadyChanged.remove(onReadyChanged);
 		super.destroy();
-	}
-
-	override public function onFocusLost() {
-		super.onFocusLost();
-		this.handleFocusLost();
-	}
-
-	override public function onFocus() {
-		super.onFocus();
-		this.handleFocus();
 	}
 }

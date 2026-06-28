@@ -127,7 +127,7 @@ class Player extends FlxSprite {
 		return value;
 	}
 
-	var frozen:Bool = false;
+	public var frozen:Bool = false;
 
 	public var sessionId:String = "";
 

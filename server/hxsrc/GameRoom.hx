@@ -138,7 +138,14 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			}
 		});
 
-		// set_position removed — server computes spawn positions itself
+		// Client tells server its spawn position (lobby uses client-side collision map)
+		onMessage("set_position", (client:Client, data:Dynamic) -> {
+			var ps = state.players.get(client.sessionId);
+			if (ps != null) {
+				ps.x = data.x;
+				ps.y = data.y;
+			}
+		});
 
 		// --- Cast system: server validates and broadcasts state changes ---
 		onMessage("cast_start", (client:Client, data:{dir:String}) -> {
@@ -480,11 +487,18 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		trace('player joined: ${client.sessionId}');
 		state.players.set(client.sessionId, new PlayerState());
 		state.inputQueue.set(client.sessionId, []);
-		// Set player hitbox dimensions for simulation
+		// Set player hitbox dimensions and spawn position
 		var ps = state.players.get(client.sessionId);
 		ps.speed = 100;
 		ps.width = 16;
 		ps.height = 8;
+		// Initial position — client sends set_position with lobby spawn shortly after
+		var rawObjects:Dynamic = Reflect.getProperty(ldtkRaw, "l_Objects");
+		var allSpawn:Array<Dynamic> = Reflect.getProperty(rawObjects, "all_Spawn");
+		if (allSpawn != null && allSpawn.length > 0) {
+			ps.x = allSpawn[0].pixelX;
+			ps.y = allSpawn[0].pixelY;
+		}
 
 
 		// Cloud sync is requested by client after PlayState loads

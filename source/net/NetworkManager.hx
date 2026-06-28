@@ -96,11 +96,15 @@ class NetworkManager {
 	}
 
 	public function connect(host:String, port:Int) {
-		if (host == null || host == "" || host == "local") {
+		if (host == "local") {
 			// In-process local server — no network needed
 			if (localRoom == null) {
 				localRoom = new LocalRoom(this);
 			}
+			return;
+		}
+		if (host == null || host == "") {
+			trace('NetworkManager: no server URL configured, cannot connect');
 			return;
 		}
 		var addr = '${Configure.getServerProtocol()}$host:$port';

@@ -132,11 +132,13 @@ class GameLogic {
 
 	// --- Player lifecycle ---
 
-	public function addPlayer(sessionId:String) {
+	public function addPlayer(sessionId:String, ?spawnX:Float, ?spawnY:Float) {
 		var ps = new PlayerState();
 		ps.speed = 100;
 		ps.width = 16;
 		ps.height = 8;
+		if (spawnX != null) { ps.x = spawnX; }
+		if (spawnY != null) { ps.y = spawnY; }
 		players.set(sessionId, ps);
 		inputQueue.set(sessionId, []);
 		onPlayerAdded(sessionId, ps);
@@ -155,6 +157,10 @@ class GameLogic {
 
 	public function handleMessage(clientId:String, topic:String, data:Dynamic) {
 		switch (topic) {
+			case "set_position":
+				var ps = players.get(clientId);
+				if (ps != null) { ps.x = data.x; ps.y = data.y; }
+
 			case "player_input":
 				if (!players.exists(clientId)) { return; }
 				if (!inputQueue.exists(clientId)) { inputQueue.set(clientId, []); }

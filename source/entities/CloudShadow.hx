@@ -44,27 +44,15 @@ class CloudShadow extends FlxSprite {
 	}
 
 	function respawnAtEdge() {
+		// Wrap to the opposite edge — deterministic so all clients agree
 		var bounds = FlxG.worldBounds;
-		var dx = Math.cos(windAngle);
-		var dy = Math.sin(windAngle);
+		var totalW = bounds.width + width + MARGIN * 2;
+		var totalH = bounds.height + height + MARGIN * 2;
+		var minX = bounds.x - width - MARGIN;
+		var minY = bounds.y - height - MARGIN;
 
-		// place at upwind edge
-		if (dx > 0) {
-			x = bounds.x - width - MARGIN;
-		} else {
-			x = bounds.right + MARGIN;
-		}
-		if (dy > 0) {
-			y = bounds.y - height - MARGIN;
-		} else {
-			y = bounds.bottom + MARGIN;
-		}
-
-		// random perpendicular spread
-		var perpX = -dy;
-		var perpY = dx;
-		var spread = (Math.random() - 0.5) * Math.max(bounds.width, bounds.height);
-		x += perpX * spread;
-		y += perpY * spread;
+		// wrap each axis independently
+		x = minX + ((x - minX) % totalW + totalW) % totalW;
+		y = minY + ((y - minY) % totalH + totalH) % totalH;
 	}
 }
