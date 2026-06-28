@@ -14,6 +14,8 @@ import Ldtk.LdtkProject;
 
 class GameRoom extends RoomOf<GameState, Dynamic> {
 	var simulation:Simulation;
+	var lobbySimulation:Simulation;
+	var gameSimulation:Simulation;
 	var elapsedTime:Float;
 
 	// Fish AI data
@@ -70,13 +72,21 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		maxClients = 6;
 		setState(new GameState());
 
-		// Build collision map from level data
+		// Build collision maps for both levels
 		var hitboxJson = sys.io.File.getContent("../assets/data/tile-hitboxes.json");
 		var ldtkProject = new LdtkProject();
+
+		var lobbyRaw = ldtkProject.getLevel("Lobby");
+		var lobbyCol = CollisionMap.fromLevel(lobbyRaw, hitboxJson);
+		lobbySimulation = new Simulation(lobbyCol);
+
 		var raw = ldtkProject.getLevel("Level_0");
 		ldtkRaw = raw;
 		state.collision = CollisionMap.fromLevel(raw, hitboxJson);
-		simulation = new Simulation(state.collision);
+		gameSimulation = new Simulation(state.collision);
+
+		// Start in lobby simulation
+		simulation = lobbySimulation;
 		state.inputQueue = new Map();
 
 		// Initialize fish AI data
@@ -183,6 +193,8 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		// Client signals PlayState is loaded — start spawning creatures and world items
 		onMessage("start_gameplay", (client:Client, _) -> {
 			if (!gameplayStarted) {
+				// Switch to game-level collision map
+				simulation = gameSimulation;
 				// New round (or first round): reset and respawn everything
 				resetRoundState();
 				spawnWorldItems();

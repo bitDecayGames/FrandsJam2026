@@ -39,16 +39,13 @@ class LobbyState extends FlxTransitionableState {
 	var player:Player;
 	var remotePlayers:Map<String, Player> = new Map();
 
-	// Name + ready labels above each player
+	// Name labels above each player
 	var localNameLabel:FlxText;
-	var localReadyLabel:FlxText;
 	var remoteNameLabels:Map<String, FlxText> = new Map();
-	var remoteReadyLabels:Map<String, FlxText> = new Map();
 
 	// Player list HUD (top-left)
 	var playerListGroup = new FlxGroup();
 	var playerListEntries:Array<FlxText> = [];
-	var _txtPlayerCount:FlxText;
 
 	// HUD
 	var _btnReady:FlxButton;
@@ -122,7 +119,7 @@ class LobbyState extends FlxTransitionableState {
 		player.swapSkin();
 		GameManager.ME.mySkinIndex = skinIdx;
 
-		// Prediction
+		// Wire up prediction
 		if (GameManager.ME.net.isLocal()) {
 			player.simulation = GameManager.ME.net.getLocalSimulation();
 			player.playerState = GameManager.ME.net.getLocalPlayerState();
@@ -143,11 +140,9 @@ class LobbyState extends FlxTransitionableState {
 		);
 		ySortGroup.add(player);
 
-		// Name and ready labels above local player
+		// Name label above local player
 		localNameLabel = makeNameLabel(_playerName);
-		localReadyLabel = makeReadyIndicator();
 		labelsGroup.add(localNameLabel);
-		labelsGroup.add(localReadyLabel);
 
 		// Enter key defocuses name field
 		FlxG.stage.addEventListener(openfl.events.KeyboardEvent.KEY_DOWN, (e:openfl.events.KeyboardEvent) -> {
@@ -163,6 +158,7 @@ class LobbyState extends FlxTransitionableState {
 		GameManager.ME.net.onSkinChanged.add(onSkinChanged);
 		GameManager.ME.net.onPlayerNameChanged.add(onNameChanged);
 		GameManager.ME.net.onPlayerReadyChanged.add(onReadyChanged);
+		GameManager.ME.net.onPlayersReady.add(onAllPlayersReady);
 		GameManager.ME.net.onKicked.addOnce(handleKicked);
 
 		createHUD();
@@ -242,15 +238,6 @@ class LobbyState extends FlxTransitionableState {
 		return label;
 	}
 
-	function makeReadyIndicator():FlxText {
-		var label = new FlxText(0, 0, 100, "");
-		label.setFormat(null, 7, FlxColor.GREEN, FlxTextAlign.CENTER);
-		label.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
-		label.letterSpacing = 1;
-		label.visible = false;
-		return label;
-	}
-
 	function makeHudText(x:Int, y:Int, text:String, color:FlxColor):FlxText {
 		var t = new FlxText(x, y, 300, text);
 		t.setFormat(null, 10, color);
@@ -269,15 +256,6 @@ class LobbyState extends FlxTransitionableState {
 		_txtTitle.letterSpacing = 1;
 		_txtTitle.scrollFactor.set(0, 0);
 		add(_txtTitle);
-
-		// Player count (top-right)
-		_txtPlayerCount = new FlxText(0, 8, FlxG.width - 8);
-		_txtPlayerCount.setFormat(null, 10, FlxColor.WHITE, FlxTextAlign.RIGHT);
-		_txtPlayerCount.setBorderStyle(SHADOW, FlxColor.BLACK, 1, 1);
-		_txtPlayerCount.letterSpacing = 1;
-		_txtPlayerCount.scrollFactor.set(0, 0);
-		_txtPlayerCount.text = "Players: 1/${MAX_PLAYERS}";
-		add(_txtPlayerCount);
 
 		// Bottom bar
 		var bottomY = FlxG.height - 28;
@@ -329,11 +307,6 @@ class LobbyState extends FlxTransitionableState {
 		createSkinOverlay();
 	}
 
-	function updatePlayerCount() {
-		var count = 1 + Lambda.count(remotePlayers);
-		_txtPlayerCount.text = 'Players: ${count}/${MAX_PLAYERS}';
-	}
-
 	function updatePlayerList() {
 		for (entry in playerListEntries) {
 			playerListGroup.remove(entry);
@@ -345,8 +318,9 @@ class LobbyState extends FlxTransitionableState {
 		var y = 30;
 
 		// Local player
-		var readyStr = _localReady ? " [READY]" : "";
-		var entry = makeHudText(8, y, '${_playerName}${readyStr}', _localReady ? FlxColor.GREEN : FlxColor.WHITE);
+		var localIsReady = _localReady || _countdownActive;
+		var readyStr = localIsReady ? " [READY]" : "";
+		var entry = makeHudText(8, y, '${_playerName}${readyStr}', localIsReady ? FlxColor.GREEN : FlxColor.WHITE);
 		playerListGroup.add(entry);
 		playerListEntries.push(entry);
 		y += 16;
@@ -355,7 +329,8 @@ class LobbyState extends FlxTransitionableState {
 		for (sessionId => _ in remotePlayers) {
 			var name = gm.names.get(sessionId);
 			if (name == null || name == "") { name = "???"; }
-			var ready = gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId);
+			// During countdown, show everyone as ready
+			var ready = _countdownActive ? true : (gm.readyStates.exists(sessionId) && gm.readyStates.get(sessionId));
 			var rStr = ready ? " [READY]" : "";
 			var e = makeHudText(8, y, '${name}${rStr}', ready ? FlxColor.GREEN : FlxColor.WHITE);
 			playerListGroup.add(e);
@@ -363,7 +338,6 @@ class LobbyState extends FlxTransitionableState {
 			y += 16;
 		}
 
-		updatePlayerCount();
 	}
 
 	function onNameInputChanged(text:String) {
@@ -381,19 +355,19 @@ class LobbyState extends FlxTransitionableState {
 		overlay.scrollFactor.set(0, 0);
 		_skinOverlayGroup.add(overlay);
 
-		// "Click to close" label at top
-		_skinCloseLabel = new FlxText(0, 20, FlxG.width, "Click a character to select  -  Click outside to close");
-		_skinCloseLabel.setFormat(null, 10, FlxColor.GRAY, FlxTextAlign.CENTER);
-		_skinCloseLabel.letterSpacing = 1;
-		_skinCloseLabel.scrollFactor.set(0, 0);
-		_skinOverlayGroup.add(_skinCloseLabel);
-
 		var numSkins = Player.SKINS.length;
 		var cols = 4;
 		var totalWidth = cols * SKIN_SIZE + (cols - 1) * SKIN_PADDING;
 		var startX = Std.int((FlxG.width - totalWidth) / 2);
 		var totalHeight = SKIN_SIZE * 2 + SKIN_PADDING;
 		var startY = Std.int((FlxG.height - totalHeight) / 2);
+
+		// Helper text just above the character grid
+		_skinCloseLabel = new FlxText(0, startY - 20, FlxG.width, "Click a character to select  -  Click outside to close");
+		_skinCloseLabel.setFormat(null, 10, FlxColor.GRAY, FlxTextAlign.CENTER);
+		_skinCloseLabel.letterSpacing = 1;
+		_skinCloseLabel.scrollFactor.set(0, 0);
+		_skinOverlayGroup.add(_skinCloseLabel);
 
 		for (i in 0...numSkins) {
 			var col = i % cols;
@@ -458,8 +432,7 @@ class LobbyState extends FlxTransitionableState {
 		_skinOverlayGroup.visible = false;
 		_skinOverlayVisible = false;
 		_txtReady.visible = true;
-		localReadyLabel.text = "READY";
-		localReadyLabel.visible = true;
+		localNameLabel.color = FlxColor.GREEN;
 		GameManager.ME.mySkinIndex = player.skinIndex;
 		GameManager.ME.net.sendMessage("player_ready", true);
 		trace('LobbyState: player ready with skin ${player.skinIndex}');
@@ -546,15 +519,11 @@ class LobbyState extends FlxTransitionableState {
 		remotePlayers.set(sessionId, remote);
 		ySortGroup.add(remote);
 
-		// Name and ready labels for remote
+		// Name label for remote
 		var name = GameManager.ME.names.get(sessionId);
 		var nameLabel = makeNameLabel(name != null ? name : "");
 		remoteNameLabels.set(sessionId, nameLabel);
 		labelsGroup.add(nameLabel);
-
-		var readyLabel = makeReadyIndicator();
-		remoteReadyLabels.set(sessionId, readyLabel);
-		labelsGroup.add(readyLabel);
 
 		trace('LobbyState: remote player added $sessionId');
 		refreshBorders();
@@ -577,8 +546,6 @@ class LobbyState extends FlxTransitionableState {
 		}
 		var label = remoteNameLabels.get(sessionId);
 		if (label != null) { labelsGroup.remove(label); label.destroy(); remoteNameLabels.remove(sessionId); }
-		var rlabel = remoteReadyLabels.get(sessionId);
-		if (rlabel != null) { labelsGroup.remove(rlabel); rlabel.destroy(); remoteReadyLabels.remove(sessionId); }
 		refreshBorders();
 		updatePlayerList();
 	}
@@ -602,26 +569,35 @@ class LobbyState extends FlxTransitionableState {
 	}
 
 	function onReadyChanged(sessionId:String, ready:Bool) {
-		// Update remote ready indicator
-		var rlabel = remoteReadyLabels.get(sessionId);
-		if (rlabel != null) {
-			rlabel.text = ready ? "READY" : "";
-			rlabel.visible = ready;
+		// Don't update labels during countdown (server resets ready flags)
+		if (_countdownActive) { return; }
+		var nLabel = remoteNameLabels.get(sessionId);
+		if (nLabel != null) {
+			nLabel.color = ready ? FlxColor.GREEN : FlxColor.WHITE;
 		}
 		updatePlayerList();
+	}
+
+	function onAllPlayersReady() {
+		// Start the 3-second countdown
+		_countdownActive = true;
+		_countdownTimer = 3.0;
+		_txtCountdown.text = "3";
+		_txtCountdown.visible = true;
+		// Hide buttons during countdown
+		_btnReady.visible = false;
+		_btnChangeSkin.visible = false;
+		_inputField.visible = false;
 	}
 
 	function handleKicked() {
 		FlxG.switchState(() -> new MainMenuState());
 	}
 
-	function positionLabelAbovePlayer(p:Player, nameLabel:FlxText, readyLabel:FlxText) {
+	function positionLabelAbovePlayer(p:Player, nameLabel:FlxText) {
 		var cx = p.x - p.offset.x + p.frameWidth / 2;
 		var topY = p.y - p.offset.y;
 		nameLabel.setPosition(cx - nameLabel.width / 2, topY - 10);
-		if (readyLabel != null) {
-			readyLabel.setPosition(cx - readyLabel.width / 2, topY - 20);
-		}
 	}
 
 	override public function update(elapsed:Float):Void {
@@ -637,12 +613,11 @@ class LobbyState extends FlxTransitionableState {
 		FlxG.collide(midGroundGroup, player);
 
 		// Position labels above players
-		positionLabelAbovePlayer(player, localNameLabel, localReadyLabel);
+		positionLabelAbovePlayer(player, localNameLabel);
 		for (sessionId => remote in remotePlayers) {
 			var nLabel = remoteNameLabels.get(sessionId);
-			var rLabel = remoteReadyLabels.get(sessionId);
 			if (nLabel != null) {
-				positionLabelAbovePlayer(remote, nLabel, rLabel);
+				positionLabelAbovePlayer(remote, nLabel);
 			}
 		}
 
@@ -697,6 +672,7 @@ class LobbyState extends FlxTransitionableState {
 		GameManager.ME.net.onSkinChanged.remove(onSkinChanged);
 		GameManager.ME.net.onPlayerNameChanged.remove(onNameChanged);
 		GameManager.ME.net.onPlayerReadyChanged.remove(onReadyChanged);
+		GameManager.ME.net.onPlayersReady.remove(onAllPlayersReady);
 		super.destroy();
 	}
 }

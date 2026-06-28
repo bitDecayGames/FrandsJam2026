@@ -297,7 +297,7 @@ class GameManager {
 			setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
 		}
 		if (wasLobby) {
-			FlxTimer.wait(2, () -> {
+			FlxTimer.wait(3, () -> {
 				switchStateBasedOnStatus();
 			});
 		} else {

@@ -1320,8 +1320,8 @@ class Player extends FlxSprite {
 
 	function getDirSuffix():String {
 		return switch (lastInputDir) {
-			case N: "up";
-			case S: "down";
+			case N, NE, NW: "up";
+			case S, SE, SW: "down";
 			case W: "left";
 			case E: "right";
 			default: "down";
