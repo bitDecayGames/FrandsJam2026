@@ -112,7 +112,7 @@ class LocalRoom {
 			case "ground_fish_spawn":
 				net.onGroundFishSpawn.dispatch(data);
 			case "ground_fish_pickup":
-				net.onGroundFishPickup.dispatch(data.x, data.y);
+				net.onGroundFishPickup.dispatch(data.x, data.y, data.sessionId);
 			case "cloud_sync":
 				entities.CloudShadow.windAngle = data.angle;
 				net.onCloudSync.dispatch(data);
@@ -142,6 +142,24 @@ class LocalRoom {
 				// deprecated — handled by dog_ate_fish now
 			case "players_ready":
 				net.onPlayersReady.dispatch();
+			case "powerup_spawn":
+				net.onPowerUpSpawn.dispatch(data);
+			case "powerup_pickup":
+				net.onPowerUpPickup.dispatch(data);
+			case "rocket_fired":
+				net.onRocketFired.dispatch(data);
+			case "rocket_update":
+				net.onRocketUpdate.dispatch(data);
+			case "rocket_hit":
+				net.onRocketHit.dispatch(data);
+			case "rocket_despawn":
+				net.onRocketDespawn.dispatch(data);
+			case "throw_potion":
+				net.onThrowPotion.dispatch(data);
+			case "hunger_active":
+				net.onHungerActive.dispatch(data);
+			case "hunger_expired":
+				net.onHungerExpired.dispatch(data);
 		}
 	}
 }

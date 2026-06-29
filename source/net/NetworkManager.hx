@@ -67,7 +67,7 @@ class NetworkManager {
 	public var onPlayerDrown = new FlxTypedSignal<String->Float->Float->Void>(); // sessionId, x, y
 	public var onCastStart = new FlxTypedSignal<String->String->Void>(); // sessionId, dir
 	public var onGroundFishSpawn = new FlxTypedSignal<Dynamic->Void>(); // {startX, startY, landX, landY, fishType, lengthCm}
-	public var onGroundFishPickup = new FlxTypedSignal<Float->Float->Void>(); // x, y (approximate match)
+	public var onGroundFishPickup = new FlxTypedSignal<Float->Float->String->Void>(); // x, y, sessionId
 	public var onKicked = new FlxTypedSignal<Void->Void>();
 	public var onTimerSync = new FlxTypedSignal<Float->Float->Void>(); // runTimeSec, totalSec
 	public var onRoundTimeUp = new FlxTypedSignal<Void->Void>();
@@ -84,6 +84,17 @@ class NetworkManager {
 	public var onDogItemLanded = new FlxTypedSignal<Dynamic->Void>(); // {startX, startY, landX, landY, itemType, itemData}
 	public var onDogAteFish = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y}
 	public var onSkinAssigned = new FlxTypedSignal<Int->Void>(); // skinIndex
+
+	// Power-up / Rocket signals
+	public var onPowerUpSpawn = new FlxTypedSignal<Dynamic->Void>(); // {x, y}
+	public var onPowerUpPickup = new FlxTypedSignal<Dynamic->Void>(); // {sessionId}
+	public var onRocketFired = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, dirX, dirY, sessionId}
+	public var onRocketUpdate = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y}
+	public var onRocketHit = new FlxTypedSignal<Dynamic->Void>(); // {id, targetSessionId, shooterSessionId}
+	public var onRocketDespawn = new FlxTypedSignal<Dynamic->Void>(); // {id}
+	public var onThrowPotion = new FlxTypedSignal<Dynamic->Void>(); // {sessionId, targetX, targetY, dir}
+	public var onHungerActive = new FlxTypedSignal<Dynamic->Void>(); // {duration}
+	public var onHungerExpired = new FlxTypedSignal<Dynamic->Void>(); // {}
 
 	public static inline var roomName:String = "game_room";
 
@@ -372,7 +383,7 @@ class NetworkManager {
 			});
 
 			onMsg("ground_fish_pickup", (message:Dynamic) -> {
-				onGroundFishPickup.dispatch(message.x, message.y);
+				onGroundFishPickup.dispatch(message.x, message.y, message.sessionId);
 			});
 
 			onMsg("cloud_sync", (message:Dynamic) -> {
@@ -414,6 +425,17 @@ class NetworkManager {
 			onMsg("skin_assigned", (message:Dynamic) -> {
 				onSkinAssigned.dispatch(Std.int(message.skinIndex));
 			});
+
+			// Power-up / Rocket messages
+			onMsg("powerup_spawn", (message:Dynamic) -> { onPowerUpSpawn.dispatch(message); });
+			onMsg("powerup_pickup", (message:Dynamic) -> { onPowerUpPickup.dispatch(message); });
+			onMsg("rocket_fired", (message:Dynamic) -> { onRocketFired.dispatch(message); });
+			onMsg("rocket_update", (message:Dynamic) -> { onRocketUpdate.dispatch(message); });
+			onMsg("rocket_hit", (message:Dynamic) -> { onRocketHit.dispatch(message); });
+			onMsg("rocket_despawn", (message:Dynamic) -> { onRocketDespawn.dispatch(message); });
+			onMsg("throw_potion", (message:Dynamic) -> { onThrowPotion.dispatch(message); });
+			onMsg("hunger_active", (message:Dynamic) -> { onHungerActive.dispatch(message); });
+			onMsg("hunger_expired", (message:Dynamic) -> { onHungerExpired.dispatch(message); });
 			}); // end runInMainThread
 		});
 	}

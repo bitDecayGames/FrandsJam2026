@@ -184,6 +184,8 @@ class Player extends FlxSprite {
 
 	// Factory for creating thrown rocks — set by PlayState
 	public var makeRock:(Float, Float, Bool) -> Rock;
+	public var makePotion:(Float, Float) -> Rock;
+	var throwingPotion:Bool = false;
 
 	// Effect callbacks — set by PlayState
 	public var onBobberLanded:Null<(Float, Float) -> Void> = null;
@@ -587,15 +589,15 @@ class Player extends FlxSprite {
 
 		// Hot mode timer and butt fire — run for both local and remote players
 		if (hotModeActive) {
-			hotModeTimer -= delta;
-			if (hotModeTimer <= 0) {
-				hotModeActive = false;
-
-				if (!isRemote) {
+			// Only tick the timer for the local player — remote players deactivate via network signal
+			if (!isRemote) {
+				hotModeTimer -= delta;
+				if (hotModeTimer <= 0) {
+					hotModeActive = false;
 					GameManager.ME.net.sendHotPepper(false);
 				}
-
-			} else {
+			}
+			if (hotModeActive) {
 				fireEmitTimer += delta;
 				if (fireEmitTimer >= 0.03) {
 					fireEmitTimer = 0;
@@ -723,19 +725,58 @@ class Player extends FlxSprite {
 			playMovementAnim();
 		}
 
-		// Throw rock with B button (prefers big rock, falls back to small)
-		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
-			if (inventory.has(BigRock)) {
-				inventory.remove(BigRock);
-				throwingBigRock = true;
-			} else {
-				inventory.remove(Rock);
-				throwingBigRock = false;
-			}
+		// Fire rocket with C key
+		if (!frozen && !throwing && castState == IDLE && FlxG.keys.justPressed.C && inventory.has(Rocket)) {
+			#if !db inventory.remove(Rocket); #end
+			// Convert facing to direction index: 0=up, 1=right, 2=down, 3=left
+			var dirIdx = switch (lastInputDir) {
+				case N: 0;
+				case E: 1;
+				case S: 2;
+				case W: 3;
+				case NE: 1;
+				case SE: 1;
+				case NW: 3;
+				case SW: 3;
+				default: 2; // default down
+			};
+			GameManager.ME.net.sendMessage("fire_rocket", {dir: dirIdx});
+		}
+
+		// Throw hunger potion with B button (priority over rock, same arc)
+		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(HungerPotion)) {
+			#if !db inventory.remove(HungerPotion); #end
+			throwingPotion = true;
+			throwingBigRock = false;
 			throwing = true;
 			frozen = true;
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
-			// Capture reticle target for the rock
+			var dir = lastInputDir.asVector();
+			var rawX = x + dir.x * 96 + 4;
+			var rawY = y + dir.y * 96 - 8;
+			var bounds = FlxG.worldBounds;
+			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
+			dir.put();
+			GameManager.ME.net.sendMessage("throw_potion", {
+				targetX: rockTarget.x,
+				targetY: rockTarget.y,
+				dir: getDirSuffix()
+			});
+		}
+
+		// Throw rock with B button (prefers big rock, falls back to small)
+		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
+			if (inventory.has(BigRock)) {
+				#if !db inventory.remove(BigRock); #end
+				throwingBigRock = true;
+			} else {
+				#if !db inventory.remove(Rock); #end
+				throwingBigRock = false;
+			}
+			throwingPotion = false;
+			throwing = true;
+			frozen = true;
+			sendAnimUpdate("throw_" + getDirSuffix(), true);
 			var dir = lastInputDir.asVector();
 			var rawX = x + dir.x * 96 + 4;
 			var rawY = y + dir.y * 96 - 8;
@@ -909,7 +950,13 @@ class Player extends FlxSprite {
 	function launchRock() {
 		TODO.sfx("rock_throw");
 		var rockWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
-		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8 + rockWy, throwingBigRock) else new Rock(x + 4, y - 8 + rockWy, throwingBigRock);
+		rockSprite = if (throwingPotion && makePotion != null) {
+			makePotion(x + 4, y - 8 + rockWy);
+		} else if (makeRock != null) {
+			makeRock(x + 4, y - 8 + rockWy, throwingBigRock);
+		} else {
+			new Rock(x + 4, y - 8 + rockWy, throwingBigRock);
+		};
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;

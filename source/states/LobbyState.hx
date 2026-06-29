@@ -20,6 +20,7 @@ import flixel.math.FlxRect;
 import entities.Player;
 import levels.ldtk.Level;
 import levels.ldtk.BDTilemap;
+import flixel.tile.FlxTilemap;
 import states.MainMenuState;
 import todo.TODO;
 import misc.Macros;
@@ -155,6 +156,7 @@ class LobbyState extends FlxTransitionableState {
 		GameManager.ME.net.onPlayerAdded.add(onPlayerAdded);
 		GameManager.ME.net.onPlayerChanged.add(onPlayerChanged);
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
+		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
 		GameManager.ME.net.onSkinChanged.add(onSkinChanged);
 		GameManager.ME.net.onPlayerNameChanged.add(onNameChanged);
 		GameManager.ME.net.onPlayerReadyChanged.add(onReadyChanged);
@@ -538,11 +540,15 @@ class LobbyState extends FlxTransitionableState {
 		updatePlayerList();
 	}
 
+	function onServerAck(serverState:schema.PlayerState) {
+		if (player != null) {
+			player.reconcileFromServer(serverState);
+		}
+	}
+
 	function onPlayerChanged(sessionId:String, data:PlayerUpdateData) {
-		if (sessionId == GameManager.ME.net.mySessionId) { return; }
-		var remote = remotePlayers.get(sessionId);
-		if (remote == null) { return; }
-		remote.setPosition(data.state.x, data.state.y);
+		// Remote player movement is handled by Player.handleChange (set via setNetwork)
+		// which does proper interpolation + animation. Nothing extra needed here.
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -688,7 +694,6 @@ class LobbyState extends FlxTransitionableState {
 		#if play_solo
 		if (!_localReady) { clickReady(); }
 		#elseif db
-		// In debug mode, auto-ready once another player is in the room
 		if (!_localReady && Lambda.count(remotePlayers) > 0) {
 			clickReady();
 		}
@@ -699,6 +704,7 @@ class LobbyState extends FlxTransitionableState {
 		GameManager.ME.net.onPlayerAdded.remove(onPlayerAdded);
 		GameManager.ME.net.onPlayerChanged.remove(onPlayerChanged);
 		GameManager.ME.net.onPlayerRemoved.remove(onPlayerRemoved);
+		GameManager.ME.net.onLocalPlayerAck.remove(onServerAck);
 		GameManager.ME.net.onSkinChanged.remove(onSkinChanged);
 		GameManager.ME.net.onPlayerNameChanged.remove(onNameChanged);
 		GameManager.ME.net.onPlayerReadyChanged.remove(onReadyChanged);

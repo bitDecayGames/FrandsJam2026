@@ -51,13 +51,14 @@ class GameLogic {
 	var dogs:Array<{
 		id:Int, x:Float, y:Float, velX:Float, velY:Float,
 		targetSession:String, state:String, fleeTimer:Float,
-		fishTargetX:Float, fishTargetY:Float, waitTimer:Float
+		fishTargetX:Float, fishTargetY:Float, waitTimer:Float,
+		path:Array<{x:Float, y:Float}>, pathIndex:Int, pathCooldown:Float
 	}>;
 	var nextDogId:Int;
 	var dogSpawnTimer:Float;
-	static var DOG_SPEED:Float = 50;
-	static var DOG_SEEK_SPEED:Float = 40;
-	static var DOG_FLEE_SPEED:Float = 80;
+	static var DOG_SPEED:Float = 100;
+	static var DOG_SEEK_SPEED:Float = 80;
+	static var DOG_FLEE_SPEED:Float = 160;
 	static var DOG_CATCH_DIST:Float = 10;
 	static var DOG_FISH_PICKUP_DIST:Float = 6;
 	static var DOG_SPAWN_INTERVAL_MIN:Float = 15;
@@ -67,6 +68,30 @@ class GameLogic {
 	static var DOG_WAIT_TIMEOUT:Float = 2.0; // max time to wait for item drop response
 	static var DOG_ITEM_DROP_RADIUS:Float = 36.0;
 	var dogUpdateTimer:Float;
+
+	// Power-up item box
+	var powerUpX:Float;
+	var powerUpY:Float;
+	var powerUpAlive:Bool;
+	var powerUpRespawnTimer:Float;
+	static var POWERUP_RESPAWN_DELAY:Float = 5.0;
+
+	// Rockets in flight
+	var rockets:Array<{
+		id:Int, x:Float, y:Float, dirX:Float, dirY:Float,
+		speed:Float, ownerSession:String
+	}>;
+	var nextRocketId:Int;
+	static var ROCKET_INITIAL_SPEED:Float = 40;
+	static var ROCKET_ACCELERATION:Float = 300;
+	static var ROCKET_MAX_SPEED:Float = 350;
+	static var ROCKET_HIT_DIST:Float = 12;
+
+	// Hunger potion
+	var hungerTimer:Float;
+	var hungerBodyIndex:Int; // which water body is affected (-1 = none)
+	static var HUNGER_DURATION:Float = 10.0;
+	static var HUNGER_ATTRACT_DIST:Float = 999; // attract from anywhere in body
 
 	// Round timer
 	public var roundTimerSec:Float;
@@ -132,6 +157,15 @@ class GameLogic {
 		nextDogId = 1;
 		dogSpawnTimer = 10.0; // first dog after 10 seconds
 		dogUpdateTimer = 0;
+
+		powerUpAlive = false;
+		powerUpRespawnTimer = 3.0; // spawn first power-up after 3 seconds
+		powerUpX = 0;
+		powerUpY = 0;
+		rockets = [];
+		nextRocketId = 1;
+		hungerTimer = 0;
+		hungerBodyIndex = -1;
 
 		roundTimerSec = 0;
 		roundDurationSec = 90;
@@ -237,7 +271,7 @@ class GameLogic {
 					fishType: data.fishType, lengthCm: data.lengthCm
 				});
 			case "ground_fish_pickup":
-				broadcast("ground_fish_pickup", data);
+				broadcast("ground_fish_pickup", {x: data.x, y: data.y, sessionId: clientId});
 
 			case "player_name_changed":
 				var ps = players.get(clientId);
@@ -380,6 +414,54 @@ class GameLogic {
 				var worldH:Float = collision.rows * collision.tileSize;
 				spawnDog(worldW, worldH);
 
+			case "throw_potion":
+				broadcast("throw_potion", {sessionId: clientId, targetX: data.targetX, targetY: data.targetY, dir: data.dir});
+
+			case "potion_landed":
+				// Find which water body the potion landed in
+				var landX:Float = data.x;
+				var landY:Float = data.y;
+				var grid = collision.tileSize;
+				var landCx = Std.int(landX / grid);
+				var landCy = Std.int(landY / grid);
+				hungerBodyIndex = -1;
+				for (bi in 0...waterBodies.length) {
+					for (tile in waterBodies[bi]) {
+						var tcx = Std.int(tile.x / grid);
+						var tcy = Std.int(tile.y / grid);
+						if (tcx == landCx && tcy == landCy) {
+							hungerBodyIndex = bi;
+							break;
+						}
+					}
+					if (hungerBodyIndex >= 0) { break; }
+				}
+				if (hungerBodyIndex >= 0) {
+					hungerTimer = HUNGER_DURATION;
+					broadcast("hunger_active", {duration: HUNGER_DURATION, x: landX, y: landY});
+				}
+
+			case "fire_rocket":
+				var p = players.get(clientId);
+				if (p != null) {
+					var dir:Int = data.dir; // 0=up, 1=right, 2=down, 3=left
+					var dx:Float = if (dir == 1) 1 else if (dir == 3) -1 else 0;
+					var dy:Float = if (dir == 0) -1 else if (dir == 2) 1 else 0;
+					var rid = nextRocketId++;
+					// Spawn from visual center of player (hitbox is 16x8 near feet of 48x48 graphic)
+					var spawnX = p.x + p.width / 2;
+					var spawnY = p.y - 4;
+					rockets.push({
+						id: rid, x: spawnX, y: spawnY,
+						dirX: dx, dirY: dy, speed: ROCKET_INITIAL_SPEED,
+						ownerSession: clientId
+					});
+					broadcast("rocket_fired", {
+						id: rid, x: spawnX, y: spawnY,
+						dirX: dx, dirY: dy, sessionId: clientId
+					});
+				}
+
 			case "debug_end_round":
 				if (gameplayStarted) {
 					broadcast("round_time_up", {});
@@ -477,6 +559,15 @@ class GameLogic {
 		updateSeagulls(t);
 		updateWorms(t);
 		updateDogs(t);
+		updatePowerUp(t);
+		updateRockets(t);
+		if (hungerTimer > 0) {
+			hungerTimer -= t;
+			if (hungerTimer <= 0) {
+				hungerTimer = 0;
+				broadcast("hunger_expired", {});
+			}
+		}
 
 		if (gameplayStarted) {
 			roundTimerSec += t;
@@ -762,7 +853,17 @@ class GameLogic {
 			// Fish shadow sprite is 16x16; use center for distance checks
 			var fcx = f.x + 8;
 			var fcy = f.y + 8;
+			// Is this fish in the hungry water body?
+			var fishHungry = hungerTimer > 0 && hungerBodyIndex >= 0 && f.bodyIndex == hungerBodyIndex;
 			for (sid => bpos in bobberPositions) {
+				// During hunger, only attract to bobbers that are in water (shallow or deep)
+				if (fishHungry) {
+					var bcx = Std.int(bpos.x / collision.tileSize);
+					var bcy = Std.int(bpos.y / collision.tileSize);
+					var inWater = collision.isSwimmableAt(bcx, bcy)
+						|| collision.isShallowAt(bpos.x, bpos.y);
+					if (!inWater) { continue; }
+				}
 				hasBobbers = true;
 				var dx = bpos.x - fcx;
 				var dy = bpos.y - fcy;
@@ -771,15 +872,15 @@ class GameLogic {
 			}
 
 			if (f.attracted && !hasBobbers) { f.attracted = false; fleeFromFish(f, f.x + f.velX, f.y + f.velY); continue; }
-			if (f.attracted && closestDist > FISH_ATTRACT_DIST) { f.attracted = false; fleeFromFish(f, closestBX, closestBY); continue; }
+			var attractDist = if (fishHungry) HUNGER_ATTRACT_DIST else FISH_ATTRACT_DIST;
+			if (f.attracted && closestDist > attractDist) { f.attracted = false; fleeFromFish(f, closestBX, closestBY); continue; }
 			if (hasBobbers && closestDist < FISH_CATCH_DIST) {
 				f.alive = false; f.velX = 0; f.velY = 0; f.attracted = false; f.respawnTimer = 3.0;
 				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: f.fishType});
-				// Remove bobber so only one fish is caught per bobber per tick
 				bobberPositions.remove(closestSid);
 				continue;
 			}
-			if (hasBobbers && closestDist < FISH_ATTRACT_DIST) {
+			if (hasBobbers && closestDist < attractDist) {
 				f.attracted = true; f.pauseTimer = 0;
 				var dx = closestBX - fcx; var dy = closestBY - fcy;
 				var aDist = Math.sqrt(dx * dx + dy * dy);
@@ -989,19 +1090,17 @@ class GameLogic {
 					}
 
 				case "seeking":
-					// Walk toward the fish
+					// Walk toward the fish using pathfinding — recompute every frame
+					dog.path = findPath(dog.x, dog.y, dog.fishTargetX, dog.fishTargetY);
+					dog.pathIndex = 0;
 					var dx = dog.fishTargetX - dog.x;
 					var dy = dog.fishTargetY - dog.y;
 					var dist = Math.sqrt(dx * dx + dy * dy);
 					if (dist <= DOG_FISH_PICKUP_DIST) {
-						// Reached the fish — eat it and flee
 						broadcast("dog_ate_fish", {id: dog.id, x: dog.fishTargetX, y: dog.fishTargetY});
 						startDogFlee(dog);
 					} else {
-						dog.velX = (dx / dist) * DOG_SEEK_SPEED;
-						dog.velY = (dy / dist) * DOG_SEEK_SPEED;
-						dog.x += dog.velX * t;
-						dog.y += dog.velY * t;
+						moveDogAlongPath(dog, DOG_SEEK_SPEED, t);
 					}
 					if (shouldBroadcast) {
 						broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: dog.velX, velY: dog.velY});
@@ -1026,12 +1125,10 @@ class GameLogic {
 					dog.targetSession = closestSid;
 
 					if (closestDist > DOG_CATCH_DIST) {
-						var dx = closestX - dog.x;
-						var dy = closestY - dog.y;
-						dog.velX = (dx / closestDist) * DOG_SPEED;
-						dog.velY = (dy / closestDist) * DOG_SPEED;
-						dog.x += dog.velX * t;
-						dog.y += dog.velY * t;
+						// Recompute path every frame for responsive chasing
+						dog.path = findPath(dog.x, dog.y, closestX, closestY);
+						dog.pathIndex = 0;
+						moveDogAlongPath(dog, DOG_SPEED, t);
 					}
 
 					if (closestDist <= DOG_CATCH_DIST && closestSid != null) {
@@ -1051,7 +1148,7 @@ class GameLogic {
 		}
 	}
 
-	function startDogFlee(dog:{id:Int, x:Float, y:Float, velX:Float, velY:Float, targetSession:String, state:String, fleeTimer:Float, fishTargetX:Float, fishTargetY:Float, waitTimer:Float}) {
+	function startDogFlee(dog:{id:Int, x:Float, y:Float, velX:Float, velY:Float, targetSession:String, state:String, fleeTimer:Float, fishTargetX:Float, fishTargetY:Float, waitTimer:Float, path:Array<{x:Float, y:Float}>, pathIndex:Int, pathCooldown:Float}) {
 		dog.state = "fleeing";
 		dog.fleeTimer = DOG_FLEE_DURATION;
 		var fleeLen = Math.sqrt(dog.velX * dog.velX + dog.velY * dog.velY);
@@ -1088,8 +1185,277 @@ class GameLogic {
 		dogs.push({
 			id: did, x: sx, y: sy, velX: 0, velY: 0,
 			targetSession: null, state: "chasing", fleeTimer: 0,
-			fishTargetX: 0, fishTargetY: 0, waitTimer: 0
+			fishTargetX: 0, fishTargetY: 0, waitTimer: 0,
+			path: [], pathIndex: 0, pathCooldown: 0
 		});
 		broadcast("dog_spawn", {id: did, x: sx, y: sy});
+	}
+
+	function moveDogAlongPath(dog:{x:Float, y:Float, velX:Float, velY:Float, path:Array<{x:Float, y:Float}>, pathIndex:Int}, speed:Float, t:Float) {
+		if (dog.path.length == 0 || dog.pathIndex >= dog.path.length) {
+			dog.velX = 0;
+			dog.velY = 0;
+			return;
+		}
+		var wp = dog.path[dog.pathIndex];
+		var dx = wp.x - dog.x;
+		var dy = wp.y - dog.y;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+		if (dist < 4) {
+			dog.pathIndex++;
+			return;
+		}
+		dog.velX = (dx / dist) * speed;
+		dog.velY = (dy / dist) * speed;
+		dog.x += dog.velX * t;
+		dog.y += dog.velY * t;
+	}
+
+	/** Check if a straight line between two points is clear of obstacles for the dog. */
+	function dogLineOfSight(x1:Float, y1:Float, x2:Float, y2:Float):Bool {
+		var gs = collision.tileSize;
+		var dx = x2 - x1;
+		var dy = y2 - y1;
+		var dist = Math.sqrt(dx * dx + dy * dy);
+		if (dist < 1) { return true; }
+		var steps = Math.ceil(dist / (gs * 0.5)); // check every half-tile
+		for (i in 1...steps) {
+			var t = i / steps;
+			var px = x1 + dx * t;
+			var py = y1 + dy * t;
+			var col = Std.int(px / gs);
+			var row = Std.int(py / gs);
+			if (!isDogWalkable(col, row)) { return false; }
+		}
+		return true;
+	}
+
+	/** Simplify a path by removing waypoints that can be skipped via line-of-sight. */
+	function smoothPath(path:Array<{x:Float, y:Float}>, fromX:Float, fromY:Float):Array<{x:Float, y:Float}> {
+		if (path.length <= 1) { return path; }
+		var result = new Array<{x:Float, y:Float}>();
+		var current = {x: fromX, y: fromY};
+		var i = 0;
+		while (i < path.length) {
+			// Look ahead as far as possible
+			var farthest = i;
+			for (j in (i + 1)...path.length) {
+				if (dogLineOfSight(current.x, current.y, path[j].x, path[j].y)) {
+					farthest = j;
+				}
+			}
+			result.push(path[farthest]);
+			current = path[farthest];
+			i = farthest + 1;
+		}
+		return result;
+	}
+
+	/** A* pathfinding on the collision grid. Returns waypoints in world coords. */
+	function findPath(fromX:Float, fromY:Float, toX:Float, toY:Float):Array<{x:Float, y:Float}> {
+		// If direct line of sight exists, skip A* entirely
+		if (dogLineOfSight(fromX, fromY, toX, toY)) {
+			return [{x: toX, y: toY}];
+		}
+
+		var gs = collision.tileSize;
+		var startCol = Std.int(fromX / gs);
+		var startRow = Std.int(fromY / gs);
+		var endCol = Std.int(toX / gs);
+		var endRow = Std.int(toY / gs);
+
+		// Clamp to grid
+		if (startCol < 0) { startCol = 0; } if (startCol >= collision.cols) { startCol = collision.cols - 1; }
+		if (startRow < 0) { startRow = 0; } if (startRow >= collision.rows) { startRow = collision.rows - 1; }
+		if (endCol < 0) { endCol = 0; } if (endCol >= collision.cols) { endCol = collision.cols - 1; }
+		if (endRow < 0) { endRow = 0; } if (endRow >= collision.rows) { endRow = collision.rows - 1; }
+
+		if (startCol == endCol && startRow == endRow) {
+			return [{x: toX, y: toY}];
+		}
+
+		// Also check if any bush rects block a tile
+		var w = collision.cols;
+
+		// A* with cardinal movement only
+		var openList = new Array<Int>(); // packed as row * w + col
+		var gScore = new haxe.ds.IntMap<Float>();
+		var fScore = new haxe.ds.IntMap<Float>();
+		var cameFrom = new haxe.ds.IntMap<Int>();
+
+		var startKey = startRow * w + startCol;
+		var endKey = endRow * w + endCol;
+		openList.push(startKey);
+		gScore.set(startKey, 0);
+		fScore.set(startKey, heuristic(startCol, startRow, endCol, endRow));
+
+		var maxIter = 2000; // cap to prevent lag on huge maps
+		while (openList.length > 0 && maxIter-- > 0) {
+			// Find lowest fScore in open list
+			var bestIdx = 0;
+			var bestF = fScore.exists(openList[0]) ? fScore.get(openList[0]) : 1e20;
+			for (oi in 1...openList.length) {
+				var f = fScore.exists(openList[oi]) ? fScore.get(openList[oi]) : 1e20;
+				if (f < bestF) { bestF = f; bestIdx = oi; }
+			}
+			var current = openList[bestIdx];
+			if (current == endKey) {
+				// Reconstruct and smooth path
+				var rawPath = reconstructPath(cameFrom, current, w, gs, toX, toY);
+				return smoothPath(rawPath, fromX, fromY);
+			}
+			openList[bestIdx] = openList[openList.length - 1];
+			openList.pop();
+
+			var cx = current % w;
+			var cy = Std.int(current / w);
+			var curG = gScore.exists(current) ? gScore.get(current) : 1e20;
+
+			for (d in [{dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}]) {
+				var nx = cx + d.dx;
+				var ny = cy + d.dy;
+				if (nx < 0 || nx >= collision.cols || ny < 0 || ny >= collision.rows) { continue; }
+				// Allow the end tile even if not walkable (dog needs to reach the player)
+				var nKey = ny * w + nx;
+				if (nKey != endKey && !isDogWalkable(nx, ny)) { continue; }
+
+				var tentG = curG + 1;
+				var prevG = gScore.exists(nKey) ? gScore.get(nKey) : 1e20;
+				if (tentG < prevG) {
+					cameFrom.set(nKey, current);
+					gScore.set(nKey, tentG);
+					fScore.set(nKey, tentG + heuristic(nx, ny, endCol, endRow));
+					// Add to open list if not already there
+					var inOpen = false;
+					for (o in openList) { if (o == nKey) { inOpen = true; break; } }
+					if (!inOpen) { openList.push(nKey); }
+				}
+			}
+		}
+
+		// No path found — fall back to direct movement
+		return [{x: toX, y: toY}];
+	}
+
+	/** Post-process A* result: smooth the grid-aligned path into direct lines. */
+	function postProcessPath(path:Array<{x:Float, y:Float}>, fromX:Float, fromY:Float):Array<{x:Float, y:Float}> {
+		return smoothPath(path, fromX, fromY);
+	}
+
+	function isDogWalkable(col:Int, row:Int):Bool {
+		if (!collision.isWalkableAt(col, row)) { return false; }
+		// Also check bush entity rects
+		var gs = collision.tileSize;
+		var tx = col * gs;
+		var ty = row * gs;
+		for (b in bushRects) {
+			if (b.w <= 0 || b.h <= 0) { continue; }
+			if (tx + gs > b.x && tx < b.x + b.w && ty + gs > b.y && ty < b.y + b.h) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	static function heuristic(ax:Int, ay:Int, bx:Int, by:Int):Float {
+		return Math.abs(ax - bx) + Math.abs(ay - by); // Manhattan distance
+	}
+
+	function reconstructPath(cameFrom:haxe.ds.IntMap<Int>, current:Int, w:Int, gs:Int, finalX:Float, finalY:Float):Array<{x:Float, y:Float}> {
+		var path = new Array<{x:Float, y:Float}>();
+		path.push({x: finalX, y: finalY}); // exact target as final waypoint
+		var node = current;
+		while (cameFrom.exists(node)) {
+			var prev = cameFrom.get(node);
+			// Convert grid coords to world center
+			var cx = (node % w) * gs + gs / 2.0;
+			var cy = Std.int(node / w) * gs + gs / 2.0;
+			path.push({x: cx, y: cy});
+			node = prev;
+		}
+		path.reverse();
+		return path;
+	}
+
+	// ── Power-Up ──
+
+	function updatePowerUp(t:Float) {
+		if (!gameplayStarted) { return; }
+
+		if (!powerUpAlive) {
+			powerUpRespawnTimer -= t;
+			if (powerUpRespawnTimer <= 0) {
+				spawnPowerUp();
+			}
+			return;
+		}
+
+		// Check player pickup
+		for (id => p in players) {
+			var dx = (p.x + p.width / 2) - powerUpX;
+			var dy = (p.y + p.height / 2) - powerUpY;
+			if (dx * dx + dy * dy < 14 * 14) {
+				powerUpAlive = false;
+				powerUpRespawnTimer = POWERUP_RESPAWN_DELAY;
+				broadcast("powerup_pickup", {sessionId: id});
+				break;
+			}
+		}
+	}
+
+	function spawnPowerUp() {
+		// Pick a random walkable tile
+		var grid = collision.tileSize;
+		for (_ in 0...100) {
+			var cx = Std.int(Math.random() * collision.cols);
+			var cy = Std.int(Math.random() * collision.rows);
+			if (collision.isWalkableAt(cx, cy)) {
+				powerUpX = cx * grid + grid / 2.0;
+				powerUpY = cy * grid + grid / 2.0;
+				powerUpAlive = true;
+				broadcast("powerup_spawn", {x: powerUpX, y: powerUpY});
+				return;
+			}
+		}
+	}
+
+	// ── Rockets ──
+
+	function updateRockets(t:Float) {
+		var worldW:Float = collision.cols * collision.tileSize;
+		var worldH:Float = collision.rows * collision.tileSize;
+		var i = rockets.length;
+		while (i-- > 0) {
+			var r = rockets[i];
+			// Accelerate
+			r.speed += ROCKET_ACCELERATION * t;
+			if (r.speed > ROCKET_MAX_SPEED) { r.speed = ROCKET_MAX_SPEED; }
+			r.x += r.dirX * r.speed * t;
+			r.y += r.dirY * r.speed * t;
+
+			// Check out of bounds
+			if (r.x < -16 || r.x > worldW + 16 || r.y < -16 || r.y > worldH + 16) {
+				broadcast("rocket_despawn", {id: r.id});
+				rockets.splice(i, 1);
+				continue;
+			}
+
+			// Check collision with players
+			var hit = false;
+			for (pid => p in players) {
+				if (pid == r.ownerSession) { continue; } // can't hit yourself
+				var dx = r.x - (p.x + p.width / 2);
+				var dy = r.y - (p.y + p.height / 2);
+				if (dx * dx + dy * dy < ROCKET_HIT_DIST * ROCKET_HIT_DIST) {
+					broadcast("rocket_hit", {id: r.id, targetSessionId: pid, shooterSessionId: r.ownerSession});
+					rockets.splice(i, 1);
+					hit = true;
+					break;
+				}
+			}
+			if (hit) { continue; }
+
+			// Clients simulate trajectory locally — no per-tick position broadcast needed
+		}
 	}
 }

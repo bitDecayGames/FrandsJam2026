@@ -68,6 +68,11 @@ class PlayState extends FlxTransitionableState {
 	var localBushContacts = new Map<Int, Bool>(); // entityRect index -> in contact
 	var remoteBushContacts = new Map<String, Map<Int, Bool>>(); // sessionId -> bushIndex -> inContact
 	var serverDogs = new Map<Int, entities.Dog>(); // dogId -> Dog sprite
+	var powerUpSprite:FlxSprite;
+	var rocketSprites = new Map<Int, FlxSprite>();
+	var rocketData = new Map<Int, {x:Float, y:Float, dirX:Float, dirY:Float, speed:Float}>();
+	var rocketEmitters = new Map<Int, flixel.effects.particles.FlxEmitter>();
+	var hungerOverlay:FlxSprite;
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
@@ -178,7 +183,7 @@ class PlayState extends FlxTransitionableState {
 
 	#if db
 	function addDebugButtons() {
-		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog"];
+		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog", "Rocket", "Potion", "Fish"];
 		var btnW = 60;
 		var btnH = 16;
 		var margin = 4;
@@ -217,14 +222,16 @@ class PlayState extends FlxTransitionableState {
 		if (mx < startX || mx > startX + btnW) {
 			return;
 		}
-		for (i in 0...6) {
+		for (i in 0...9) {
 			var by = startY + i * (btnH + margin);
 			if (my >= by && my < by + btnH) {
 				switch (i) {
 					case 0:
-						player.inventory.add(Rock);
+						if (player.inventory.has(Rock)) { player.inventory.remove(Rock); }
+						else { player.inventory.add(Rock); }
 					case 1:
-						player.inventory.add(BigRock);
+						if (player.inventory.has(BigRock)) { player.inventory.remove(BigRock); }
+						else { player.inventory.add(BigRock); }
 					case 2:
 						if (player.hotModeActive) {
 							player.deactivateHotMode();
@@ -243,6 +250,17 @@ class PlayState extends FlxTransitionableState {
 						GameManager.ME.net.sendMessage("debug_end_round", {});
 					case 5:
 						GameManager.ME.net.sendMessage("debug_spawn_dog", {});
+					case 6:
+						if (player.inventory.has(Rocket)) { player.inventory.remove(Rocket); }
+						else { player.inventory.add(Rocket); }
+					case 7:
+						if (player.inventory.has(HungerPotion)) { player.inventory.remove(HungerPotion); }
+						else { player.inventory.add(HungerPotion); }
+					case 8:
+						// Fish button: always adds (no toggle), random fish type
+						var ftype = FlxG.random.int(0, 11);
+						var flen = FlxG.random.int(20, 60);
+						player.inventory.add(Fish(ftype, flen));
 				}
 				return;
 			}
@@ -282,6 +300,15 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onDogDespawn.remove(onDogDespawn);
 		GameManager.ME.net.onDogItemLanded.remove(onDogItemLanded);
 		GameManager.ME.net.onDogAteFish.remove(onDogAteFish);
+		GameManager.ME.net.onPowerUpSpawn.remove(onPowerUpSpawn);
+		GameManager.ME.net.onPowerUpPickup.remove(onPowerUpPickup);
+		GameManager.ME.net.onRocketFired.remove(onRocketFired);
+		GameManager.ME.net.onRocketUpdate.remove(onRocketUpdate);
+		GameManager.ME.net.onRocketHit.remove(onRocketHit);
+		GameManager.ME.net.onRocketDespawn.remove(onRocketDespawn);
+		GameManager.ME.net.onThrowPotion.remove(onThrowPotion);
+		GameManager.ME.net.onHungerActive.remove(onHungerActive);
+		GameManager.ME.net.onHungerExpired.remove(onHungerExpired);
 		GameManager.ME.net.onCloudSync.remove(onServerCloudSync);
 		GameManager.ME.net.onGroundFishSpawn.remove(onRemoteGroundFishSpawn);
 		GameManager.ME.net.onGroundFishPickup.remove(onRemoteGroundFishPickup);
@@ -323,6 +350,15 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onDogDespawn.add(onDogDespawn);
 		GameManager.ME.net.onDogItemLanded.add(onDogItemLanded);
 		GameManager.ME.net.onDogAteFish.add(onDogAteFish);
+		GameManager.ME.net.onPowerUpSpawn.add(onPowerUpSpawn);
+		GameManager.ME.net.onPowerUpPickup.add(onPowerUpPickup);
+		GameManager.ME.net.onRocketFired.add(onRocketFired);
+		GameManager.ME.net.onRocketUpdate.add(onRocketUpdate);
+		GameManager.ME.net.onRocketHit.add(onRocketHit);
+		GameManager.ME.net.onRocketDespawn.add(onRocketDespawn);
+		GameManager.ME.net.onThrowPotion.add(onThrowPotion);
+		GameManager.ME.net.onHungerActive.add(onHungerActive);
+		GameManager.ME.net.onHungerExpired.add(onHungerExpired);
 
 		// Fish may have been added to the schema before we subscribed
 		// (server spawns fish on room creation, before clients join PlayState).
@@ -458,8 +494,21 @@ class PlayState extends FlxTransitionableState {
 
 		waterLayer = level.waterGrid;
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		player.makePotion = (rx, ry) -> {
+			var r = new Rock(rx, ry, false, waterLayer, null, (lx, ly, _) -> {
+				// Potion landed in water — tell server
+				GameManager.ME.net.sendMessage("potion_landed", {x: lx, y: ly});
+			});
+			r.makeGraphic(8, 8, 0xFF00CC66); // green potion placeholder
+			return r;
+		};
 		for (_ => remote in remotePlayers) {
 			remote.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onRemoteSplash);
+			remote.makePotion = (rx, ry) -> {
+				var r = new Rock(rx, ry, false, waterLayer, null, null);
+				r.makeGraphic(8, 8, 0xFF00CC66);
+				return r;
+			};
 		}
 		groundFishGroup.setWaterLayer(waterLayer);
 		groundFishGroup.onPickedUp = (fx, fy) -> {
@@ -835,8 +884,10 @@ class PlayState extends FlxTransitionableState {
 		groundFishGroup.add(new entities.GroundFish(startX, startY, landX, landY, fishType, lengthCm));
 	}
 
-	function onRemoteGroundFishPickup(px:Float, py:Float) {
-		// find the closest ground fish to the reported position and kill it
+	function onRemoteGroundFishPickup(px:Float, py:Float, sessionId:String) {
+		// Local player already killed the fish in handleOverlap — skip the echo
+		if (sessionId == player.sessionId) { return; }
+		// For remote players, find the closest ground fish and kill it
 		var closest:entities.GroundFish = null;
 		var closestDist = Math.POSITIVE_INFINITY;
 		for (fish in groundFishGroup) {
@@ -1002,6 +1053,22 @@ class PlayState extends FlxTransitionableState {
 			// (local player reads it in onServerAck, remotes in handleChange)
 		}
 
+		// Simulate rockets locally (deterministic: straight line + acceleration)
+		for (rid => rd in rocketData) {
+			rd.speed += 300.0 * elapsed; // ROCKET_ACCELERATION
+			if (rd.speed > 350.0) { rd.speed = 350.0; } // ROCKET_MAX_SPEED
+			rd.x += rd.dirX * rd.speed * elapsed;
+			rd.y += rd.dirY * rd.speed * elapsed;
+			var sprite = rocketSprites.get(rid);
+			if (sprite != null) {
+				sprite.setPosition(rd.x - 4, rd.y - 4);
+			}
+			var emitter = rocketEmitters.get(rid);
+			if (emitter != null) {
+				emitter.setPosition(rd.x, rd.y);
+			}
+		}
+
 		ySortGroup.sort((order, a, b) -> {
 			if (a == null || b == null) { return 0; }
 			var objA:flixel.FlxObject = cast a;
@@ -1074,6 +1141,10 @@ class PlayState extends FlxTransitionableState {
 						items.push({type: "rock", data: {big: true}});
 					case Waders:
 						items.push({type: "waders", data: {}});
+					case Rocket:
+						items.push({type: "rocket", data: {}});
+					case HungerPotion:
+						items.push({type: "potion", data: {}});
 				}
 			}
 			player.inventory.clear();
@@ -1148,6 +1219,211 @@ class PlayState extends FlxTransitionableState {
 			ySortGroup.remove(dog);
 			dog.destroy();
 			serverDogs.remove(id);
+		}
+	}
+
+	// ── Power-Up / Rocket ──
+
+	function onPowerUpSpawn(data:Dynamic) {
+		if (powerUpSprite != null) {
+			powerUpSprite.kill();
+		}
+		powerUpSprite = new FlxSprite(data.x - 8, data.y - 8);
+		powerUpSprite.makeGraphic(16, 16, 0xFFFF00FF); // magenta box placeholder
+		ySortGroup.add(powerUpSprite);
+	}
+
+	function onPowerUpPickup(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		if (powerUpSprite != null) {
+			ySortGroup.remove(powerUpSprite);
+			powerUpSprite.destroy();
+			powerUpSprite = null;
+		}
+		if (sessionId == player.sessionId) {
+			player.inventory.add(Rocket);
+			TODO.sfx("powerup_pickup");
+		}
+	}
+
+	function onRocketFired(data:Dynamic) {
+		var rid:Int = data.id;
+		var rx:Float = data.x;
+		var ry:Float = data.y;
+		var dirX:Float = data.dirX;
+		var dirY:Float = data.dirY;
+		var sprite = new FlxSprite(rx - 4, ry - 4);
+		sprite.makeGraphic(8, 8, 0xFFFF4400); // orange rocket placeholder
+		ySortGroup.add(sprite);
+		rocketSprites.set(rid, sprite);
+		rocketData.set(rid, {x: rx, y: ry, dirX: dirX, dirY: dirY, speed: 40.0});
+
+		// Trailing smoke emitter
+		var emitter = new flixel.effects.particles.FlxEmitter(rx, ry, 500);
+		emitter.makeParticles(6, 6, 0xFFBBBBBB, 500);
+		emitter.lifespan.set(0.5, 1.2);
+		// Spray smoke backwards from the rocket's direction
+		var smokeSpeedMin:Float = 20;
+		var smokeSpeedMax:Float = 60;
+		var backAngle = Math.atan2(-dirY, -dirX) * 180 / Math.PI; // opposite of travel dir
+		emitter.launchMode = flixel.effects.particles.FlxEmitter.FlxEmitterMode.CIRCLE;
+		emitter.launchAngle.set(backAngle - 50, backAngle + 50); // 100 degree spread behind rocket
+		emitter.speed.set(smokeSpeedMin, smokeSpeedMax);
+		emitter.alpha.set(0.9, 0.9, 0.0, 0.0);
+		emitter.scale.set(1.5, 2.5, 0.3, 0.5);
+		emitter.frequency = 0.001;
+		emitter.start(false);
+		emitter.start(false);
+		add(emitter);
+		rocketEmitters.set(rid, emitter);
+
+		TODO.sfx("rocket_fire");
+	}
+
+	function onRocketUpdate(data:Dynamic) {
+		// Clients simulate locally — server updates not used
+	}
+
+	function removeRocket(rid:Int) {
+		var sprite = rocketSprites.get(rid);
+		if (sprite != null) {
+			ySortGroup.remove(sprite);
+			sprite.destroy();
+			rocketSprites.remove(rid);
+		}
+		rocketData.remove(rid);
+		var emitter = rocketEmitters.get(rid);
+		if (emitter != null) {
+			emitter.emitting = false;
+			// Let remaining particles fade out, then remove
+			flixel.util.FlxTimer.wait(1.0, () -> {
+				remove(emitter);
+				emitter.destroy();
+			});
+			rocketEmitters.remove(rid);
+		}
+	}
+
+	function onRocketHit(data:Dynamic) {
+		var rid:Int = data.id;
+		var targetSessionId:String = data.targetSessionId;
+
+		removeRocket(rid);
+
+		TODO.sfx("rocket_hit");
+
+		// Stun the target player (same as dog caught)
+		if (targetSessionId == player.sessionId) {
+			if (player.isCasting()) {
+				player.catchFish(false);
+			}
+			player.frozen = true;
+			flixel.effects.FlxFlicker.flicker(player, 3.0, 0.13);
+			flixel.util.FlxTimer.wait(3.0, () -> {
+				player.frozen = false;
+			});
+
+			// Explode inventory
+			var items:Array<Dynamic> = [];
+			for (item in player.inventory.getItems()) {
+				switch (item) {
+					case Fish(spriteIndex, lengthCm):
+						items.push({type: "fish", data: {fishType: spriteIndex, lengthCm: lengthCm}});
+					case Rock:
+						items.push({type: "rock", data: {big: false}});
+					case BigRock:
+						items.push({type: "rock", data: {big: true}});
+					case Waders:
+						items.push({type: "waders", data: {}});
+					case Rocket:
+						items.push({type: "rocket", data: {}});
+					case HungerPotion:
+						items.push({type: "potion", data: {}});
+				}
+			}
+			player.inventory.clear();
+
+			if (items.length > 0) {
+				GameManager.ME.net.sendMessage("dog_item_drop", {
+					dogId: -1,
+					playerX: player.x + 8,
+					playerY: player.y - 14,
+					items: items
+				});
+			}
+		} else {
+			var remote = remotePlayers.get(targetSessionId);
+			if (remote != null) {
+				flixel.effects.FlxFlicker.flicker(remote, 3.0, 0.13);
+			}
+		}
+	}
+
+	function onRocketDespawn(data:Dynamic) {
+		removeRocket(data.id);
+	}
+
+	function onThrowPotion(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		if (sessionId == player.sessionId) { return; } // local player already threw
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteThrowRock(data.targetX, data.targetY, false, data.dir);
+		}
+	}
+
+	function onHungerActive(data:Dynamic) {
+		TODO.sfx("hunger_potion");
+		var landX:Float = data.x;
+		var landY:Float = data.y;
+		// Flood-fill from landing position to find the water body, then tint those tiles
+		if (waterLayer != null) {
+			var gs = waterLayer.gridSize;
+			var startCx = Std.int(landX / gs);
+			var startCy = Std.int(landY / gs);
+			if (waterLayer.getInt(startCx, startCy) == 1) {
+				// Flood-fill to find all tiles in this water body
+				var visited = new Map<Int, Bool>();
+				var queue = new Array<Int>();
+				var key = startCy * waterLayer.cWid + startCx;
+				queue.push(key);
+				visited.set(key, true);
+				while (queue.length > 0) {
+					var k = queue.shift();
+					var cx = k % waterLayer.cWid;
+					var cy = Std.int(k / waterLayer.cWid);
+					for (d in [{dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}]) {
+						var nx = cx + d.dx;
+						var ny = cy + d.dy;
+						if (nx < 0 || nx >= waterLayer.cWid || ny < 0 || ny >= waterLayer.cHei) { continue; }
+						var nk = ny * waterLayer.cWid + nx;
+						if (visited.exists(nk)) { continue; }
+						if (waterLayer.getInt(nx, ny) != 1) { continue; }
+						visited.set(nk, true);
+						queue.push(nk);
+					}
+				}
+				// Create overlay sprites for each water tile in the body
+				if (hungerOverlay != null) { remove(hungerOverlay); hungerOverlay.destroy(); }
+				hungerOverlay = new FlxSprite();
+				hungerOverlay.makeGraphic(waterLayer.cWid * gs, waterLayer.cHei * gs, 0x00000000);
+				// Fill the water body tiles with a green tint
+				flixel.util.FlxSpriteUtil.drawRect(hungerOverlay, 0, 0, 0, 0, 0x00000000); // ensure pixels exist
+				for (k => _ in visited) {
+					var cx = k % waterLayer.cWid;
+					var cy = Std.int(k / waterLayer.cWid);
+					flixel.util.FlxSpriteUtil.drawRect(hungerOverlay, cx * gs, cy * gs, gs, gs, 0x2200FF66);
+				}
+				add(hungerOverlay);
+			}
+		}
+	}
+
+	function onHungerExpired(data:Dynamic) {
+		if (hungerOverlay != null) {
+			remove(hungerOverlay);
+			hungerOverlay.destroy();
+			hungerOverlay = null;
 		}
 	}
 

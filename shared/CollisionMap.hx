@@ -123,6 +123,59 @@ class CollisionMap {
 		return map;
 	}
 
+	/**
+	 * Build a CollisionMap from a flat tile-ID grid (e.g. from LakeGenerator).
+	 * Uses hardcoded tile→flag mappings matching the devTiles tileset.
+	 **/
+	public static function fromTileGrid(tileIds:haxe.ds.Vector<Int>, w:Int, h:Int, ts:Int, hitboxJson:String):CollisionMap {
+		var map = new CollisionMap(w, h, ts);
+
+		// Parse polygon hitboxes
+		if (hitboxJson != null) {
+			try {
+				var data:Dynamic = haxe.Json.parse(hitboxJson);
+				var tiles:Dynamic = Reflect.field(data, "tiles");
+				if (tiles != null) {
+					for (key in Reflect.fields(tiles)) {
+						var tileId = Std.parseInt(key);
+						if (tileId == null) { continue; }
+						var tileData:Dynamic = Reflect.field(tiles, key);
+						var polygon:Array<Dynamic> = Reflect.field(tileData, "polygon");
+						if (polygon == null || polygon.length < 3) { continue; }
+						var verts:Array<Vec2> = [];
+						for (v in polygon) {
+							var arr:Array<Dynamic> = cast v;
+							verts.push({x: (cast arr[0] : Float), y: (cast arr[1] : Float)});
+						}
+						map.tilePolygons.set(tileId, verts);
+					}
+				}
+			} catch (e) {}
+		}
+
+		// Hardcoded tile→flag table matching devTiles tileset enumTags
+		var solidIds = [1, 20, 21, 23, 40, 41, 42, 43, 44, 63];
+		var shallowIds = [2, 22, 24, 25, 26, 27, 28, 29, 45, 46, 47, 48, 49, 62, 64, 67, 68, 69,
+			80, 81, 82, 83, 84, 100, 101, 102, 103, 104, 122, 123, 124];
+		var swimmableIds = [20, 21, 22, 23, 24, 40, 41, 42, 43, 44, 62, 63, 64,
+			80, 81, 82, 83, 84, 100, 101, 102, 103, 104, 122, 123, 124];
+
+		for (i in 0...w * h) {
+			var tid = tileIds[i];
+			if (tid < 0) { continue; }
+			map.cellTileIds[i] = tid;
+			var flags = 0;
+			for (s in solidIds) { if (tid == s) { flags |= FLAG_SOLID; break; } }
+			for (s in shallowIds) { if (tid == s) { flags |= FLAG_SHALLOW; break; } }
+			for (s in swimmableIds) { if (tid == s) { flags |= FLAG_SWIMMABLE; break; } }
+			if (map.tilePolygons.exists(tid)) { flags |= FLAG_HAS_POLYGON; }
+			for (dirtId in DIRT_TILE_IDS) { if (tid == dirtId) { flags |= FLAG_DIRT; break; } }
+			map.cellFlags[i] = flags;
+		}
+
+		return map;
+	}
+
 	inline function cellIdx(col:Int, row:Int):Int {
 		return row * cols + col;
 	}

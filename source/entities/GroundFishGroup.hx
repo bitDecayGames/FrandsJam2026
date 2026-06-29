@@ -8,6 +8,7 @@ class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 	var waterLayer:levels.ldtk.WaterGrid;
 
 	public var onPickedUp:(Float, Float) -> Void;
+	var pickedUpThisFrame:Bool = false;
 
 	public function new() {
 		super();
@@ -18,14 +19,19 @@ class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 	}
 
 	public function checkPickup(player:Player) {
+		pickedUpThisFrame = false;
 		FlxG.overlap(player, this, handleOverlap);
 	}
 
 	function handleOverlap(player:Player, fish:GroundFish) {
+		if (pickedUpThisFrame) {
+			return; // only pick up one fish per frame
+		}
 		if (fish.landing) {
 			return;
 		}
 		if (!player.inventory.isFull()) {
+			pickedUpThisFrame = true;
 			trace('GroundFish pickup: player=(${Std.int(player.x)},${Std.int(player.y)}) fish=(${Std.int(fish.x)},${Std.int(fish.y)}) frozen=${player.frozen}');
 			player.pickupItem(Fish(fish.fishSpriteIndex, fish.lengthCm));
 			if (onPickedUp != null) {

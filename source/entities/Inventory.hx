@@ -102,6 +102,8 @@ class Inventory {
 			case [BigRock, BigRock]: true;
 			case [Fish(_, _), Fish(_, _)]: true;
 			case [Waders, Waders]: true;
+			case [Rocket, Rocket]: true;
+			case [HungerPotion, HungerPotion]: true;
 			default: false;
 		};
 	}
@@ -112,4 +114,6 @@ enum InventoryItem {
 	BigRock;
 	Fish(fishSpriteIndex:Int, lengthCm:Int);
 	Waders;
+	Rocket;
+	HungerPotion;
 }
