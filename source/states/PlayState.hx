@@ -388,19 +388,17 @@ class PlayState extends FlxTransitionableState {
 		var col = CollisionMap.fromLevel(level.raw, hitboxJson);
 		simulation = new Simulation(col);
 
-		// static spawn points near top-left for easy testing
-		var allSessionIds = [GameManager.ME.net.mySessionId];
-		for (_ => seshID in GameManager.ME.sessions) {
-			allSessionIds.push(seshID);
+		// Use server's current player position if available, otherwise fallback
+		var lx:Float = level.spawnPoint.x;
+		var ly:Float = level.spawnPoint.y;
+		var serverState = GameManager.ME.net.getState();
+		if (serverState != null) {
+			var myState = serverState.players.get(GameManager.ME.net.mySessionId);
+			if (myState != null && (myState.x != 0 || myState.y != 0)) {
+				lx = myState.x;
+				ly = myState.y;
+			}
 		}
-		var spawnMap = new Map<String, {x:Float, y:Float}>();
-		for (i in 0...allSessionIds.length) {
-			spawnMap.set(allSessionIds[i], {x: 100.0 + i * 40, y: 100.0});
-		}
-
-		var localPos = spawnMap.get(GameManager.ME.net.mySessionId);
-		var lx = localPos != null ? localPos.x : 100;
-		var ly = localPos != null ? localPos.y : 100;
 		player = new Player(lx, ly, this);
 		if (GameManager.ME.mySkinIndex >= 0) {
 			player.skinIndex = GameManager.ME.mySkinIndex;
@@ -429,9 +427,15 @@ class PlayState extends FlxTransitionableState {
 		ySortGroup.add(player);
 
 		for (_ => seshID in GameManager.ME.sessions) {
-			var remotePos = spawnMap.get(seshID);
-			var rx = remotePos != null ? remotePos.x : level.spawnPoint.x;
-			var ry = remotePos != null ? remotePos.y : level.spawnPoint.y;
+			var rx:Float = level.spawnPoint.x;
+			var ry:Float = level.spawnPoint.y;
+			if (serverState != null) {
+				var remoteState = serverState.players.get(seshID);
+				if (remoteState != null && (remoteState.x != 0 || remoteState.y != 0)) {
+					rx = remoteState.x;
+					ry = remoteState.y;
+				}
+			}
 			var remote = new Player(rx, ry, this);
 			remote.isRemote = true;
 			remote.simulation = simulation; // shared simulation for wall collision
@@ -751,6 +755,8 @@ class PlayState extends FlxTransitionableState {
 				player.playerState.x = myPos.x;
 				player.playerState.y = myPos.y;
 			}
+			// Clear pending inputs so reconciliation doesn't jump back to old position
+			player.clearPendingInputs();
 		}
 		for (seshID => remote in remotePlayers) {
 			var pos:Dynamic = Reflect.field(message, seshID);
@@ -888,6 +894,7 @@ class PlayState extends FlxTransitionableState {
 
 	function onServerAck(serverState:schema.PlayerState) {
 		player.reconcileFromServer(serverState);
+		player.inShallowWater = serverState.inShallowWater;
 	}
 
 	function updateTimerHUD(elapsed:Float) {
@@ -991,18 +998,8 @@ class PlayState extends FlxTransitionableState {
 				enterShop();
 			}
 
-			if (player.inventory.hasWaders() && terrainLayer != null) {
-				player.inShallowWater = terrainLayer.isFullyInTaggedArea(player, [SHALLOW, SOLID]);
-			} else {
-				player.inShallowWater = false;
-			}
-
-			// Update shallow water visual for remote players
-			if (terrainLayer != null) {
-				for (_ => remote in remotePlayers) {
-					remote.inShallowWater = terrainLayer.isFullyInTaggedArea(remote, [SHALLOW, SOLID]);
-				}
-			}
+			// inShallowWater is set server-authoritatively via PlayerState schema
+			// (local player reads it in onServerAck, remotes in handleChange)
 		}
 
 		ySortGroup.sort((order, a, b) -> {

@@ -154,8 +154,8 @@ class Player extends FlxSprite {
 	var remoteWasStationary:Bool = false;
 
 	// Interpolation targets for smooth remote player movement
-	var remoteTargetX:Float = 0;
-	var remoteTargetY:Float = 0;
+	public var remoteTargetX:Float = 0;
+	public var remoteTargetY:Float = 0;
 	var remoteServerVelX:Float = 0;
 	var remoteServerVelY:Float = 0;
 
@@ -373,8 +373,10 @@ class Player extends FlxSprite {
 	}
 
 	function playMovementAnim(force:Bool = false) {
-		// in prediction mode velocity is zeroed — use playerState velocity instead
-		var moving = if (playerState != null) {
+		// Determine if player is moving — check different sources depending on mode
+		var moving = if (isRemote) {
+			remoteServerVelX != 0 || remoteServerVelY != 0;
+		} else if (playerState != null) {
 			playerState.velocityX != 0 || playerState.velocityY != 0;
 		} else {
 			velocity.x != 0 || velocity.y != 0;
@@ -412,6 +414,7 @@ class Player extends FlxSprite {
 		remoteTargetY = data.state.y;
 		remoteServerVelX = data.state.velocityX;
 		remoteServerVelY = data.state.velocityY;
+		inShallowWater = data.state.inShallowWater;
 
 		// Update facing direction: server velocity is most accurate; fall back to position delta
 		if (remoteServerVelX != 0 || remoteServerVelY != 0) {
@@ -510,7 +513,14 @@ class Player extends FlxSprite {
 			simulation.tickPlayer(remoteSimState, [inp], FlxG.elapsed);
 			lastHitEntityIndices = simulation.hitEntityIndices;
 			setPosition(remoteSimState.x, remoteSimState.y);
-			velocity.set(0, 0); // position set by simulation, not velocity
+			velocity.set(0, 0);
+			// Drive animation from simulation velocity
+			remoteServerVelX = remoteSimState.velocityX;
+			remoteServerVelY = remoteSimState.velocityY;
+			if (remoteSimState.velocityX != 0 || remoteSimState.velocityY != 0) {
+				var velPt = new flixel.math.FlxPoint(remoteSimState.velocityX, remoteSimState.velocityY);
+				lastInputDir = Cardinal.closest(velPt);
+			}
 		} else {
 			// Fallback: no simulation available, use velocity (old behavior)
 			var dist = Math.sqrt(distSq);
@@ -1216,6 +1226,10 @@ class Player extends FlxSprite {
 			default:
 				// nothing to do
 		}
+	}
+
+	public function clearPendingInputs() {
+		pendingInputs = [];
 	}
 
 	public function isCasting():Bool {

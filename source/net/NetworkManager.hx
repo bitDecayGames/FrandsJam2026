@@ -206,6 +206,10 @@ class NetworkManager {
 					onPlayerChanged.dispatch(sessionId, {state: player});
 				});
 
+				cb.listen(player, "inShallowWater", (_, _) -> {
+					onPlayerChanged.dispatch(sessionId, {state: player});
+				});
+
 				cb.listen(player, "name", (_, _) -> {
 					playerDebugTrace('NetMan: sesh: ${sessionId} name: ${player.name}');
 					onPlayerNameChanged.dispatch(sessionId, player.name);

@@ -460,6 +460,17 @@ class GameLogic {
 				simulation.tickPlayer(p, [inp], inp.elapsed, blockFlags);
 			}
 			queue.splice(0, queue.length);
+
+			// Server-authoritative shallow water state
+			var hasWaders2 = wadersPlayers.exists(id) && wadersPlayers.get(id);
+			if (hasWaders2) {
+				p.inShallowWater = collision.isShallowAt(p.x, p.y)
+					&& collision.isShallowAt(p.x + p.width - 1, p.y)
+					&& collision.isShallowAt(p.x, p.y + p.height - 1)
+					&& collision.isShallowAt(p.x + p.width - 1, p.y + p.height - 1);
+			} else {
+				p.inShallowWater = false;
+			}
 		}
 
 		updateFish(t);
@@ -764,6 +775,8 @@ class GameLogic {
 			if (hasBobbers && closestDist < FISH_CATCH_DIST) {
 				f.alive = false; f.velX = 0; f.velY = 0; f.attracted = false; f.respawnTimer = 3.0;
 				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: f.fishType});
+				// Remove bobber so only one fish is caught per bobber per tick
+				bobberPositions.remove(closestSid);
 				continue;
 			}
 			if (hasBobbers && closestDist < FISH_ATTRACT_DIST) {

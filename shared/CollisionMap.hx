@@ -230,13 +230,10 @@ class CollisionMap {
 				if ((cellFlags[fi] & FLAG_HAS_POLYGON) != 0) {
 					var mtv = satAABBvsPoly(x, y, w, h, tx, ty, tilePolygons.get(cellTileIds[fi]));
 					if (mtv != null) {
+						// Only resolve X component during X pass — let Y pass handle Y
 						x += mtv.nx * mtv.depth;
-						y += mtv.ny * mtv.depth;
 						if (Math.abs(mtv.nx) > 0.001) {
 							hitX = true;
-						}
-						if (Math.abs(mtv.ny) > 0.001) {
-							hitY = true;
 						}
 					}
 				} else {
@@ -275,11 +272,8 @@ class CollisionMap {
 				if ((cellFlags[fi] & FLAG_HAS_POLYGON) != 0) {
 					var mtv = satAABBvsPoly(x, y, w, h, tx, ty, tilePolygons.get(cellTileIds[fi]));
 					if (mtv != null) {
-						x += mtv.nx * mtv.depth;
+						// Only resolve Y component during Y pass — X pass already handled X
 						y += mtv.ny * mtv.depth;
-						if (Math.abs(mtv.nx) > 0.001) {
-							hitX = true;
-						}
 						if (Math.abs(mtv.ny) > 0.001) {
 							hitY = true;
 						}

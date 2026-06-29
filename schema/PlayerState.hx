@@ -29,6 +29,7 @@ class PlayerState extends Schema {
 	@:type("float32") public var width:Float;
 	@:type("float32") public var height:Float;
 	@:type("uint8") public var facing:Int;
+	@:type("boolean") public var inShallowWater:Bool;
 
 	public function new() {
 		super();
@@ -45,6 +46,7 @@ class PlayerState extends Schema {
 		width = 16;
 		height = 8;
 		facing = FACING_DOWN;
+		inShallowWater = false;
 	}
 
 	public static function copy(source:PlayerState):PlayerState {
@@ -62,6 +64,7 @@ class PlayerState extends Schema {
 		s.lastProcessedSeq = source.lastProcessedSeq;
 		s.ready = source.ready;
 		s.facing = source.facing;
+		s.inShallowWater = source.inShallowWater;
 		return s;
 	}
 }
