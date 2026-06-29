@@ -88,13 +88,11 @@ class LocalRoom {
 			case "fish_sold":
 				// single player — no remote players to notify
 			case "weed_burst":
-				// single player — no remote players to notify
+				net.onWeedBurst.dispatch(data.sessionId, Std.int(data.index));
 			case "world_items":
 				net.onWorldItems.dispatch(data);
 			case "item_pickup":
 				// single player — no remote players to notify
-			case "bush_rustle":
-				// single player — handled locally
 			case "bush_ignite":
 				// single player — handled locally
 			case "weed_ignite":

@@ -243,7 +243,7 @@ class GameLogic {
 			case "player_drown":
 				broadcast("player_drown", {sessionId: clientId, x: data.x, y: data.y});
 			case "bush_rustle":
-				broadcast("bush_rustle", {index: data.index, dirX: data.dirX, dirY: data.dirY});
+				// Tier 1 cosmetic — handled client-side only, no relay needed
 			case "bush_ignite":
 				broadcast("bush_ignite", {index: data.index});
 			case "bush_dead":

@@ -61,7 +61,6 @@ class NetworkManager {
 	public var onWormKilled = new FlxTypedSignal<String->Int->Void>(); // sessionId, wormId
 	public var onWorldItems = new FlxTypedSignal<Dynamic->Void>();
 	public var onItemPickup = new FlxTypedSignal<String->String->Int->Void>(); // sessionId, itemType, index
-	public var onBushRustle = new FlxTypedSignal<Int->Float->Float->Void>(); // index, dirX, dirY
 	public var onBushIgnite = new FlxTypedSignal<Int->Void>(); // index
 	public var onWeedIgnite = new FlxTypedSignal<Int->Void>(); // index
 	public var onHotPepper = new FlxTypedSignal<String->Bool->Void>(); // sessionId, isStart
@@ -303,10 +302,6 @@ class NetworkManager {
 				onItemPickup.dispatch(message.sessionId, message.itemType, Std.int(message.index));
 			});
 
-			onMsg("bush_rustle", (message:Dynamic) -> {
-				trace('[NetMan] bush_rustle => index:${message.index} dir:(${message.dirX},${message.dirY})');
-				onBushRustle.dispatch(Std.int(message.index), message.dirX, message.dirY);
-			});
 
 			onMsg("bush_ignite", (message:Dynamic) -> {
 				onBushIgnite.dispatch(Std.int(message.index));
@@ -444,9 +439,6 @@ class NetworkManager {
 		sendMessage("weed_burst", {index: index});
 	}
 
-	public function sendBushRustle(index:Int, dirX:Float, dirY:Float) {
-		sendMessage("bush_rustle", {index: index, dirX: dirX, dirY: dirY});
-	}
 
 	public function sendInput(input:P_Input) {
 		sendMessage(GameState.MSG_P_INPUT, [input], true);

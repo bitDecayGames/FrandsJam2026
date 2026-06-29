@@ -588,6 +588,12 @@ class LobbyState extends FlxTransitionableState {
 		_btnReady.visible = false;
 		_btnChangeSkin.visible = false;
 		_inputField.visible = false;
+		// Force all name labels green
+		localNameLabel.color = FlxColor.GREEN;
+		for (_ => label in remoteNameLabels) {
+			label.color = FlxColor.GREEN;
+		}
+		updatePlayerList();
 	}
 
 	function handleKicked() {
@@ -611,6 +617,9 @@ class LobbyState extends FlxTransitionableState {
 		super.update(elapsed);
 
 		FlxG.collide(midGroundGroup, player);
+		for (_ => remote in remotePlayers) {
+			FlxG.collide(midGroundGroup, remote);
+		}
 
 		// Position labels above players
 		positionLabelAbovePlayer(player, localNameLabel);
@@ -659,9 +668,14 @@ class LobbyState extends FlxTransitionableState {
 			}
 		}
 
-		// Auto-ready only for explicit single player
+		// Auto-ready for single player or debug testing
 		#if play_solo
 		if (!_localReady) { clickReady(); }
+		#elseif db
+		// In debug mode, auto-ready once another player is in the room
+		if (!_localReady && Lambda.count(remotePlayers) > 0) {
+			clickReady();
+		}
 		#end
 	}
 

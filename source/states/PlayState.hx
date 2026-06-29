@@ -65,6 +65,7 @@ class PlayState extends FlxTransitionableState {
 	var ySortGroup = new FlxGroup();
 	var serverFishGroup = new FlxGroup();
 	var bushGroup = new FlxTypedGroup<Bush>();
+	var remoteBushContacts = new Map<String, Map<Int, Bool>>(); // sessionId -> bushIndex -> inContact
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
@@ -269,7 +270,6 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onWorldItems.remove(onRemoteWorldItems);
 		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
-		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
 		GameManager.ME.net.onBushIgnite.remove(onRemoteBushIgnite);
 		GameManager.ME.net.onWeedIgnite.remove(onRemoteWeedIgnite);
 		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
@@ -301,7 +301,6 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onWorldItems.add(onRemoteWorldItems);
 		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
-		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
 		GameManager.ME.net.onBushIgnite.add(onRemoteBushIgnite);
 		GameManager.ME.net.onWeedIgnite.add(onRemoteWeedIgnite);
 		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
@@ -568,22 +567,15 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onRemoteWeedBurst(sessionId:String, index:Int) {
+		// Tier 2: server confirmed the weed burst — record score for the player
 		if (index >= 0 && index < weedGroup.members.length) {
 			var weed = weedGroup.members[index];
 			if (weed != null && weed.alive) {
+				// Remote player or sender whose prediction hasn't fired yet
 				weed.burst();
 			}
 		}
 		GameManager.ME.recordWeedKill(sessionId);
-	}
-
-	function onRemoteBushRustle(index:Int, dirX:Float, dirY:Float) {
-		if (index >= 0 && index < bushGroup.members.length) {
-			var bush = bushGroup.members[index];
-			if (bush != null && bush.alive) {
-				bush.rustleFrom(dirX, dirY);
-			}
-		}
 	}
 
 	function onRemoteBushIgnite(index:Int) {
@@ -904,9 +896,44 @@ class PlayState extends FlxTransitionableState {
 
 		FlxG.collide(midGroundGroup, player);
 
+		// Collide remote players with terrain and bushes so interpolation
+		// respects world rules (stops at walls/bushes instead of overshooting).
+		// Rustle: ENTER via collide callback, EXIT via proximity check.
+		// This avoids the collide/separate oscillation that breaks justTouched.
+		for (sessionId => remote in remotePlayers) {
+			FlxG.collide(midGroundGroup, remote);
+			var contacts = remoteBushContacts.get(sessionId);
+			if (contacts == null) { contacts = new Map<Int, Bool>(); remoteBushContacts.set(sessionId, contacts); }
+			FlxG.collide(bushGroup, remote, (bush:Bush, _:Player) -> {
+				if (bush.burning) { return; }
+				var index = bushGroup.members.indexOf(bush);
+				if (!contacts.exists(index)) {
+					// ENTER: real collision, first contact
+					contacts.set(index, true);
+					var dx = bush.x + bush.width / 2 - (remote.x + remote.width / 2);
+					var dy = bush.y + bush.height / 2 - (remote.y + remote.height / 2);
+					var dist = Math.sqrt(dx * dx + dy * dy);
+					bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
+				}
+			});
+			// EXIT: proximity check — clear contact when player moves away
+			for (i in [for (k in contacts.keys()) k]) {
+				var bush = bushGroup.members[i];
+				if (bush == null || !bush.alive) { contacts.remove(i); continue; }
+				var dx = Math.abs(remote.x - bush.x);
+				var dy = Math.abs(remote.y - bush.y);
+				if (dx > bush.width + remote.width || dy > bush.height + remote.height) {
+					contacts.remove(i);
+				}
+			}
+		}
+
 		if (insideShop) {
 			checkShopExit();
 		} else {
+			// Bush collision — rustle is Tier 1 (cosmetic, client-only),
+			// ignite is Tier 2 (stateful, server-authoritative).
+			// Uses FlxObject.justTouched() for enter detection (built-in touching/wasTouching).
 			FlxG.collide(bushGroup, player, (bush:Bush, p:Player) -> {
 				if (p.hotModeActive && !bush.burning) {
 					bush.ignite();
@@ -914,15 +941,16 @@ class PlayState extends FlxTransitionableState {
 					GameManager.ME.net.sendMessage("bush_ignite", {index: index});
 					return;
 				}
-				var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
-				var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
-				var dist = Math.sqrt(dx * dx + dy * dy);
-				var dirX = dist > 0 ? dx / dist : 1.0;
-				var dirY = dist > 0 ? dy / dist : 0.0;
-				bush.rustleFrom(dirX, dirY);
-				var index = bushGroup.members.indexOf(bush);
-				GameManager.ME.net.sendBushRustle(index, dirX, dirY);
+				if (bush.justTouched(flixel.util.FlxDirectionFlags.ANY)) {
+					var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
+					var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
+					var dist = Math.sqrt(dx * dx + dy * dy);
+					bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
+				}
 			});
+
+			// Weed interaction — burst is Tier 2 (stateful, affects score)
+			// ignite is Tier 2 (stateful, destroys weed)
 			FlxG.overlap(weedGroup, player, (weed:entities.Weed, p:Player) -> {
 				if (p.hotModeActive) {
 					if (!weed.burning) {
@@ -932,10 +960,12 @@ class PlayState extends FlxTransitionableState {
 					}
 					return;
 				}
+				if (!weed.alive) { return; }
 				var index = weedGroup.members.indexOf(weed);
+				// Tier 2: play burst immediately (predicted cosmetic), send to server for scoring
 				weed.burst();
 				GameManager.ME.net.sendWeedBurst(index);
-				GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
+				// Score is recorded when server confirms via onRemoteWeedBurst
 			});
 			FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
 				TODO.sfx("worm_squish");

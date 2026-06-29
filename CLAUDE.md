@@ -178,6 +178,10 @@ Server build output is tee'd to `build.log` with `[server-build]` prefix (haxe p
 - Use `FlxPoint.get()`/`.put()` for pooled points; call `.put()` when done to return to pool
 - Always use curly braces `{}` around single-line `if`/`else`/`for`/`while` bodies, even when not required by the language
 - Use casual language in code comments — say "butt" not "backside", keep it fun
+- **Client-server interaction tiers** (see `docs/client-server.md` for full details):
+  - **Tier 1 (cosmetic)**: Client-only, no network message. Bush rustle, particles, footsteps. Each client detects overlap locally — including for remote players' interpolated positions.
+  - **Tier 2 (stateful)**: Client predicts cosmetics immediately, server validates and broadcasts state change. Bush ignite, weed burst (score), item pickup, fish catch. Score/inventory changes only on server confirmation.
+  - SFX always plays immediately on the client that caused the interaction. Never wait for server.
 
 ## Key Sprite Assets
 - `assets/aseprite/characters/playerA.json` (and playerB-H) — player skins, 48x48 frames, Aseprite JSON atlas with frame tags for animations

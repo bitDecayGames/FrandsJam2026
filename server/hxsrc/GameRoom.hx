@@ -308,9 +308,10 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 		});
 
 		// sent when a player bursts a weed
+		// Tier 2: server validates weed burst and broadcasts to ALL (including sender for score)
 		onMessage("weed_burst", (client:Client, data:Dynamic) -> {
 			trace('${client.sessionId}: sent "weed_burst": index=${data.index}');
-			broadcast("weed_burst", {sessionId: client.sessionId, index: data.index}, {except: client});
+			broadcast("weed_burst", {sessionId: client.sessionId, index: data.index});
 		});
 
 		// sent when a hot player drowns in water
@@ -318,11 +319,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			broadcast("player_drown", {sessionId: client.sessionId, x: data.x, y: data.y}, {except: client});
 		});
 
-		// sent when a player walks into a bush
-		onMessage("bush_rustle", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "bush_rustle": index=${data.index}');
-			broadcast("bush_rustle", {index: data.index, dirX: data.dirX, dirY: data.dirY}, {except: client});
-		});
+		// bush_rustle removed — Tier 1 cosmetic, handled client-side only
 
 		// sent when a hot player ignites a bush
 		onMessage("bush_ignite", (client:Client, data:Dynamic) -> {

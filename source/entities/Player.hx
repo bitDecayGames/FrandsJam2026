@@ -477,10 +477,8 @@ class Player extends FlxSprite {
 			}
 
 			if (serverStopped) {
-				// Stopped but not yet close — spring directly without blend dampening the correction
 				velocity.set(corrVx, corrVy);
 			} else {
-				// Moving — blend server velocity (correct direction/anim) with correction (position fix)
 				var errorWeight = Math.min(dist / REMOTE_BLEND_RANGE, 1.0);
 				velocity.x = remoteServerVelX + (corrVx - remoteServerVelX) * errorWeight;
 				velocity.y = remoteServerVelY + (corrVy - remoteServerVelY) * errorWeight;
@@ -677,7 +675,7 @@ class Player extends FlxSprite {
 		}
 
 		// Throw rock with B button (prefers big rock, falls back to small)
-		if (!throwing && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
+		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
 			if (inventory.has(BigRock)) {
 				inventory.remove(BigRock);
 				throwingBigRock = true;
@@ -1022,7 +1020,8 @@ class Player extends FlxSprite {
 			switch (castState) {
 				// --- START: Local player handling
 				case IDLE:
-					if (SimpleController.just_pressed(A)) {
+					if (frozen) { /* skip input while frozen (e.g. typing) */ }
+					else if (SimpleController.just_pressed(A)) {
 						castState = CHARGING;
 						frozen = true;
 						castDirSuffix = getDirSuffix();
