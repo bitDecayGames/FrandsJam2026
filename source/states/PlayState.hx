@@ -434,6 +434,7 @@ class PlayState extends FlxTransitionableState {
 			var ry = remotePos != null ? remotePos.y : level.spawnPoint.y;
 			var remote = new Player(rx, ry, this);
 			remote.isRemote = true;
+			remote.simulation = simulation; // shared simulation for wall collision
 			remote.terrainLayer = terrainLayer;
 			remote.groundEffectsGroup = midGroundGroup;
 			if (GameManager.ME.skins.exists(seshID)) {
@@ -601,6 +602,35 @@ class PlayState extends FlxTransitionableState {
 			if (bush != null && bush.alive && !bush.burning) {
 				bush.ignite();
 			}
+		}
+	}
+
+	/** Process bush hits from Simulation.hitEntityIndices for any player. */
+	function processBushHits(p:Player, contacts:Map<Int, Bool>, isLocal:Bool) {
+		for (entityIdx in p.lastHitEntityIndices) {
+			if (entityIdx < 0 || entityIdx >= bushGroup.members.length) { continue; }
+			var bush = bushGroup.members[entityIdx];
+			if (bush == null || !bush.alive) { continue; }
+			if (isLocal && p.hotModeActive && !bush.burning) {
+				bush.ignite();
+				GameManager.ME.net.sendMessage("bush_ignite", {index: entityIdx});
+				continue;
+			}
+			if (!contacts.exists(entityIdx)) {
+				contacts.set(entityIdx, true);
+				var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
+				var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
+				var dist = Math.sqrt(dx * dx + dy * dy);
+				bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
+			}
+		}
+		// Clear contacts for bushes no longer hit
+		for (idx in [for (k in contacts.keys()) k]) {
+			var stillHit = false;
+			for (h in p.lastHitEntityIndices) {
+				if (h == idx) { stillHit = true; break; }
+			}
+			if (!stillHit) { contacts.remove(idx); }
 		}
 	}
 
@@ -917,65 +947,19 @@ class PlayState extends FlxTransitionableState {
 
 		// NO FlxG.collide(midGroundGroup, player) — Simulation handles all terrain collision.
 
-		// Remote players still need FlxG.collide for interpolation (Simulation doesn't run for them)
-		for (sessionId => remote in remotePlayers) {
-			FlxG.collide(midGroundGroup, remote);
-			var contacts = remoteBushContacts.get(sessionId);
-			if (contacts == null) { contacts = new Map<Int, Bool>(); remoteBushContacts.set(sessionId, contacts); }
-			FlxG.collide(bushGroup, remote, (bush:Bush, _:Player) -> {
-				if (bush.burning) { return; }
-				var index = bushGroup.members.indexOf(bush);
-				if (!contacts.exists(index)) {
-					contacts.set(index, true);
-					var dx = bush.x + bush.width / 2 - (remote.x + remote.width / 2);
-					var dy = bush.y + bush.height / 2 - (remote.y + remote.height / 2);
-					var dist = Math.sqrt(dx * dx + dy * dy);
-					bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
-				}
-			});
-			for (i in [for (k in contacts.keys()) k]) {
-				var bush = bushGroup.members[i];
-				if (bush == null || !bush.alive) { contacts.remove(i); continue; }
-				var dx = Math.abs(remote.x - bush.x);
-				var dy = Math.abs(remote.y - bush.y);
-				if (dx > bush.width + remote.width || dy > bush.height + remote.height) {
-					contacts.remove(i);
-				}
-			}
-		}
+		// Remote players use Simulation.tickPlayer in their updateRemoteInterpolation.
+		// Bush rustle for remotes is handled below alongside the local player.
 
 		if (insideShop) {
 			checkShopExit();
 		} else {
-			// Bush interaction — driven by Simulation.hitEntityIndices.
-			// Simulation already blocked the player; we just read which entity rects were hit.
-			if (player.simulation != null) {
-				for (entityIdx in player.simulation.hitEntityIndices) {
-					if (entityIdx < 0 || entityIdx >= bushGroup.members.length) { continue; }
-					var bush = bushGroup.members[entityIdx];
-					if (bush == null || !bush.alive) { continue; }
-					if (player.hotModeActive && !bush.burning) {
-						bush.ignite();
-						GameManager.ME.net.sendMessage("bush_ignite", {index: entityIdx});
-						continue;
-					}
-					// Rustle on first contact — track via localBushContacts
-					if (!localBushContacts.exists(entityIdx)) {
-						localBushContacts.set(entityIdx, true);
-						var dx = bush.x + bush.width / 2 - (player.x + player.width / 2);
-						var dy = bush.y + bush.height / 2 - (player.y + player.height / 2);
-						var dist = Math.sqrt(dx * dx + dy * dy);
-						bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
-					}
-				}
-				// Clear contacts for bushes no longer in hitEntityIndices
-				for (idx in [for (k in localBushContacts.keys()) k]) {
-					var stillHit = false;
-					for (h in player.simulation.hitEntityIndices) {
-						if (h == idx) { stillHit = true; break; }
-					}
-					if (!stillHit) { localBushContacts.remove(idx); }
-				}
+			// Bush interaction — driven by Simulation hitEntityIndices.
+			// Same system for local AND remote players — one collision path.
+			processBushHits(player, localBushContacts, true);
+			for (sessionId => remote in remotePlayers) {
+				var contacts = remoteBushContacts.get(sessionId);
+				if (contacts == null) { contacts = new Map<Int, Bool>(); remoteBushContacts.set(sessionId, contacts); }
+				processBushHits(remote, contacts, false);
 			}
 
 			// Weed interaction — burst is Tier 2 (stateful, affects score)

@@ -446,6 +446,11 @@ class Player extends FlxSprite {
 		}
 	}
 
+	// Temp PlayerState for remote simulation — avoids allocation per frame
+	var remoteSimState:schema.PlayerState;
+	// Entity indices hit during the last simulation tick (for bush rustle etc.)
+	public var lastHitEntityIndices:Array<Int> = [];
+
 	function updateRemoteInterpolation() {
 		// Freeze during cast/catch animations, same as local player
 		if (castState == CAST_ANIM || castState == CASTING || castState == CATCH_ANIM || castState == RETURNING) {
@@ -459,29 +464,62 @@ class Player extends FlxSprite {
 		var serverStopped = remoteServerVelX == 0 && remoteServerVelY == 0;
 
 		if (distSq > REMOTE_TELEPORT_DIST_SQ) {
-			// Way off — snap and sync velocity
-			setPosition(remoteTargetX, remoteTargetY);
-			velocity.set(remoteServerVelX, remoteServerVelY);
-		} else if (serverStopped && distSq <= REMOTE_SNAP_DIST_SQ) {
-			// Server stopped and we're close — snap exactly so position aligns and idle anim plays
 			setPosition(remoteTargetX, remoteTargetY);
 			velocity.set(0, 0);
-		} else {
+		} else if (serverStopped && distSq <= REMOTE_SNAP_DIST_SQ) {
+			setPosition(remoteTargetX, remoteTargetY);
+			velocity.set(0, 0);
+		} else if (simulation != null) {
+			// Use the shared Simulation to move with proper collision
+			if (remoteSimState == null) {
+				remoteSimState = new schema.PlayerState();
+				remoteSimState.width = 16;
+				remoteSimState.height = 8;
+			}
+			remoteSimState.x = x;
+			remoteSimState.y = y;
+
+			// Compute interpolation velocity
 			var dist = Math.sqrt(distSq);
-			var corrVx = 0.0;
-			var corrVy = 0.0;
-			if (distSq > 0.25) {
+			var interpVx:Float = 0;
+			var interpVy:Float = 0;
+			if (dist > 0.5) {
 				var corrSpeed = Math.min(dist * REMOTE_SPRING_K, REMOTE_MAX_CORRECTION);
-				corrVx = (dx / dist) * corrSpeed;
-				corrVy = (dy / dist) * corrSpeed;
+				var corrVx = (dx / dist) * corrSpeed;
+				var corrVy = (dy / dist) * corrSpeed;
+				if (serverStopped) {
+					interpVx = corrVx;
+					interpVy = corrVy;
+				} else {
+					var errorWeight = Math.min(dist / REMOTE_BLEND_RANGE, 1.0);
+					interpVx = remoteServerVelX + (corrVx - remoteServerVelX) * errorWeight;
+					interpVy = remoteServerVelY + (corrVy - remoteServerVelY) * errorWeight;
+				}
 			}
 
-			if (serverStopped) {
-				velocity.set(corrVx, corrVy);
+			// Compute direction angle from velocity for the simulation input
+			remoteSimState.speed = Math.sqrt(interpVx * interpVx + interpVy * interpVy);
+			var dirAngle:Int = -1;
+			if (remoteSimState.speed > 0.1) {
+				dirAngle = Std.int(Math.atan2(interpVy, interpVx) * 180 / Math.PI);
+				// atan2 gives -180..180 with 0=right; Simulation expects 0=up
+				dirAngle = (dirAngle + 90 + 360) % 360;
+			}
+
+			var inp:PInput.P_Input = {seq: 0, dir: dirAngle, buttons: 0, elapsed: FlxG.elapsed};
+			simulation.tickPlayer(remoteSimState, [inp], FlxG.elapsed);
+			lastHitEntityIndices = simulation.hitEntityIndices;
+			setPosition(remoteSimState.x, remoteSimState.y);
+			velocity.set(0, 0); // position set by simulation, not velocity
+		} else {
+			// Fallback: no simulation available, use velocity (old behavior)
+			var dist = Math.sqrt(distSq);
+			if (dist > 0.5) {
+				var corrSpeed = Math.min(dist * REMOTE_SPRING_K, REMOTE_MAX_CORRECTION);
+				velocity.x = (dx / dist) * corrSpeed;
+				velocity.y = (dy / dist) * corrSpeed;
 			} else {
-				var errorWeight = Math.min(dist / REMOTE_BLEND_RANGE, 1.0);
-				velocity.x = remoteServerVelX + (corrVx - remoteServerVelX) * errorWeight;
-				velocity.y = remoteServerVelY + (corrVy - remoteServerVelY) * errorWeight;
+				velocity.set(0, 0);
 			}
 		}
 
@@ -640,13 +678,14 @@ class Player extends FlxSprite {
 			GameManager.ME.net.sendInput(inp);
 			if (GameManager.ME.net.isLocal()) {
 				// Local mode: GameLogic is the authority, just read position after it ticks
-				// (ticked by PlayState.update -> net.update)
 				setPosition(playerState.x, playerState.y);
+				lastHitEntityIndices = simulation.hitEntityIndices;
 			} else {
 				// Networked mode: predict locally, reconcile from server later
 				pendingInputs.push(inp);
 				var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
 				simulation.tickPlayer(playerState, [inp], delta, blockFlags);
+				lastHitEntityIndices = simulation.hitEntityIndices;
 				setPosition(playerState.x, playerState.y);
 			}
 			velocity.set(0, 0);
