@@ -26,6 +26,7 @@ class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 			return;
 		}
 		if (!player.inventory.isFull()) {
+			trace('GroundFish pickup: player=(${Std.int(player.x)},${Std.int(player.y)}) fish=(${Std.int(fish.x)},${Std.int(fish.y)}) frozen=${player.frozen}');
 			player.pickupItem(Fish(fish.fishSpriteIndex, fish.lengthCm));
 			if (onPickedUp != null) {
 				onPickedUp(fish.x, fish.y);

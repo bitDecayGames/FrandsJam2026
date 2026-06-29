@@ -1052,6 +1052,7 @@ class PlayState extends FlxTransitionableState {
 			}
 			// Freeze + blink
 			player.frozen = true;
+			trace('DOG CAUGHT: player=(${Std.int(player.x)},${Std.int(player.y)}) frozen=${player.frozen} inventory=${player.inventory.count()}');
 			flixel.effects.FlxFlicker.flicker(player, 3.0, 0.13);
 			flixel.util.FlxTimer.wait(3.0, () -> {
 				player.frozen = false;
@@ -1099,6 +1100,7 @@ class PlayState extends FlxTransitionableState {
 		var landY:Float = data.landY;
 		var itemType:String = data.itemType;
 		var itemData:Dynamic = data.itemData;
+		trace('DOG ITEM LANDED: type=${itemType} start=(${Std.int(startX)},${Std.int(startY)}) land=(${Std.int(landX)},${Std.int(landY)}) player=(${Std.int(player.x)},${Std.int(player.y)}) frozen=${player.frozen}');
 
 		switch (itemType) {
 			case "fish":
