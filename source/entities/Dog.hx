@@ -27,9 +27,9 @@ class Dog extends FlxSprite {
 		targetX = startX;
 		targetY = startY;
 
-		// Placeholder graphic — 12x12 brown square
+		// Placeholder graphic — 12x12 brown square, positioned by center
 		makeGraphic(12, 12, FlxColor.fromRGB(139, 90, 43));
-		centerOffsets();
+		offset.set(6, 6); // render graphic centered on (x,y)
 
 		TODO.sfx("dog_bark");
 	}

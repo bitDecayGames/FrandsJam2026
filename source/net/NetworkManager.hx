@@ -92,9 +92,13 @@ class NetworkManager {
 	public var onRocketUpdate = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y}
 	public var onRocketHit = new FlxTypedSignal<Dynamic->Void>(); // {id, targetSessionId, shooterSessionId}
 	public var onRocketDespawn = new FlxTypedSignal<Dynamic->Void>(); // {id}
-	public var onThrowPotion = new FlxTypedSignal<Dynamic->Void>(); // {sessionId, targetX, targetY, dir}
-	public var onHungerActive = new FlxTypedSignal<Dynamic->Void>(); // {duration}
-	public var onHungerExpired = new FlxTypedSignal<Dynamic->Void>(); // {}
+	public var onThrowPotion = new FlxTypedSignal<Dynamic->Void>();
+	public var onHungerActive = new FlxTypedSignal<Dynamic->Void>();
+	public var onHungerExpired = new FlxTypedSignal<Dynamic->Void>();
+	public var onPlayerKnockback = new FlxTypedSignal<Dynamic->Void>();
+	public var onThrowBait = new FlxTypedSignal<Dynamic->Void>();
+	public var onBaitActive = new FlxTypedSignal<Dynamic->Void>();
+	public var onBaitExpired = new FlxTypedSignal<Dynamic->Void>();
 
 	public static inline var roomName:String = "game_room";
 
@@ -436,6 +440,10 @@ class NetworkManager {
 			onMsg("throw_potion", (message:Dynamic) -> { onThrowPotion.dispatch(message); });
 			onMsg("hunger_active", (message:Dynamic) -> { onHungerActive.dispatch(message); });
 			onMsg("hunger_expired", (message:Dynamic) -> { onHungerExpired.dispatch(message); });
+			onMsg("player_knockback", (message:Dynamic) -> { onPlayerKnockback.dispatch(message); });
+			onMsg("throw_bait", (message:Dynamic) -> { onThrowBait.dispatch(message); });
+			onMsg("bait_active", (message:Dynamic) -> { onBaitActive.dispatch(message); });
+			onMsg("bait_expired", (message:Dynamic) -> { onBaitExpired.dispatch(message); });
 			}); // end runInMainThread
 		});
 	}

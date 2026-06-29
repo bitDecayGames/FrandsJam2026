@@ -30,6 +30,7 @@ class GameLogic {
 	public var bushPositions:Map<String, {x:Float, y:Float}> = new Map();
 	public var round:RoundState = new RoundState();
 	public var inputQueue:Map<String, Array<P_Input>> = new Map();
+	var knockbacks:Map<String, {velX:Float, velY:Float, timer:Float}> = new Map();
 
 	public var simulation:Simulation;
 	public var collision:CollisionMap;
@@ -92,6 +93,17 @@ class GameLogic {
 	var hungerBodyIndex:Int; // which water body is affected (-1 = none)
 	static var HUNGER_DURATION:Float = 10.0;
 	static var HUNGER_ATTRACT_DIST:Float = 999; // attract from anywhere in body
+
+	// Fish bait
+	var baitTimer:Float;
+	var baitX:Float;
+	var baitY:Float;
+	var baitRadiusX:Float;
+	var baitRadiusY:Float;
+	var baitBodyIndex:Int;
+	static var BAIT_DURATION:Float = 15.0;
+	static var BAIT_RADIUS:Float = 64.0;
+	static var BAIT_RADIUS_Y:Float = 44.0; // squashed oval
 
 	// Round timer
 	public var roundTimerSec:Float;
@@ -166,9 +178,15 @@ class GameLogic {
 		nextRocketId = 1;
 		hungerTimer = 0;
 		hungerBodyIndex = -1;
+		baitTimer = 0;
+		baitX = 0;
+		baitY = 0;
+		baitRadiusX = BAIT_RADIUS;
+		baitRadiusY = BAIT_RADIUS_Y;
+		baitBodyIndex = -1;
 
 		roundTimerSec = 0;
-		roundDurationSec = 90;
+		roundDurationSec = 600;
 		timerSyncCooldown = 5.0;
 		gameplayStarted = false;
 
@@ -263,11 +281,27 @@ class GameLogic {
 			case "ground_fish_drop":
 				var px:Float = data.playerX;
 				var py:Float = data.playerY;
-				var angle = Math.random() * Math.PI * 2;
-				var dist = 16 + Math.random() * 16;
+				var gfWorldW:Float = collision.cols * collision.tileSize;
+				var gfWorldH:Float = collision.rows * collision.tileSize;
+				var gfLandX = px;
+				var gfLandY = py;
+				for (_ in 0...20) {
+					var angle = Math.random() * Math.PI * 2;
+					var dist = 16 + Math.random() * 16;
+					var tx = px + Math.cos(angle) * dist;
+					var ty = py + Math.sin(angle) * dist;
+					if (tx < 8 || tx > gfWorldW - 8 || ty < 8 || ty > gfWorldH - 8) { continue; }
+					var col = Std.int(tx / collision.tileSize);
+					var row = Std.int(ty / collision.tileSize);
+					if (collision.isWalkableAt(col, row)) {
+						gfLandX = tx;
+						gfLandY = ty;
+						break;
+					}
+				}
 				broadcast("ground_fish_spawn", {
 					startX: px, startY: py,
-					landX: px + Math.cos(angle) * dist, landY: py + Math.sin(angle) * dist,
+					landX: gfLandX, landY: gfLandY,
 					fishType: data.fishType, lengthCm: data.lengthCm
 				});
 			case "ground_fish_pickup":
@@ -330,7 +364,7 @@ class GameLogic {
 			case "weed_burst":
 				broadcast("weed_burst", {sessionId: clientId, index: data.index});
 			case "player_drown":
-				broadcast("player_drown", {sessionId: clientId, x: data.x, y: data.y});
+				// Server-authoritative — drowning is detected in fixedTick(), not from client messages
 			case "bush_rustle":
 				// Tier 1 cosmetic — handled client-side only, no relay needed
 			case "bush_ignite":
@@ -365,11 +399,30 @@ class GameLogic {
 				var hasFish = false;
 				if (items != null) {
 					var count = items.length;
+					var worldW:Float = collision.cols * collision.tileSize;
+					var worldH:Float = collision.rows * collision.tileSize;
 					for (j in 0...count) {
-						var angle = (j / count) * Math.PI * 2 + Math.random() * 0.3;
-						var dist = DOG_ITEM_DROP_RADIUS + Math.random() * 12;
-						var landX = px + Math.cos(angle) * dist;
-						var landY = py + Math.sin(angle) * dist;
+						// Find a walkable landing spot (not water, not off-screen)
+						var landX:Float = px;
+						var landY:Float = py;
+						var baseAngle = (j / count) * Math.PI * 2;
+						for (_ in 0...20) {
+							var angle = baseAngle + Math.random() * 0.6 - 0.3;
+							var dist = DOG_ITEM_DROP_RADIUS + Math.random() * 12;
+							var tx = px + Math.cos(angle) * dist;
+							var ty = py + Math.sin(angle) * dist;
+							// Clamp to world bounds
+							if (tx < 8 || tx > worldW - 8 || ty < 8 || ty > worldH - 8) { continue; }
+							var col = Std.int(tx / collision.tileSize);
+							var row = Std.int(ty / collision.tileSize);
+							if (collision.isWalkableAt(col, row)) {
+								landX = tx;
+								landY = ty;
+								break;
+							}
+							// Try a different angle on next attempt
+							baseAngle += 0.5;
+						}
 						broadcast("dog_item_landed", {
 							startX: px, startY: py,
 							landX: landX, landY: landY,
@@ -417,6 +470,31 @@ class GameLogic {
 			case "throw_potion":
 				broadcast("throw_potion", {sessionId: clientId, targetX: data.targetX, targetY: data.targetY, dir: data.dir});
 
+			case "throw_bait":
+				broadcast("throw_bait", {sessionId: clientId, targetX: data.targetX, targetY: data.targetY, dir: data.dir});
+
+			case "bait_landed":
+				baitX = data.x;
+				baitY = data.y;
+				// Find which water body the bait landed in
+				var baitGrid = collision.tileSize;
+				var baitCx = Std.int(baitX / baitGrid);
+				var baitCy = Std.int(baitY / baitGrid);
+				baitBodyIndex = -1;
+				for (bi in 0...waterBodies.length) {
+					for (tile in waterBodies[bi]) {
+						if (Std.int(tile.x / baitGrid) == baitCx && Std.int(tile.y / baitGrid) == baitCy) {
+							baitBodyIndex = bi;
+							break;
+						}
+					}
+					if (baitBodyIndex >= 0) { break; }
+				}
+				if (baitBodyIndex >= 0) {
+					baitTimer = BAIT_DURATION;
+					broadcast("bait_active", {duration: BAIT_DURATION, x: baitX, y: baitY, radiusX: BAIT_RADIUS, radiusY: BAIT_RADIUS_Y});
+				}
+
 			case "potion_landed":
 				// Find which water body the potion landed in
 				var landX:Float = data.x;
@@ -460,6 +538,11 @@ class GameLogic {
 						id: rid, x: spawnX, y: spawnY,
 						dirX: dx, dirY: dy, sessionId: clientId
 					});
+					// Apply decelerating knockback to shooter
+					if (!knockbacks.exists(clientId)) {
+						knockbacks.set(clientId, {velX: -dx * 300, velY: -dy * 300, timer: 0.3});
+						broadcast("player_knockback", {sessionId: clientId, duration: 0.3});
+					}
 				}
 
 			case "debug_end_round":
@@ -529,6 +612,26 @@ class GameLogic {
 
 	function fixedTick(t:Float) {
 		for (id => p in players) {
+			// Process knockback — decelerating slide, blocks normal input
+			var kb = knockbacks.get(id);
+			if (kb != null) {
+				var frac = kb.timer > 0 ? kb.timer / 0.3 : 0; // decelerate from full to zero
+				p.x += kb.velX * frac * t;
+				p.y += kb.velY * frac * t;
+				p.velocityX = kb.velX * frac;
+				p.velocityY = kb.velY * frac;
+				kb.timer -= t;
+				if (kb.timer <= 0) { knockbacks.remove(id); }
+				// Drain input queue but don't process it
+				var queue = inputQueue.get(id);
+				if (queue != null) {
+					// Update lastProcessedSeq so client reconciliation stays in sync
+					for (inp in queue) { p.lastProcessedSeq = inp.seq; }
+					queue.splice(0, queue.length);
+				}
+				continue; // skip normal movement
+			}
+
 			var queue = inputQueue.get(id);
 			if (queue == null || queue.length == 0) {
 				p.velocityX = 0;
@@ -543,6 +646,14 @@ class GameLogic {
 			}
 			queue.splice(0, queue.length);
 
+			// Clamp player to world bounds
+			var worldW:Float = collision.cols * collision.tileSize;
+			var worldH:Float = collision.rows * collision.tileSize;
+			if (p.x < 0) { p.x = 0; }
+			if (p.y < 0) { p.y = 0; }
+			if (p.x + p.width > worldW) { p.x = worldW - p.width; }
+			if (p.y + p.height > worldH) { p.y = worldH - p.height; }
+
 			// Server-authoritative shallow water state
 			var hasWaders2 = wadersPlayers.exists(id) && wadersPlayers.get(id);
 			if (hasWaders2) {
@@ -552,6 +663,25 @@ class GameLogic {
 					&& collision.isShallowAt(p.x + p.width - 1, p.y + p.height - 1);
 			} else {
 				p.inShallowWater = false;
+			}
+
+			// Server-authoritative hot mode drown check
+			var isHot2 = hotModePlayers.exists(id) && hotModePlayers.get(id);
+			if (isHot2) {
+				var pcx = Std.int((p.x + p.width / 2) / collision.tileSize);
+				var pcy = Std.int((p.y + p.height / 2) / collision.tileSize);
+				var inWater = collision.isSwimmableAt(pcx, pcy)
+					|| collision.isShallowAt(p.x + p.width / 2, p.y + p.height / 2);
+				if (inWater) {
+					var hasW = wadersPlayers.exists(id) && wadersPlayers.get(id);
+					if (hasW) {
+						hotModePlayers.set(id, false);
+						broadcast("hot_pepper", {sessionId: id, isStart: false});
+					} else {
+						hotModePlayers.set(id, false);
+						broadcast("player_drown", {sessionId: id, x: p.x, y: p.y});
+					}
+				}
 			}
 		}
 
@@ -566,6 +696,13 @@ class GameLogic {
 			if (hungerTimer <= 0) {
 				hungerTimer = 0;
 				broadcast("hunger_expired", {});
+			}
+		}
+		if (baitTimer > 0) {
+			baitTimer -= t;
+			if (baitTimer <= 0) {
+				baitTimer = 0;
+				broadcast("bait_expired", {});
 			}
 		}
 
@@ -611,6 +748,26 @@ class GameLogic {
 
 		seagulls = [];
 		seagullSpawnTimer = 3.0;
+
+		// Clear dogs and reset spawn timer
+		for (d in dogs) {
+			broadcast("dog_despawn", {id: d.id});
+		}
+		dogs = [];
+		dogSpawnTimer = 10.0;
+
+		// Clear rockets
+		for (r in rockets) {
+			broadcast("rocket_despawn", {id: r.id});
+		}
+		rockets = [];
+
+		// Reset hunger/bait
+		hungerTimer = 0;
+		baitTimer = 0;
+		powerUpAlive = false;
+		powerUpRespawnTimer = 3.0;
+
 		wormTimer = 3.0;
 		timerSyncCooldown = 5.0;
 		bobberPositions = new Map();
@@ -817,8 +974,10 @@ class GameLogic {
 				f.scaredTimer -= t;
 				f.x += f.velX * t;
 				f.y += f.velY * t;
+				f.aiState = FishState.STATE_SCARED;
 				if (f.scaredTimer <= 0) {
 					f.alive = false; f.velX = 0; f.velY = 0; f.respawnTimer = 5.5;
+					f.aiState = FishState.STATE_DEAD;
 				}
 				continue;
 			}
@@ -833,7 +992,8 @@ class GameLogic {
 							f.x = tile.x + Math.random() * 12;
 							f.y = tile.y + Math.random() * 12;
 							f.velX = 0; f.velY = 0; f.alive = true;
-							f.attracted = false; f.pauseTimer = 0;
+							f.attracted = false; f.pauseTimer = 0; f.rocketFeared = false;
+							f.aiState = FishState.STATE_SPAWNING;
 							f.retargetTimer = Math.random() + 2.0;
 							pickFishTarget(f);
 						}
@@ -842,15 +1002,12 @@ class GameLogic {
 				continue;
 			}
 
-			if (f.pauseTimer > 0) { f.pauseTimer -= t; continue; }
-
-			// Bobber interaction
+			// Bobber interaction — checked before pause so fish always react to lures
 			var closestDist = 1e20;
 			var closestSid:String = null;
 			var closestBX:Float = 0;
 			var closestBY:Float = 0;
 			var hasBobbers = false;
-			// Fish shadow sprite is 16x16; use center for distance checks
 			var fcx = f.x + 8;
 			var fcy = f.y + 8;
 			// Is this fish in the hungry water body?
@@ -871,17 +1028,18 @@ class GameLogic {
 				if (dist < closestDist) { closestDist = dist; closestSid = sid; closestBX = bpos.x; closestBY = bpos.y; }
 			}
 
-			if (f.attracted && !hasBobbers) { f.attracted = false; fleeFromFish(f, f.x + f.velX, f.y + f.velY); continue; }
+			if (f.attracted && !hasBobbers) { f.attracted = false; f.aiState = FishState.STATE_ROAMING; fleeFromFish(f, f.x + f.velX, f.y + f.velY); continue; }
 			var attractDist = if (fishHungry) HUNGER_ATTRACT_DIST else FISH_ATTRACT_DIST;
-			if (f.attracted && closestDist > attractDist) { f.attracted = false; fleeFromFish(f, closestBX, closestBY); continue; }
+			if (f.attracted && closestDist > attractDist) { f.attracted = false; f.aiState = FishState.STATE_ROAMING; fleeFromFish(f, closestBX, closestBY); continue; }
 			if (hasBobbers && closestDist < FISH_CATCH_DIST) {
 				f.alive = false; f.velX = 0; f.velY = 0; f.attracted = false; f.respawnTimer = 3.0;
+				f.aiState = FishState.STATE_DEAD;
 				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: f.fishType});
 				bobberPositions.remove(closestSid);
 				continue;
 			}
 			if (hasBobbers && closestDist < attractDist) {
-				f.attracted = true; f.pauseTimer = 0;
+				f.attracted = true; f.pauseTimer = 0; f.aiState = FishState.STATE_ATTRACTED;
 				var dx = closestBX - fcx; var dy = closestBY - fcy;
 				var aDist = Math.sqrt(dx * dx + dy * dy);
 				if (aDist > 0.1) { f.velX = (dx / aDist) * FISH_ATTRACT_SPEED; f.velY = (dy / aDist) * FISH_ATTRACT_SPEED; }
@@ -889,7 +1047,63 @@ class GameLogic {
 				continue;
 			}
 
+			// Rocket fear — once triggered, fish flees perpendicular for the full duration
+			if (f.rocketFeared) {
+				f.retargetTimer -= t;
+				// Check if next position is still in the water body
+				var nextX = f.x + f.velX * t;
+				var nextY = f.y + f.velY * t;
+				var grid = collision.tileSize;
+				var nextCol = Std.int((nextX + 8) / grid);
+				var nextRow = Std.int((nextY + 8) / grid);
+				if (collision.isSwimmableAt(nextCol, nextRow) || collision.isShallowAt(nextX + 8, nextY + 8)) {
+					f.x = nextX;
+					f.y = nextY;
+				} else {
+					// Hit the shore — stop moving but stay feared until timer runs out
+					f.velX = 0;
+					f.velY = 0;
+				}
+				if (f.retargetTimer <= 0) {
+					f.rocketFeared = false;
+					f.velX = 0;
+					f.velY = 0;
+					f.pauseTimer = 1.0; // pause before resuming roaming
+					f.aiState = FishState.STATE_ROAMING;
+				}
+				continue;
+			}
+
+			// Check if a rocket triggers fear
+			for (r in rockets) {
+				var rdx = fcx - r.x;
+				var rdy = fcy - r.y;
+				var rdistSq = rdx * rdx + rdy * rdy;
+				if (rdistSq < 40.0 * 40.0 && rdistSq > 0.01) {
+					var perpX1 = -r.dirY;
+					var perpY1 = r.dirX;
+					var dot = perpX1 * rdx + perpY1 * rdy;
+					f.velX = if (dot >= 0) perpX1 * FISH_SPEED * 2 else r.dirY * FISH_SPEED * 2;
+					f.velY = if (dot >= 0) perpY1 * FISH_SPEED * 2 else -r.dirX * FISH_SPEED * 2;
+					f.attracted = false;
+					f.pauseTimer = 0;
+					f.retargetTimer = 1.0;
+					f.rocketFeared = true;
+					f.aiState = FishState.STATE_FEARED;
+					break;
+				}
+			}
+			if (f.rocketFeared) {
+				f.x += f.velX * t;
+				f.y += f.velY * t;
+				continue;
+			}
+
+			if (f.pauseTimer > 0) { f.pauseTimer -= t; continue; }
+
 			// Wander
+			var isBaitFish = baitTimer > 0 && baitBodyIndex >= 0 && f.bodyIndex == baitBodyIndex;
+			f.aiState = if (isBaitFish) FishState.STATE_BAIT_ROAMING else FishState.STATE_ROAMING;
 			f.retargetTimer -= t;
 			if (f.retargetTimer <= 0) { pickFishTarget(f); }
 			var dx = f.targetX - f.x; var dy = f.targetY - f.y;
@@ -905,10 +1119,10 @@ class GameLogic {
 		// Separation
 		for (i in 0...fishStates.length) {
 			var a = fishStates[i];
-			if (!a.alive) { continue; }
+			if (!a.alive || a.aiState == FishState.STATE_BAIT_ROAMING) { continue; }
 			for (j in (i + 1)...fishStates.length) {
 				var b = fishStates[j];
-				if (!b.alive) { continue; }
+				if (!b.alive || b.aiState == FishState.STATE_BAIT_ROAMING) { continue; }
 				var dx = a.x - b.x; var dy = a.y - b.y;
 				if (dx * dx + dy * dy < FISH_SEPARATION_DIST * FISH_SEPARATION_DIST) {
 					fleeFromFish(a, b.x, b.y); fleeFromFish(b, a.x, a.y);
@@ -920,6 +1134,45 @@ class GameLogic {
 	function pickFishTarget(f:FishState) {
 		var bodyTiles = waterBodies[f.bodyIndex];
 		if (bodyTiles == null || bodyTiles.length == 0) { return; }
+
+		// When bait is active, fish in the SAME body pick targets within the bait oval
+		if (baitTimer > 0 && baitBodyIndex >= 0 && f.bodyIndex == baitBodyIndex) {
+			var candidates = new Array<{x:Float, y:Float}>();
+			var grid = collision.tileSize;
+			// Scan tiles within the bait oval bounds
+			var minCol = Std.int((baitX - baitRadiusX) / grid);
+			var maxCol = Std.int((baitX + baitRadiusX) / grid);
+			var minRow = Std.int((baitY - baitRadiusY) / grid);
+			var maxRow = Std.int((baitY + baitRadiusY) / grid);
+			if (minCol < 0) { minCol = 0; }
+			if (minRow < 0) { minRow = 0; }
+			if (maxCol >= collision.cols) { maxCol = collision.cols - 1; }
+			if (maxRow >= collision.rows) { maxRow = collision.rows - 1; }
+			for (row in minRow...maxRow + 1) {
+				for (col in minCol...maxCol + 1) {
+					// Allow swimmable OR shallow tiles within the bait oval
+					if (!collision.isSwimmableAt(col, row) && !collision.isShallowAt(col * grid + grid / 2.0, row * grid + grid / 2.0)) {
+						continue;
+					}
+					var tx = col * grid + 2.0;
+					var ty = row * grid + 2.0;
+					var dx = (tx + 6) - baitX;
+					var dy = (ty + 6) - baitY;
+					if (dx * dx / (baitRadiusX * baitRadiusX) + dy * dy / (baitRadiusY * baitRadiusY) < 1) {
+						candidates.push({x: tx, y: ty});
+					}
+				}
+			}
+			if (candidates.length > 0) {
+				var tile = candidates[Std.int(Math.random() * candidates.length)];
+				f.targetX = tile.x + Math.random() * 12;
+				f.targetY = tile.y + Math.random() * 12;
+				f.retargetTimer = 1.0 + Math.random();
+				f.aiState = FishState.STATE_BAIT_ROAMING;
+				return;
+			}
+		}
+
 		var tile = bodyTiles[Std.int(Math.random() * bodyTiles.length)];
 		f.targetX = tile.x + Math.random() * 12;
 		f.targetY = tile.y + Math.random() * 12;
@@ -954,7 +1207,7 @@ class GameLogic {
 			if (!f.alive) { continue; }
 			var dx = f.x - splashX; var dy = f.y - splashY;
 			if (dx * dx + dy * dy < radius * radius) {
-				f.scaredTimer = 0.5; f.attracted = false;
+				f.scaredTimer = 0.5; f.attracted = false; f.aiState = FishState.STATE_SCARED;
 				var len = Math.sqrt(dx * dx + dy * dy);
 				if (len > 0.01) { f.velX = (dx / len) * FISH_SPEED * 1.5; f.velY = (dy / len) * FISH_SPEED * 1.5; }
 			}
@@ -1050,12 +1303,12 @@ class GameLogic {
 		var worldW:Float = collision.cols * collision.tileSize;
 		var worldH:Float = collision.rows * collision.tileSize;
 
-		// Spawn timer
-		dogSpawnTimer -= t;
-		if (dogSpawnTimer <= 0) {
-			dogSpawnTimer = DOG_SPAWN_INTERVAL_MIN + Math.random() * (DOG_SPAWN_INTERVAL_MAX - DOG_SPAWN_INTERVAL_MIN);
-			spawnDog(worldW, worldH);
-		}
+		// Auto-spawn disabled — use debug button to spawn dogs
+		// dogSpawnTimer -= t;
+		// if (dogSpawnTimer <= 0) {
+		// 	dogSpawnTimer = DOG_SPAWN_INTERVAL_MIN + Math.random() * (DOG_SPAWN_INTERVAL_MAX - DOG_SPAWN_INTERVAL_MIN);
+		// 	spawnDog(worldW, worldH);
+		// }
 
 		// Periodic position broadcast
 		dogUpdateTimer -= t;
@@ -1090,7 +1343,7 @@ class GameLogic {
 					}
 
 				case "seeking":
-					// Walk toward the fish using pathfinding — recompute every frame
+					// Walk toward the fish using pathfinding
 					dog.path = findPath(dog.x, dog.y, dog.fishTargetX, dog.fishTargetY);
 					dog.pathIndex = 0;
 					var dx = dog.fishTargetX - dog.x;
@@ -1112,14 +1365,17 @@ class GameLogic {
 					var closestX:Float = dog.x;
 					var closestY:Float = dog.y;
 					for (sid => p in players) {
-						var dx = p.x - dog.x;
-						var dy = p.y - dog.y;
+						// Target player visual center
+						var pcx = p.x + p.width / 2;
+						var pcy = p.y - 4;
+						var dx = pcx - dog.x;
+						var dy = pcy - dog.y;
 						var dist = Math.sqrt(dx * dx + dy * dy);
 						if (dist < closestDist) {
 							closestDist = dist;
 							closestSid = sid;
-							closestX = p.x;
-							closestY = p.y;
+							closestX = pcx;
+							closestY = pcy;
 						}
 					}
 					dog.targetSession = closestSid;
@@ -1455,7 +1711,7 @@ class GameLogic {
 			}
 			if (hit) { continue; }
 
-			// Clients simulate trajectory locally — no per-tick position broadcast needed
+			// Fish scare is handled inside updateFish() so it takes priority over wander
 		}
 	}
 }

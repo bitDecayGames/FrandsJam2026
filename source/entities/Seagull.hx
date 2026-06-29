@@ -148,7 +148,7 @@ class Seagull extends FlxSprite {
 		var altitude = Math.max(0, Math.min(1, (flyBounds.bottom - y) / flyBounds.height));
 		var shadowOffsetY = SHADOW_BASE_OFFSET + altitude * 40;
 		var fallDist = shadowOffsetY - height / 2;
-		parentState.add(new SeagullPoop(x + width / 2, y + height / 2, fallDist, velocity.x, parentState, groundGroup, terrain, fishSpawner));
+		parentState.add(new SeagullPoop(x + width / 2, y + height / 2, fallDist, velocity.x, parentState, groundGroup, terrain));
 	}
 
 	override public function draw() {

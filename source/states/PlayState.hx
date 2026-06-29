@@ -59,11 +59,11 @@ class PlayState extends FlxTransitionableState {
 
 	// Network things
 	var remotePlayers:Map<String, Player> = new Map();
-	var remoteFish:Map<String, WaterFish> = new Map();
+	// Fish are stored in fishSpawner (single group + fishMap for ID lookup)
 
 	var midGroundGroup = new FlxGroup();
 	var ySortGroup = new FlxGroup();
-	var serverFishGroup = new FlxGroup();
+	// serverFishGroup removed — fishSpawner is the single fish render group
 	var bushGroup = new FlxTypedGroup<Bush>();
 	var localBushContacts = new Map<Int, Bool>(); // entityRect index -> in contact
 	var remoteBushContacts = new Map<String, Map<Int, Bool>>(); // sessionId -> bushIndex -> inContact
@@ -73,6 +73,9 @@ class PlayState extends FlxTransitionableState {
 	var rocketData = new Map<Int, {x:Float, y:Float, dirX:Float, dirY:Float, speed:Float}>();
 	var rocketEmitters = new Map<Int, flixel.effects.particles.FlxEmitter>();
 	var hungerOverlay:FlxSprite;
+	var baitOverlay:FlxSprite;
+	var arcingItems:Array<{sprite:FlxSprite, startX:Float, startY:Float, landX:Float, landY:Float, flightTime:Float, elapsed:Float, onLand:Void->Void}> = [];
+	var groundItems:Array<{sprite:FlxSprite, item:entities.Inventory.InventoryItem}> = [];
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
@@ -133,8 +136,8 @@ class PlayState extends FlxTransitionableState {
 
 		// QLog.error('Example error');
 
-		fishSpawner = new FishSpawner(onFishCaught);
-		rockGroup = new RockGroup(fishSpawner, this);
+		fishSpawner = new FishSpawner();
+		rockGroup = new RockGroup(this);
 		groundFishGroup = new GroundFishGroup();
 		wadersPickup = new WadersPickup();
 		pepperPickup = new PepperPickup();
@@ -147,7 +150,6 @@ class PlayState extends FlxTransitionableState {
 		add(wadersPickup);
 		add(pepperPickup);
 		add(fishSpawner);
-		add(serverFishGroup);
 		add(wormGroup);
 		add(ySortGroup);
 		add(transitions);
@@ -183,7 +185,7 @@ class PlayState extends FlxTransitionableState {
 
 	#if db
 	function addDebugButtons() {
-		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog", "Rocket", "Potion", "Fish"];
+		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog", "Rocket", "Potion", "Fish", "Bait"];
 		var btnW = 60;
 		var btnH = 16;
 		var margin = 4;
@@ -222,7 +224,7 @@ class PlayState extends FlxTransitionableState {
 		if (mx < startX || mx > startX + btnW) {
 			return;
 		}
-		for (i in 0...9) {
+		for (i in 0...10) {
 			var by = startY + i * (btnH + margin);
 			if (my >= by && my < by + btnH) {
 				switch (i) {
@@ -257,10 +259,12 @@ class PlayState extends FlxTransitionableState {
 						if (player.inventory.has(HungerPotion)) { player.inventory.remove(HungerPotion); }
 						else { player.inventory.add(HungerPotion); }
 					case 8:
-						// Fish button: always adds (no toggle), random fish type
 						var ftype = FlxG.random.int(0, 11);
 						var flen = FlxG.random.int(20, 60);
 						player.inventory.add(Fish(ftype, flen));
+					case 9:
+						if (player.inventory.has(FishBait)) { player.inventory.remove(FishBait); }
+						else { player.inventory.add(FishBait); }
 				}
 				return;
 			}
@@ -276,7 +280,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onCastLine.remove(onRemoteCastLine);
 		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
-		GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onRockSplash.remove(onRockSplash);
 		GameManager.ME.net.onThrowRock.remove(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
@@ -300,6 +304,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onDogDespawn.remove(onDogDespawn);
 		GameManager.ME.net.onDogItemLanded.remove(onDogItemLanded);
 		GameManager.ME.net.onDogAteFish.remove(onDogAteFish);
+		GameManager.ME.net.onPlayerKnockback.remove(onPlayerKnockback);
 		GameManager.ME.net.onPowerUpSpawn.remove(onPowerUpSpawn);
 		GameManager.ME.net.onPowerUpPickup.remove(onPowerUpPickup);
 		GameManager.ME.net.onRocketFired.remove(onRocketFired);
@@ -309,6 +314,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onThrowPotion.remove(onThrowPotion);
 		GameManager.ME.net.onHungerActive.remove(onHungerActive);
 		GameManager.ME.net.onHungerExpired.remove(onHungerExpired);
+		GameManager.ME.net.onThrowBait.remove(onThrowBait);
+		GameManager.ME.net.onBaitActive.remove(onBaitActive);
+		GameManager.ME.net.onBaitExpired.remove(onBaitExpired);
 		GameManager.ME.net.onCloudSync.remove(onServerCloudSync);
 		GameManager.ME.net.onGroundFishSpawn.remove(onRemoteGroundFishSpawn);
 		GameManager.ME.net.onGroundFishPickup.remove(onRemoteGroundFishPickup);
@@ -322,7 +330,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onCastLine.add(onRemoteCastLine);
 		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
-		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onRockSplash.add(onRockSplash);
 		GameManager.ME.net.onThrowRock.add(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
@@ -350,6 +358,7 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onDogDespawn.add(onDogDespawn);
 		GameManager.ME.net.onDogItemLanded.add(onDogItemLanded);
 		GameManager.ME.net.onDogAteFish.add(onDogAteFish);
+		GameManager.ME.net.onPlayerKnockback.add(onPlayerKnockback);
 		GameManager.ME.net.onPowerUpSpawn.add(onPowerUpSpawn);
 		GameManager.ME.net.onPowerUpPickup.add(onPowerUpPickup);
 		GameManager.ME.net.onRocketFired.add(onRocketFired);
@@ -359,6 +368,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onThrowPotion.add(onThrowPotion);
 		GameManager.ME.net.onHungerActive.add(onHungerActive);
 		GameManager.ME.net.onHungerExpired.add(onHungerExpired);
+		GameManager.ME.net.onThrowBait.add(onThrowBait);
+		GameManager.ME.net.onBaitActive.add(onBaitActive);
+		GameManager.ME.net.onBaitExpired.add(onBaitExpired);
 
 		// Fish may have been added to the schema before we subscribed
 		// (server spawns fish on room creation, before clients join PlayState).
@@ -390,14 +402,10 @@ class PlayState extends FlxTransitionableState {
 		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y} alive=${fishState.alive}');
 
 		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true, fishState.fishType);
-		// In local mode, give the sprite a direct reference to the GameLogic's FishState
-		// so it can read position each frame without schema signals
-		if (GameManager.ME.net.isLocal()) {
-			newFish.serverFishState = fishState;
-		}
-		remoteFish.set(fishId, newFish);
+		// Direct reference to the FishState for reading synced fields (position, aiState, etc.)
+		newFish.serverFishState = fishState;
 		fishSpawner.fishMap.set(fishId, newFish);
-		serverFishGroup.add(newFish);
+		fishSpawner.add(newFish);
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
 
@@ -496,10 +504,16 @@ class PlayState extends FlxTransitionableState {
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
 		player.makePotion = (rx, ry) -> {
 			var r = new Rock(rx, ry, false, waterLayer, null, (lx, ly, _) -> {
-				// Potion landed in water — tell server
 				GameManager.ME.net.sendMessage("potion_landed", {x: lx, y: ly});
 			});
-			r.makeGraphic(8, 8, 0xFF00CC66); // green potion placeholder
+			r.makeGraphic(8, 8, 0xFF00CC66);
+			return r;
+		};
+		player.makeBait = (rx, ry) -> {
+			var r = new Rock(rx, ry, false, waterLayer, null, (lx, ly, _) -> {
+				GameManager.ME.net.sendMessage("bait_landed", {x: lx, y: ly});
+			});
+			r.makeGraphic(8, 8, 0xFFDDAA00); // golden bait placeholder
 			return r;
 		};
 		for (_ => remote in remotePlayers) {
@@ -507,6 +521,11 @@ class PlayState extends FlxTransitionableState {
 			remote.makePotion = (rx, ry) -> {
 				var r = new Rock(rx, ry, false, waterLayer, null, null);
 				r.makeGraphic(8, 8, 0xFF00CC66);
+				return r;
+			};
+			remote.makeBait = (rx, ry) -> {
+				var r = new Rock(rx, ry, false, waterLayer, null, null);
+				r.makeGraphic(8, 8, 0xFFDDAA00);
 				return r;
 			};
 		}
@@ -703,10 +722,18 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onRemotePlayerDrown(sessionId:String, x:Float, y:Float) {
-		var remote = remotePlayers.get(sessionId);
-		if (remote != null) {
-			add(new Splash(x + remote.width / 2, y + remote.height, true));
-			remote.drown(x, y);
+		if (sessionId == player.sessionId) {
+			// Server says we drowned
+			if (!player.drowned) {
+				add(new Splash(player.x + player.width / 2, player.y + player.height, true));
+				player.drown();
+			}
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				add(new Splash(x + remote.width / 2, y + remote.height, true));
+				remote.drown(x, y);
+			}
 		}
 	}
 
@@ -838,9 +865,10 @@ class PlayState extends FlxTransitionableState {
 
 	function onRemoteFishCaught(sessionId:String, fishId:String, fishType:Int) {
 		// Hide the remote fish sprite — it will fade back in when the host starts moving it again
-		var fish = remoteFish.get(fishId);
-		if (fish != null)
+		var fish = fishSpawner.fishMap.get(fishId);
+		if (fish != null) {
 			fish.visible = false;
+		}
 
 		// Non-host clients receive this to trigger the catch animation
 		if (sessionId == player.sessionId) {
@@ -985,23 +1013,8 @@ class PlayState extends FlxTransitionableState {
 		checkDebugButtons();
 		#end
 
-		// Hot player touching water = drown — use collision map tile check instead of FlxG.overlap
-		if (player.hotModeActive && !player.drowned) {
-			var col = if (simulation != null) simulation.collision else null;
-			if (col != null) {
-				var pcx = Std.int((player.x + player.width / 2) / col.tileSize);
-				var pcy = Std.int((player.y + player.height / 2) / col.tileSize);
-				if (col.isSwimmableAt(pcx, pcy) || col.isShallowAt(pcx * col.tileSize, pcy * col.tileSize)) {
-					if (player.inventory.hasWaders()) {
-						player.deactivateHotMode();
-					} else {
-						add(new Splash(player.x + player.width / 2, player.y + player.height, true));
-						player.drown();
-						GameManager.ME.net.sendMessage("player_drown", {x: player.x, y: player.y});
-					}
-				}
-			}
-		}
+		// Hot mode drown is handled server-side in GameLogic.fixedTick()
+		// Server broadcasts "player_drown" when a hot player touches water
 
 		// NO FlxG.collide(midGroundGroup, player) — Simulation handles all terrain collision.
 
@@ -1053,8 +1066,27 @@ class PlayState extends FlxTransitionableState {
 			// (local player reads it in onServerAck, remotes in handleChange)
 		}
 
+		// Update arcing items (dog-dropped gear)
+		var ai = arcingItems.length;
+		while (ai-- > 0) {
+			var item = arcingItems[ai];
+			item.elapsed += elapsed;
+			var t = Math.min(1.0, item.elapsed / item.flightTime);
+			var gx = item.startX + (item.landX - item.startX) * t;
+			var gy = item.startY + (item.landY - item.startY) * t;
+			var dist = Math.sqrt((item.landX - item.startX) * (item.landX - item.startX) + (item.landY - item.startY) * (item.landY - item.startY));
+			var arcH = Math.min(dist * 0.5, 64);
+			item.sprite.setPosition(gx, gy - arcH * 4 * t * (1 - t));
+			if (t >= 1.0) {
+				if (item.onLand != null) { item.onLand(); }
+				arcingItems.splice(ai, 1);
+			}
+		}
+
 		// Simulate rockets locally (deterministic: straight line + acceleration)
+		var hasRockets = false;
 		for (rid => rd in rocketData) {
+			hasRockets = true;
 			rd.speed += 300.0 * elapsed; // ROCKET_ACCELERATION
 			if (rd.speed > 350.0) { rd.speed = 350.0; } // ROCKET_MAX_SPEED
 			rd.x += rd.dirX * rd.speed * elapsed;
@@ -1068,6 +1100,15 @@ class PlayState extends FlxTransitionableState {
 				emitter.setPosition(rd.x, rd.y);
 			}
 		}
+
+		// Toggle fish scare radius debug circles when rockets are in flight
+		#if db
+		for (fishSprite in fishSpawner.members) {
+			if (fishSprite != null) {
+				fishSprite.showScareRadius = hasRockets;
+			}
+		}
+		#end
 
 		ySortGroup.sort((order, a, b) -> {
 			if (a == null || b == null) { return 0; }
@@ -1090,6 +1131,23 @@ class PlayState extends FlxTransitionableState {
 			groundFishGroup.checkPickup(player);
 			wadersPickup.checkPickup(player);
 			pepperPickup.checkPickup(player);
+
+			// Check ground items (dropped from dog bites)
+			var gi = groundItems.length;
+			while (gi-- > 0) {
+				var gItem = groundItems[gi];
+				if (gItem.sprite == null || !gItem.sprite.alive) {
+					groundItems.splice(gi, 1);
+					continue;
+				}
+				if (!player.inventory.isFull() && FlxG.overlap(player, gItem.sprite)) {
+					player.inventory.add(gItem.item);
+					remove(gItem.sprite);
+					gItem.sprite.destroy();
+					groundItems.splice(gi, 1);
+					break; // one per frame
+				}
+			}
 
 			updateSparkles(elapsed);
 		}
@@ -1145,6 +1203,8 @@ class PlayState extends FlxTransitionableState {
 						items.push({type: "rocket", data: {}});
 					case HungerPotion:
 						items.push({type: "potion", data: {}});
+					case FishBait:
+						items.push({type: "bait", data: {}});
 				}
 			}
 			player.inventory.clear();
@@ -1184,10 +1244,51 @@ class PlayState extends FlxTransitionableState {
 				groundFishGroup.add(new entities.GroundFish(startX, startY, landX, landY, fishType, lengthCm));
 			case "rock":
 				var big:Bool = itemData.big == true;
-				rockGroup.addRock(landX, landY, big);
+				var rs = new FlxSprite(startX, startY);
+				rs.makeGraphic(8, 8, 0xFF888888);
+				add(rs);
+				spawnArcItem(rs, startX, startY, landX, landY, () -> {
+					remove(rs); rs.destroy();
+					rockGroup.addRock(landX, landY, big);
+				});
 			case "waders":
-				wadersPickup.spawnAt(landX, landY);
+				var ws = new FlxSprite(startX, startY);
+				ws.makeGraphic(8, 8, 0xFF0088FF);
+				add(ws);
+				spawnArcItem(ws, startX, startY, landX, landY, () -> {
+					remove(ws); ws.destroy();
+					wadersPickup.spawnAt(landX, landY);
+				});
+			case "rocket":
+				var rk = new FlxSprite(startX, startY);
+				rk.makeGraphic(8, 8, 0xFFFF4400);
+				add(rk);
+				spawnArcItem(rk, startX, startY, landX, landY, () -> {
+					groundItems.push({sprite: rk, item: Rocket});
+				});
+			case "potion":
+				var pt = new FlxSprite(startX, startY);
+				pt.makeGraphic(8, 8, 0xFF00CC66);
+				add(pt);
+				spawnArcItem(pt, startX, startY, landX, landY, () -> {
+					groundItems.push({sprite: pt, item: HungerPotion});
+				});
+			case "bait":
+				var bt = new FlxSprite(startX, startY);
+				bt.makeGraphic(8, 8, 0xFFDDAA00);
+				add(bt);
+				spawnArcItem(bt, startX, startY, landX, landY, () -> {
+					groundItems.push({sprite: bt, item: FishBait});
+				});
 		}
+	}
+
+	function spawnArcItem(sprite:FlxSprite, sx:Float, sy:Float, lx:Float, ly:Float, onLand:Void->Void) {
+		var dist = Math.sqrt((lx - sx) * (lx - sx) + (ly - sy) * (ly - sy));
+		arcingItems.push({
+			sprite: sprite, startX: sx, startY: sy, landX: lx, landY: ly,
+			flightTime: if (dist > 0) dist / 200 else 0.01, elapsed: 0, onLand: onLand
+		});
 	}
 
 	function onDogAteFish(data:Dynamic) {
@@ -1223,6 +1324,19 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	// ── Power-Up / Rocket ──
+
+	function onPlayerKnockback(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		var duration:Float = data.duration;
+		if (sessionId == player.sessionId) {
+			player.knockbackTimer = duration;
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				remote.knockbackTimer = duration;
+			}
+		}
+	}
 
 	function onPowerUpSpawn(data:Dynamic) {
 		if (powerUpSprite != null) {
@@ -1339,6 +1453,8 @@ class PlayState extends FlxTransitionableState {
 						items.push({type: "rocket", data: {}});
 					case HungerPotion:
 						items.push({type: "potion", data: {}});
+					case FishBait:
+						items.push({type: "bait", data: {}});
 				}
 			}
 			player.inventory.clear();
@@ -1361,6 +1477,20 @@ class PlayState extends FlxTransitionableState {
 
 	function onRocketDespawn(data:Dynamic) {
 		removeRocket(data.id);
+	}
+
+	function onRockSplash(sx:Float, sy:Float, big:Bool) {
+		rockGroup.onRemoteSplash(sx, sy, big);
+		// Scare fish visually — all fish are in fishSpawner now
+		var radius = if (big) 160.0 else 80.0;
+		for (fishSprite in fishSpawner.members) {
+			if (fishSprite == null || !fishSprite.alive) { continue; }
+			var dx = (fishSprite.x + fishSprite.width / 2) - sx;
+			var dy = (fishSprite.y + fishSprite.height / 2) - sy;
+			if (dx * dx + dy * dy < radius * radius) {
+				fishSprite.scare(sx, sy);
+			}
+		}
 	}
 
 	function onThrowPotion(data:Dynamic) {
@@ -1427,6 +1557,50 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	function onThrowBait(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		if (sessionId == player.sessionId) { return; }
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteThrowRock(data.targetX, data.targetY, false, data.dir);
+		}
+	}
+
+	function onBaitActive(data:Dynamic) {
+		TODO.sfx("bait_splash");
+		var cx:Float = data.x;
+		var cy:Float = data.y;
+		var rx:Float = data.radiusX;
+		var ry:Float = data.radiusY;
+		// Draw a golden oval overlay at the bait zone
+		var diam = Std.int(rx * 2);
+		var diamY = Std.int(ry * 2);
+		if (baitOverlay != null) { remove(baitOverlay); baitOverlay.destroy(); }
+		baitOverlay = new FlxSprite();
+		baitOverlay.makeGraphic(diam, diamY, 0x00000000);
+		// Draw filled oval
+		for (py in 0...diamY) {
+			for (px in 0...diam) {
+				var dx = (px - rx) / rx;
+				var dy = (py - ry) / ry;
+				if (dx * dx + dy * dy < 1) {
+					baitOverlay.pixels.setPixel32(px, py, 0x22DDAA00);
+				}
+			}
+		}
+		baitOverlay.dirty = true;
+		baitOverlay.setPosition(cx - rx, cy - ry);
+		add(baitOverlay);
+	}
+
+	function onBaitExpired(data:Dynamic) {
+		if (baitOverlay != null) {
+			remove(baitOverlay);
+			baitOverlay.destroy();
+			baitOverlay = null;
+		}
+	}
+
 	function onServerCloudSync(data:Dynamic) {
 		var cloudArray:Array<Dynamic> = data.clouds;
 		if (cloudArray != null) {
@@ -1465,14 +1639,15 @@ class PlayState extends FlxTransitionableState {
 		var poopY:Float = data.y;
 		var fallDist:Float = data.fallDist;
 		var birdVelX:Float = data.birdVelX;
-		add(new SeagullPoop(poopX, poopY, fallDist, birdVelX, this, midGroundGroup, terrainLayer, null));
+		add(new SeagullPoop(poopX, poopY, fallDist, birdVelX, this, midGroundGroup, terrainLayer));
 	}
 
 	function onServerSeagullDespawn(data:Dynamic) {
 		var sid:Int = Std.int(data.id);
 		var gull = serverSeagulls.get(sid);
 		if (gull != null) {
-			gull.kill();
+			seagullGroup.remove(gull, true);
+			gull.destroy();
 			serverSeagulls.remove(sid);
 		}
 	}

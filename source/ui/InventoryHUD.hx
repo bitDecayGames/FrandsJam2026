@@ -67,6 +67,10 @@ class InventoryHUD extends FlxSpriteGroup {
 						slots[i].makeGraphic(16, 16, 0xFF00CC66);
 						slots[i].scale.set(1, 1);
 						slots[i].offset.set(0, 0);
+					case FishBait:
+						slots[i].makeGraphic(16, 16, 0xFFDDAA00);
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
 				}
 			} else {
 				// slots[i].loadGraphic(null);

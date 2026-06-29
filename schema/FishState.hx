@@ -15,6 +15,16 @@ class FishState extends Schema {
 	@:type("float32") public var y:Float;
 	@:type("int8") public var fishType:Int;
 	@:type("boolean") public var alive:Bool;
+	@:type("int8") public var aiState:Int; // synced state for debug + client visuals
+
+	// AI state constants
+	public static inline var STATE_ROAMING = 0;
+	public static inline var STATE_ATTRACTED = 1;
+	public static inline var STATE_SCARED = 2;
+	public static inline var STATE_FEARED = 3;
+	public static inline var STATE_SPAWNING = 4;
+	public static inline var STATE_DEAD = 5;
+	public static inline var STATE_BAIT_ROAMING = 6;
 
 	// Non-synced fields for server-side AI (no @:type annotation)
 	public var targetX:Float;
@@ -26,6 +36,7 @@ class FishState extends Schema {
 	public var respawnTimer:Float;
 	public var scaredTimer:Float;
 	public var attracted:Bool;
+	public var rocketFeared:Bool;
 	public var bodyIndex:Int; // which water body this fish belongs to
 
 	public function new(x:Float, y:Float, fishType:Int = 0) {
@@ -34,6 +45,7 @@ class FishState extends Schema {
 		this.y = y;
 		this.fishType = fishType;
 		alive = true;
+		aiState = STATE_ROAMING;
 		targetX = x;
 		targetY = y;
 		velX = 0;
@@ -43,6 +55,7 @@ class FishState extends Schema {
 		respawnTimer = 0;
 		scaredTimer = 0;
 		attracted = false;
+		rocketFeared = false;
 		bodyIndex = 0;
 	}
 }

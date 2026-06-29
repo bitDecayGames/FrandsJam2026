@@ -185,7 +185,9 @@ class Player extends FlxSprite {
 	// Factory for creating thrown rocks — set by PlayState
 	public var makeRock:(Float, Float, Bool) -> Rock;
 	public var makePotion:(Float, Float) -> Rock;
+	public var makeBait:(Float, Float) -> Rock;
 	var throwingPotion:Bool = false;
+	var throwingBait:Bool = false;
 
 	// Effect callbacks — set by PlayState
 	public var onBobberLanded:Null<(Float, Float) -> Void> = null;
@@ -193,6 +195,12 @@ class Player extends FlxSprite {
 	// Throw state
 	var throwing:Bool = false;
 	var throwingBigRock:Bool = false;
+	var aimingRock:Bool = false;
+	public var knockbackTimer:Float = 0;
+	var aimReticleX:Float = 0;
+	var aimReticleY:Float = 0;
+	var blastRadiusSprite:FlxSprite;
+	static inline var AIM_RETICLE_SPEED:Float = 200;
 	var rockSprite:Rock;
 	var rockTarget:FlxPoint;
 	var rockStartPos:FlxPoint;
@@ -535,7 +543,7 @@ class Player extends FlxSprite {
 			}
 		}
 
-		if (!throwing) {
+		if (!throwing && knockbackTimer <= 0) {
 			playMovementAnim();
 		}
 	}
@@ -640,6 +648,11 @@ class Player extends FlxSprite {
 			fireEmitTimer = 0;
 		}
 
+		// Tick knockback timer (both local and remote)
+		if (knockbackTimer > 0) {
+			knockbackTimer -= delta;
+		}
+
 		if (isRemote) {
 			updateRemoteInterpolation();
 			return;
@@ -720,8 +733,8 @@ class Player extends FlxSprite {
 			}
 		}
 
-		// Only update movement animations when fully idle (not casting, catching, or throwing)
-		if (castState == IDLE && !throwing) {
+		// Only update movement animations when fully idle (not casting, catching, throwing, or in knockback)
+		if (castState == IDLE && !throwing && knockbackTimer <= 0) {
 			playMovementAnim();
 		}
 
@@ -740,13 +753,16 @@ class Player extends FlxSprite {
 				case SW: 3;
 				default: 2; // default down
 			};
-			GameManager.ME.net.sendMessage("fire_rocket", {dir: dirIdx});
+			GameManager.ME.net.sendMessage("fire_rocket", {dir: dirIdx, knockback: true});
+			// Server applies knockback; camera shake is client-only cosmetic
+			FlxG.camera.shake(0.012, 0.2);
 		}
 
 		// Throw hunger potion with B button (priority over rock, same arc)
 		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(HungerPotion)) {
 			#if !db inventory.remove(HungerPotion); #end
 			throwingPotion = true;
+			throwingBait = false;
 			throwingBigRock = false;
 			throwing = true;
 			frozen = true;
@@ -764,16 +780,12 @@ class Player extends FlxSprite {
 			});
 		}
 
-		// Throw rock with B button (prefers big rock, falls back to small)
-		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
-			if (inventory.has(BigRock)) {
-				#if !db inventory.remove(BigRock); #end
-				throwingBigRock = true;
-			} else {
-				#if !db inventory.remove(Rock); #end
-				throwingBigRock = false;
-			}
+		// Throw fish bait with B button (same arc as rock)
+		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(FishBait)) {
+			#if !db inventory.remove(FishBait); #end
+			throwingBait = true;
 			throwingPotion = false;
+			throwingBigRock = false;
 			throwing = true;
 			frozen = true;
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
@@ -783,15 +795,144 @@ class Player extends FlxSprite {
 			var bounds = FlxG.worldBounds;
 			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
 			dir.put();
-			GameManager.ME.net.sendMessage("throw_rock", {
+			GameManager.ME.net.sendMessage("throw_bait", {
 				targetX: rockTarget.x,
 				targetY: rockTarget.y,
-				big: throwingBigRock,
 				dir: getDirSuffix()
 			});
 		}
 
-		updateReticle();
+		// Rock throw: two-phase aiming system
+		// Phase 1: Press B to enter aiming mode — player freezes, reticle moves freely
+		if (!frozen && !throwing && !aimingRock && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
+			aimingRock = true;
+			frozen = true;
+			// Start reticle at current facing position (96px away)
+			var dir = lastInputDir.asVector();
+			aimReticleX = x + dir.x * 96 + 4;
+			aimReticleY = y + dir.y * 96 - 8;
+			dir.put();
+			if (reticle != null) {
+				reticle.scale.set(3, 3);
+				reticle.color = 0xFFFF0000; // red
+				reticle.setPosition(aimReticleX - reticle.width / 2, aimReticleY - reticle.height / 2);
+			}
+			// Draw blast radius circle
+			var isBig = inventory.has(BigRock);
+			var radius = if (isBig) 160 else 80;
+			var diam = radius * 2;
+			blastRadiusSprite = new FlxSprite();
+			blastRadiusSprite.makeGraphic(diam, diam, 0x00000000);
+			// Draw circle outline
+			var cx = radius;
+			var cy = radius;
+			for (angle in 0...360) {
+				var rad = angle * Math.PI / 180;
+				var px = Std.int(cx + Math.cos(rad) * (radius - 1));
+				var py = Std.int(cy + Math.sin(rad) * (radius - 1));
+				if (px >= 0 && px < diam && py >= 0 && py < diam) {
+					blastRadiusSprite.pixels.setPixel32(px, py, 0x44FF0000);
+				}
+				// thicker line
+				var px2 = Std.int(cx + Math.cos(rad) * (radius - 2));
+				var py2 = Std.int(cy + Math.sin(rad) * (radius - 2));
+				if (px2 >= 0 && px2 < diam && py2 >= 0 && py2 < diam) {
+					blastRadiusSprite.pixels.setPixel32(px2, py2, 0x44FF0000);
+				}
+			}
+			blastRadiusSprite.pixels.lock();
+			blastRadiusSprite.pixels.unlock();
+			blastRadiusSprite.dirty = true;
+			blastRadiusSprite.setPosition(aimReticleX - radius, aimReticleY - radius);
+			state.add(blastRadiusSprite);
+		}
+
+		// Phase 2: While aiming, move reticle with directional input (skip first frame to avoid double-fire)
+		else if (aimingRock && !throwing) {
+			var aimDx:Float = 0;
+			var aimDy:Float = 0;
+			if (SimpleController.pressed(LEFT)) { aimDx -= 1; }
+			if (SimpleController.pressed(RIGHT)) { aimDx += 1; }
+			if (SimpleController.pressed(UP)) { aimDy -= 1; }
+			if (SimpleController.pressed(DOWN)) { aimDy += 1; }
+			// Normalize diagonal
+			if (aimDx != 0 && aimDy != 0) {
+				aimDx *= 0.7071;
+				aimDy *= 0.7071;
+			}
+			aimReticleX += aimDx * AIM_RETICLE_SPEED * delta;
+			aimReticleY += aimDy * AIM_RETICLE_SPEED * delta;
+			// Clamp to world bounds
+			var bounds = FlxG.worldBounds;
+			aimReticleX = Math.max(bounds.left, Math.min(bounds.right, aimReticleX));
+			aimReticleY = Math.max(bounds.top, Math.min(bounds.bottom, aimReticleY));
+			// Position reticle and blast radius at aim point
+			if (reticle != null) {
+				reticle.setPosition(aimReticleX - reticle.width / 2, aimReticleY - reticle.height / 2);
+			}
+			if (blastRadiusSprite != null) {
+				blastRadiusSprite.setPosition(aimReticleX - blastRadiusSprite.width / 2, aimReticleY - blastRadiusSprite.height / 2);
+			}
+
+			// Press B again to throw
+			if (SimpleController.just_pressed(B)) {
+				if (inventory.has(BigRock)) {
+					#if !db inventory.remove(BigRock); #end
+					throwingBigRock = true;
+				} else {
+					#if !db inventory.remove(Rock); #end
+					throwingBigRock = false;
+				}
+				throwingPotion = false;
+				throwingBait = false;
+				throwing = true;
+				aimingRock = false;
+				// Face toward the target
+				var tdx = aimReticleX - x;
+				var tdy = aimReticleY - y;
+				if (Math.abs(tdx) > Math.abs(tdy)) {
+					lastInputDir = if (tdx > 0) Cardinal.E else Cardinal.W;
+				} else {
+					lastInputDir = if (tdy > 0) Cardinal.S else Cardinal.N;
+				}
+				sendAnimUpdate("throw_" + getDirSuffix(), true);
+				rockTarget = FlxPoint.get(aimReticleX, aimReticleY);
+				GameManager.ME.net.sendMessage("throw_rock", {
+					targetX: rockTarget.x,
+					targetY: rockTarget.y,
+					big: throwingBigRock,
+					dir: getDirSuffix()
+				});
+				if (reticle != null) {
+					reticle.scale.set(1, 1);
+					reticle.color = 0xFFFFFFFF; // reset to white
+				}
+				if (blastRadiusSprite != null) {
+					state.remove(blastRadiusSprite);
+					blastRadiusSprite.destroy();
+					blastRadiusSprite = null;
+				}
+			}
+
+			// Press A to cancel aiming
+			if (SimpleController.just_pressed(A)) {
+				aimingRock = false;
+				frozen = false;
+				if (reticle != null) {
+					reticle.scale.set(1, 1);
+					reticle.color = 0xFFFFFFFF;
+				}
+				if (blastRadiusSprite != null) {
+					state.remove(blastRadiusSprite);
+					blastRadiusSprite.destroy();
+					blastRadiusSprite = null;
+				}
+			}
+		}
+
+		if (!aimingRock) {
+			updateReticle();
+		}
 
 		clampToWorldBounds();
 	}
@@ -950,7 +1091,9 @@ class Player extends FlxSprite {
 	function launchRock() {
 		TODO.sfx("rock_throw");
 		var rockWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
-		rockSprite = if (throwingPotion && makePotion != null) {
+		rockSprite = if (throwingBait && makeBait != null) {
+			makeBait(x + 4, y - 8 + rockWy);
+		} else if (throwingPotion && makePotion != null) {
 			makePotion(x + 4, y - 8 + rockWy);
 		} else if (makeRock != null) {
 			makeRock(x + 4, y - 8 + rockWy, throwingBigRock);

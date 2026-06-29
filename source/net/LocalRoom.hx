@@ -92,7 +92,7 @@ class LocalRoom {
 			case "world_items":
 				net.onWorldItems.dispatch(data);
 			case "item_pickup":
-				// single player — no remote players to notify
+				net.onItemPickup.dispatch(data.sessionId, data.itemType, Std.int(data.index));
 			case "bush_ignite":
 				// single player — handled locally
 			case "weed_ignite":
@@ -100,7 +100,7 @@ class LocalRoom {
 			case "worm_killed":
 				// single player — handled locally
 			case "player_drown":
-				// single player — handled locally
+				net.onPlayerDrown.dispatch(data.sessionId, data.x, data.y);
 			case "hot_pepper":
 				// single player — handled locally
 			case "spawn_locations":
@@ -160,6 +160,14 @@ class LocalRoom {
 				net.onHungerActive.dispatch(data);
 			case "hunger_expired":
 				net.onHungerExpired.dispatch(data);
+			case "player_knockback":
+				net.onPlayerKnockback.dispatch(data);
+			case "throw_bait":
+				net.onThrowBait.dispatch(data);
+			case "bait_active":
+				net.onBaitActive.dispatch(data);
+			case "bait_expired":
+				net.onBaitExpired.dispatch(data);
 		}
 	}
 }

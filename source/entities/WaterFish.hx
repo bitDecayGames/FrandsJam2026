@@ -7,6 +7,7 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
+import flixel.text.FlxText;
 import todo.TODO;
 
 class WaterFish extends FlxSprite {
@@ -41,6 +42,13 @@ class WaterFish extends FlxSprite {
 	var fadeInTimer:Float = 0;
 	var scaredTimer:Float = 0;
 
+	#if db
+	var stateLabel:FlxText;
+	var scareCircle:FlxSprite;
+	public var showScareRadius:Bool = false;
+	static inline var ROCKET_SCARE_RADIUS:Int = 40;
+	#end
+
 	public function new(id:String, x:Float, y:Float, waterTiles:Array<FlxPoint> = null, isRemote = false, fishType:Int = 0) {
 		super(x, y);
 		fishId = id;
@@ -55,6 +63,12 @@ class WaterFish extends FlxSprite {
 		}
 		loadGraphic("assets/aseprite/characters/fishShadow.png");
 		centerOffsets();
+
+		#if db
+		stateLabel = new FlxText(0, 0, 80, "", 8);
+		stateLabel.color = FlxColor.WHITE;
+		stateLabel.alignment = flixel.text.FlxTextAlign.CENTER;
+		#end
 		if (isRemote) {
 			// server-driven fish start visible — server controls alive state
 			alpha = 1;
@@ -84,9 +98,12 @@ class WaterFish extends FlxSprite {
 		// Handle alive state from server
 		if (!state.alive) {
 			if (alive) {
+				// Start fade-out instead of instant vanish
 				alive = false;
-				visible = false;
 				velocity.set(0, 0);
+				if (scaredTimer <= 0) {
+					scaredTimer = 0.5; // fade out over 0.5s
+				}
 			}
 			return;
 		}
@@ -102,6 +119,57 @@ class WaterFish extends FlxSprite {
 
 		setPosition(state.x, state.y);
 	}
+
+	#if db
+	function updateStateLabel() {
+		if (stateLabel == null) { return; }
+		var state = if (serverFishState != null) {
+			switch (serverFishState.aiState) {
+				case FishState.STATE_ATTRACTED: "attracted";
+				case FishState.STATE_SCARED: "scared";
+				case FishState.STATE_FEARED: "feared";
+				case FishState.STATE_SPAWNING: "spawning";
+				case FishState.STATE_DEAD: "dead";
+				case FishState.STATE_BAIT_ROAMING: "bait_roaming";
+				default: "roaming";
+			};
+		} else {
+			"unknown";
+		};
+		stateLabel.text = state;
+		stateLabel.setPosition(x - 20, y + height + 1);
+		stateLabel.alpha = alpha;
+		stateLabel.visible = visible;
+	}
+
+	override public function draw() {
+		super.draw();
+		if (stateLabel != null && visible) {
+			stateLabel.draw();
+		}
+		if (showScareRadius && visible && alive) {
+			if (scareCircle == null) {
+				var diam = ROCKET_SCARE_RADIUS * 2;
+				scareCircle = new FlxSprite();
+				scareCircle.makeGraphic(diam, diam, 0x00000000);
+				for (angle in 0...360) {
+					var rad = angle * Math.PI / 180;
+					for (r in [ROCKET_SCARE_RADIUS - 1, ROCKET_SCARE_RADIUS - 2]) {
+						var px = Std.int(ROCKET_SCARE_RADIUS + Math.cos(rad) * r);
+						var py = Std.int(ROCKET_SCARE_RADIUS + Math.sin(rad) * r);
+						if (px >= 0 && px < diam && py >= 0 && py < diam) {
+							scareCircle.pixels.setPixel32(px, py, 0x66FFAA00);
+						}
+					}
+				}
+				scareCircle.dirty = true;
+			}
+			scareCircle.setPosition(x - ROCKET_SCARE_RADIUS + width / 2, y - ROCKET_SCARE_RADIUS + height / 2);
+			scareCircle.draw();
+		}
+	}
+
+	#end
 
 	function pickTarget() {
 		if (isRemote) {
@@ -164,7 +232,7 @@ class WaterFish extends FlxSprite {
 	}
 
 	override public function update(elapsed:Float) {
-		if (fadeInTimer > 0) {
+		if (fadeInTimer > 0 && scaredTimer <= 0) {
 			fadeInTimer -= elapsed;
 			alpha = Math.min(1.0, 1.0 - fadeInTimer);
 		}
@@ -174,8 +242,11 @@ class WaterFish extends FlxSprite {
 			if (serverFishState != null) {
 				if (!serverFishState.alive && alive) {
 					alive = false;
-					visible = false;
-				} else if (serverFishState.alive && !alive) {
+					// Start fade-out instead of instant vanish
+					if (scaredTimer <= 0) {
+						scaredTimer = 0.5;
+					}
+				} else if (serverFishState.alive && !alive && scaredTimer <= 0) {
 					alive = true;
 					visible = true;
 					alpha = 0;
@@ -185,7 +256,33 @@ class WaterFish extends FlxSprite {
 					setPosition(serverFishState.x, serverFishState.y);
 				}
 			}
+			// Handle fade-out for remote fish
+			if (scaredTimer > 0) {
+				scaredTimer -= elapsed;
+				alpha = Math.max(0, scaredTimer / 0.5);
+				if (scaredTimer <= 0) {
+					visible = false;
+				}
+			}
+			#if db
+			updateStateLabel();
+			#end
 			super.update(elapsed);
+			return;
+		}
+
+		// Fade out when scared (runs even if alive=false from server)
+		if (scaredTimer > 0) {
+			scaredTimer -= elapsed;
+			alpha = Math.max(0, scaredTimer / 0.5);
+			super.update(elapsed);
+			if (scaredTimer <= 0) {
+				alive = false;
+				visible = false;
+				velocity.set(0, 0);
+				respawnTimer = 5.5;
+				GameManager.ME.net.sendMessage("fish_despawn", {id: fishId, respawnTime: 5.5});
+			}
 			return;
 		}
 
@@ -198,19 +295,6 @@ class WaterFish extends FlxSprite {
 		}
 
 		super.update(elapsed);
-
-		if (scaredTimer > 0) {
-			scaredTimer -= elapsed;
-			alpha = Math.max(0, scaredTimer / 0.5);
-			if (scaredTimer <= 0) {
-				alive = false;
-				visible = false;
-				velocity.set(0, 0);
-				respawnTimer = 5.5;
-				GameManager.ME.net.sendMessage("fish_despawn", {id: fishId, respawnTime: 5.5});
-			}
-			return;
-		}
 
 		if (!Lambda.empty(bobbers) || attracted) {
 			checkBobber();
@@ -333,7 +417,9 @@ class WaterFish extends FlxSprite {
 			target.put();
 			target = null;
 		}
-		// Don't put waterTiles points — they're shared across fish in the same body
+		#if db
+		if (stateLabel != null) { stateLabel.destroy(); stateLabel = null; }
+		#end
 		waterTiles = null;
 		bobbers = null;
 		onCatch = null;

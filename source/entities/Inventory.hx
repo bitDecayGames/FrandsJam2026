@@ -104,6 +104,7 @@ class Inventory {
 			case [Waders, Waders]: true;
 			case [Rocket, Rocket]: true;
 			case [HungerPotion, HungerPotion]: true;
+			case [FishBait, FishBait]: true;
 			default: false;
 		};
 	}
@@ -116,4 +117,5 @@ enum InventoryItem {
 	Waders;
 	Rocket;
 	HungerPotion;
+	FishBait;
 }
