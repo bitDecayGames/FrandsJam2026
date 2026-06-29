@@ -634,7 +634,8 @@ class LobbyState extends FlxTransitionableState {
 
 		super.update(elapsed);
 
-		FlxG.collide(midGroundGroup, player);
+		// NO FlxG.collide for local player — Simulation handles terrain collision.
+		// Remote players still need it for interpolation blocking.
 		for (_ => remote in remotePlayers) {
 			FlxG.collide(midGroundGroup, remote);
 		}

@@ -1,44 +1,48 @@
-source/Main.hx:54: BUILD: 2026-06-26 14:57:01
+source/Main.hx:54: BUILD: 2026-06-28 23:45:35
 source/config/Configure.hx:34: No API_KEY compile flag found. Production metrics will not work.
 com/bitdecay/analytics/Bitlytics.hx:70: Bitlytics dev mode set to: true
 com/bitdecay/analytics/Bitlytics.hx:85: sender failed validation, this will not work in a prod build: "authToken is empty"
-com/bitdecay/analytics/Bitlytics.hx:95: sender sanity call failed. bitlytics will likely fail in prod : SysError(Failed to connect on 34.196.233.7:443)
+com/bitdecay/analytics/Bitlytics.hx:95: sender sanity call failed. bitlytics will likely fail in prod : Http Error #401
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "lobby_music" yet to be implemented
 source/managers/GameManager.hx:109: GameMan: joined as local_player
-source/Main.hx:85: Build Hash: 5d83f3d7b7
+bitdecay/flixel/system/QuickLog.hx:19: WARN: Player: onAnimFrameChange animName is null
+source/states/LobbyState.hx:184: LobbyState: already connected, running setup
 source/managers/GameManager.hx:349: set status: lobby -> lobby
+source/Main.hx:85: Build Hash: 970fa4e626
 source/managers/GameManager.hx:293: players ready: lobby -> active
 source/managers/GameManager.hx:349: set status: active -> active
+source/states/LobbyState.hx:445: LobbyState: player ready with skin 3
 source/managers/GameManager.hx:377: switch state based on status active
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "Play song" yet to be implemented
 bitdecay/flixel/system/QuickLog.hx:19: WARN: Player: onAnimFrameChange animName is null
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 1: 354, 178 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 354, 178
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 2: 306, 258 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 306, 258
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 3: 338, 194 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 338, 194
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 4: 354, 258 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 354, 258
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 5: 530, 514 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 530, 514
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 6: 530, 530 alive=true
-bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 530, 530
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 1: 402, 242 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 402, 242
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 2: 226, 194 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 226, 194
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 3: 386, 210 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 386, 210
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 4: 162, 242 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 162, 242
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 5: 434, 466 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 434, 466
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: adding fish 6: 642, 514 alive=true
+bitdecay/flixel/system/QuickLog.hx:12: NOTICE: fish post-add pos: 642, 514
+bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "bobber_land" yet to be implemented
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "worm_emerge" yet to be implemented
+bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "fish_caught" yet to be implemented
+bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "reel_in" yet to be implemented
 com/bitdecay/analytics/Bitlytics.hx:186: Formatted 2 analytics:
-sessionStarted,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=1 95997160
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=10 96007160
+sessionStarted,gameID=dev_in_progress,clientID=80000000-c2c3-4177-bf71-a43e5379e95d,session=142,sessionID=80000000-7978-4acc-83bd-6885715bbc08 value=1 300511160
+sessionTime,gameID=dev_in_progress,clientID=80000000-c2c3-4177-bf71-a43e5379e95d,session=142,sessionID=80000000-7978-4acc-83bd-6885715bbc08 value=10 300521160
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "worm_burrow" yet to be implemented
-bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "poop_water_splash" yet to be implemented
-bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "splash_small" yet to be implemented
-com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=20 96017160
+bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "dog_bark" yet to be implemented
 bitdecay/flixel/system/QuickLog.hx:19: WARN: SFX "poop_splat" yet to be implemented
 com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=30 96027160
-com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=40 96037160
-com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=50 96047160
-com/bitdecay/analytics/Bitlytics.hx:186: Formatted 1 analytics:
-sessionTime,gameID=dev_in_progress,clientID=80000000-6869-4bdd-808e-5b94715b9e2a,session=115,sessionID=80000000-3d3c-4e88-95db-0ec1604a8f3b value=60 96057160
+sessionTime,gameID=dev_in_progress,clientID=80000000-c2c3-4177-bf71-a43e5379e95d,session=142,sessionID=80000000-7978-4acc-83bd-6885715bbc08 value=20 300531160
+SIGNAL 15
+lime._internal.backend.native.NativeApplication.exec(lime/_internal/backend/native/NativeApplication.hx:147)
+lime.app.Application.exec(lime/app/Application.hx:150)
+openfl.display.Application.exec(openfl/display/Application.hx:130)
+$ApplicationMain.create(ApplicationMain.hx:137)
+$ApplicationMain.main(ApplicationMain.hx:26)
+.init(?:1)

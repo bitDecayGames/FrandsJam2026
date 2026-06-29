@@ -65,6 +65,7 @@ class PlayState extends FlxTransitionableState {
 	var ySortGroup = new FlxGroup();
 	var serverFishGroup = new FlxGroup();
 	var bushGroup = new FlxTypedGroup<Bush>();
+	var localBushContacts = new Map<Int, Bool>(); // entityRect index -> in contact
 	var remoteBushContacts = new Map<String, Map<Int, Bool>>(); // sessionId -> bushIndex -> inContact
 	var serverDogs = new Map<Int, entities.Dog>(); // dogId -> Dog sprite
 	var fishSpawner:FishSpawner;
@@ -562,13 +563,23 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onRemoteItemPickup(sessionId:String, itemType:String, index:Int) {
+		var isMe = sessionId == player.sessionId;
 		switch (itemType) {
 			case "rock":
+				if (isMe) {
+					// Server confirmed — read rock type before removing
+					if (index >= 0 && index < rockGroup.members.length) {
+						var rock = rockGroup.members[index];
+						player.pickupItem((rock != null && rock.big) ? BigRock : Rock);
+					}
+				}
 				rockGroup.removeByIndex(index);
 			case "waders":
 				wadersPickup.remotePickup();
+				if (isMe) { player.pickupItem(Waders); }
 			case "pepper":
 				pepperPickup.remotePickup();
+				if (isMe) { player.activateHotMode(99); }
 		}
 	}
 
@@ -886,26 +897,27 @@ class PlayState extends FlxTransitionableState {
 		checkDebugButtons();
 		#end
 
-		// hot player touching water = drown (check before collide separates them)
-		// waders protect you — just cancel pepper and wade normally
+		// Hot player touching water = drown — use collision map tile check instead of FlxG.overlap
 		if (player.hotModeActive && !player.drowned) {
-			if (FlxG.overlap(waterColliders, player) || FlxG.overlap(shallowColliders, player)) {
-				if (player.inventory.hasWaders()) {
-					player.deactivateHotMode();
-				} else {
-					add(new Splash(player.x + player.width / 2, player.y + player.height, true));
-					player.drown();
-					GameManager.ME.net.sendMessage("player_drown", {x: player.x, y: player.y});
+			var col = if (simulation != null) simulation.collision else null;
+			if (col != null) {
+				var pcx = Std.int((player.x + player.width / 2) / col.tileSize);
+				var pcy = Std.int((player.y + player.height / 2) / col.tileSize);
+				if (col.isSwimmableAt(pcx, pcy) || col.isShallowAt(pcx * col.tileSize, pcy * col.tileSize)) {
+					if (player.inventory.hasWaders()) {
+						player.deactivateHotMode();
+					} else {
+						add(new Splash(player.x + player.width / 2, player.y + player.height, true));
+						player.drown();
+						GameManager.ME.net.sendMessage("player_drown", {x: player.x, y: player.y});
+					}
 				}
 			}
 		}
 
-		FlxG.collide(midGroundGroup, player);
+		// NO FlxG.collide(midGroundGroup, player) — Simulation handles all terrain collision.
 
-		// Collide remote players with terrain and bushes so interpolation
-		// respects world rules (stops at walls/bushes instead of overshooting).
-		// Rustle: ENTER via collide callback, EXIT via proximity check.
-		// This avoids the collide/separate oscillation that breaks justTouched.
+		// Remote players still need FlxG.collide for interpolation (Simulation doesn't run for them)
 		for (sessionId => remote in remotePlayers) {
 			FlxG.collide(midGroundGroup, remote);
 			var contacts = remoteBushContacts.get(sessionId);
@@ -914,7 +926,6 @@ class PlayState extends FlxTransitionableState {
 				if (bush.burning) { return; }
 				var index = bushGroup.members.indexOf(bush);
 				if (!contacts.exists(index)) {
-					// ENTER: real collision, first contact
 					contacts.set(index, true);
 					var dx = bush.x + bush.width / 2 - (remote.x + remote.width / 2);
 					var dy = bush.y + bush.height / 2 - (remote.y + remote.height / 2);
@@ -922,7 +933,6 @@ class PlayState extends FlxTransitionableState {
 					bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
 				}
 			});
-			// EXIT: proximity check — clear contact when player moves away
 			for (i in [for (k in contacts.keys()) k]) {
 				var bush = bushGroup.members[i];
 				if (bush == null || !bush.alive) { contacts.remove(i); continue; }
@@ -937,23 +947,36 @@ class PlayState extends FlxTransitionableState {
 		if (insideShop) {
 			checkShopExit();
 		} else {
-			// Bush collision — rustle is Tier 1 (cosmetic, client-only),
-			// ignite is Tier 2 (stateful, server-authoritative).
-			// Uses FlxObject.justTouched() for enter detection (built-in touching/wasTouching).
-			FlxG.collide(bushGroup, player, (bush:Bush, p:Player) -> {
-				if (p.hotModeActive && !bush.burning) {
-					bush.ignite();
-					var index = bushGroup.members.indexOf(bush);
-					GameManager.ME.net.sendMessage("bush_ignite", {index: index});
-					return;
+			// Bush interaction — driven by Simulation.hitEntityIndices.
+			// Simulation already blocked the player; we just read which entity rects were hit.
+			if (player.simulation != null) {
+				for (entityIdx in player.simulation.hitEntityIndices) {
+					if (entityIdx < 0 || entityIdx >= bushGroup.members.length) { continue; }
+					var bush = bushGroup.members[entityIdx];
+					if (bush == null || !bush.alive) { continue; }
+					if (player.hotModeActive && !bush.burning) {
+						bush.ignite();
+						GameManager.ME.net.sendMessage("bush_ignite", {index: entityIdx});
+						continue;
+					}
+					// Rustle on first contact — track via localBushContacts
+					if (!localBushContacts.exists(entityIdx)) {
+						localBushContacts.set(entityIdx, true);
+						var dx = bush.x + bush.width / 2 - (player.x + player.width / 2);
+						var dy = bush.y + bush.height / 2 - (player.y + player.height / 2);
+						var dist = Math.sqrt(dx * dx + dy * dy);
+						bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
+					}
 				}
-				if (bush.justTouched(flixel.util.FlxDirectionFlags.ANY)) {
-					var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
-					var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
-					var dist = Math.sqrt(dx * dx + dy * dy);
-					bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
+				// Clear contacts for bushes no longer in hitEntityIndices
+				for (idx in [for (k in localBushContacts.keys()) k]) {
+					var stillHit = false;
+					for (h in player.simulation.hitEntityIndices) {
+						if (h == idx) { stillHit = true; break; }
+					}
+					if (!stillHit) { localBushContacts.remove(idx); }
 				}
-			});
+			}
 
 			// Weed interaction — burst is Tier 2 (stateful, affects score)
 			// ignite is Tier 2 (stateful, destroys weed)

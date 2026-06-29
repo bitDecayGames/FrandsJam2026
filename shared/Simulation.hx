@@ -12,7 +12,7 @@ import schema.PlayerState;
 class Simulation {
 	public static inline var FIXED_STEP:Float = 1 / 20.0; // must match GameRoom.fixedTimeStep
 
-	var collision:CollisionMap;
+	public var collision:CollisionMap;
 	public var entityRects:Array<{x:Float, y:Float, w:Float, h:Float}> = [];
 
 	public function new(collision:CollisionMap) {
@@ -23,7 +23,12 @@ class Simulation {
 	 * Advance one player by processing a batch of inputs.
 	 * Only handles movement — direction + collision resolution.
 	**/
+	/** Indices of entity rects hit during the last tickPlayer call. */
+	public var hitEntityIndices:Array<Int> = [];
+
 	public function tickPlayer(p:PlayerState, inputs:Array<P_Input>, elapsed:Float = 0, blockFlags:Int = 0):Void {
+		hitEntityIndices = [];
+
 		if (inputs == null || inputs.length == 0) {
 			return;
 		}
@@ -55,8 +60,11 @@ class Simulation {
 		p.lastProcessedSeq = lastSeq;
 
 		// Resolve against dynamic entity collision rects (bushes, etc.)
-		for (b in entityRects) {
+		for (i in 0...entityRects.length) {
+			var b = entityRects[i];
+			if (b.w <= 0 || b.h <= 0) { continue; } // zeroed-out (dead) rect
 			if (p.x < b.x + b.w && p.x + p.width > b.x && p.y < b.y + b.h && p.y + p.height > b.y) {
+				hitEntityIndices.push(i);
 				var overlapLeft = (p.x + p.width) - b.x;
 				var overlapRight = (b.x + b.w) - p.x;
 				var overlapTop = (p.y + p.height) - b.y;

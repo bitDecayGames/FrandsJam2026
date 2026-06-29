@@ -40,6 +40,7 @@ class GameLogic {
 	var hotModePlayers:Map<String, Bool>;
 	var wadersPlayers:Map<String, Bool>;
 	public var bushRects:Array<{x:Float, y:Float, w:Float, h:Float}>;
+	var pickedUpItems:Map<String, Bool>; // tracks which world items have been picked up
 	var nextFishID:Int;
 
 	// Worm spawning data
@@ -121,6 +122,7 @@ class GameLogic {
 		hotModePlayers = new Map();
 		wadersPlayers = new Map();
 		bushRects = [];
+		pickedUpItems = new Map();
 		nextFishID = 1;
 
 		wormTimer = 999;
@@ -277,9 +279,19 @@ class GameLogic {
 				if (ps != null) { ps.score = data.score; }
 
 			case "item_pickup":
-				if (data.itemType == "waders") { wadersPlayers.set(clientId, true); }
-				else if (data.itemType == "waders_remove") { wadersPlayers.remove(clientId); }
-				broadcast("item_pickup", {sessionId: clientId, itemType: data.itemType, index: data.index});
+				// Server validates — reject if item already taken
+				var itemType:String = data.itemType;
+				var index:Int = Std.int(data.index);
+				var key = '${itemType}_${index}';
+				if (pickedUpItems.exists(key)) {
+					// Already taken by someone else — reject silently
+					return;
+				}
+				pickedUpItems.set(key, true);
+				if (itemType == "waders") { wadersPlayers.set(clientId, true); }
+				else if (itemType == "waders_remove") { wadersPlayers.remove(clientId); }
+				// Broadcast to ALL (including sender) so sender gets confirmation
+				broadcast("item_pickup", {sessionId: clientId, itemType: itemType, index: index});
 
 			case "weed_burst":
 				broadcast("weed_burst", {sessionId: clientId, index: data.index});
@@ -517,6 +529,7 @@ class GameLogic {
 		}
 
 		cachedWorldItems = null;
+		pickedUpItems = new Map();
 		cachedSpawnLocations = null;
 		for (_ => p in players) { p.score = 0; p.ready = false; }
 	}
