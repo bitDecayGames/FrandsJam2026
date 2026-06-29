@@ -124,6 +124,22 @@ class LocalRoom {
 				net.onSeagullDespawn.dispatch(data);
 			case "worm_spawn":
 				net.onWormSpawn.dispatch(data);
+			case "dog_spawn":
+				net.onDogSpawn.dispatch(data);
+			case "dog_update":
+				net.onDogUpdate.dispatch(data);
+			case "dog_caught":
+				net.onDogCaught.dispatch(data);
+			case "dog_despawn":
+				net.onDogDespawn.dispatch(data);
+			case "dog_item_landed":
+				net.onDogItemLanded.dispatch(data);
+			case "dog_ate_fish":
+				net.onDogAteFish.dispatch(data);
+			case "skin_assigned":
+				net.onSkinAssigned.dispatch(Std.int(data.skinIndex));
+			case "dog_steal_fish":
+				// deprecated — handled by dog_ate_fish now
 			case "players_ready":
 				net.onPlayersReady.dispatch();
 		}

@@ -77,6 +77,13 @@ class NetworkManager {
 	public var onSeagullSpawn = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, velX, velY, altitude}
 	public var onSeagullPoop = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, fallDist, birdVelX, hitWater}
 	public var onSeagullDespawn = new FlxTypedSignal<Dynamic->Void>(); // {id}
+	public var onDogSpawn = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y}
+	public var onDogUpdate = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y, velX, velY}
+	public var onDogCaught = new FlxTypedSignal<Dynamic->Void>(); // {id, sessionId}
+	public var onDogDespawn = new FlxTypedSignal<Dynamic->Void>(); // {id}
+	public var onDogItemLanded = new FlxTypedSignal<Dynamic->Void>(); // {startX, startY, landX, landY, itemType, itemData}
+	public var onDogAteFish = new FlxTypedSignal<Dynamic->Void>(); // {id, x, y}
+	public var onSkinAssigned = new FlxTypedSignal<Int->Void>(); // skinIndex
 
 	public static inline var roomName:String = "game_room";
 
@@ -380,6 +387,28 @@ class NetworkManager {
 
 			onMsg("seagull_despawn", (message:Dynamic) -> {
 				onSeagullDespawn.dispatch(message);
+			});
+
+			onMsg("dog_spawn", (message:Dynamic) -> {
+				onDogSpawn.dispatch(message);
+			});
+			onMsg("dog_update", (message:Dynamic) -> {
+				onDogUpdate.dispatch(message);
+			});
+			onMsg("dog_caught", (message:Dynamic) -> {
+				onDogCaught.dispatch(message);
+			});
+			onMsg("dog_despawn", (message:Dynamic) -> {
+				onDogDespawn.dispatch(message);
+			});
+			onMsg("dog_item_landed", (message:Dynamic) -> {
+				onDogItemLanded.dispatch(message);
+			});
+			onMsg("dog_ate_fish", (message:Dynamic) -> {
+				onDogAteFish.dispatch(message);
+			});
+			onMsg("skin_assigned", (message:Dynamic) -> {
+				onSkinAssigned.dispatch(Std.int(message.skinIndex));
 			});
 			}); // end runInMainThread
 		});

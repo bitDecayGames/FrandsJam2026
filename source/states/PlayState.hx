@@ -66,6 +66,7 @@ class PlayState extends FlxTransitionableState {
 	var serverFishGroup = new FlxGroup();
 	var bushGroup = new FlxTypedGroup<Bush>();
 	var remoteBushContacts = new Map<String, Map<Int, Bool>>(); // sessionId -> bushIndex -> inContact
+	var serverDogs = new Map<Int, entities.Dog>(); // dogId -> Dog sprite
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
@@ -176,7 +177,7 @@ class PlayState extends FlxTransitionableState {
 
 	#if db
 	function addDebugButtons() {
-		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round"];
+		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog"];
 		var btnW = 60;
 		var btnH = 16;
 		var margin = 4;
@@ -215,7 +216,7 @@ class PlayState extends FlxTransitionableState {
 		if (mx < startX || mx > startX + btnW) {
 			return;
 		}
-		for (i in 0...5) {
+		for (i in 0...6) {
 			var by = startY + i * (btnH + margin);
 			if (my >= by && my < by + btnH) {
 				switch (i) {
@@ -238,16 +239,9 @@ class PlayState extends FlxTransitionableState {
 							GameManager.ME.net.sendItemPickup("waders", 0);
 						}
 					case 4:
-						// end round: set local timer to near-end for display
-						// server owns the real timer, so this is just a local preview
-						if (round != null) {
-							for (goal in round.getGoals()) {
-								if (Std.isOfType(goal, goals.TimedGoal)) {
-									goal.runTimeSec = timerTotalSec - 1;
-								}
-							}
-						}
-						timerRunSec = timerTotalSec - 1;
+						GameManager.ME.net.sendMessage("debug_end_round", {});
+					case 5:
+						GameManager.ME.net.sendMessage("debug_spawn_dog", {});
 				}
 				return;
 			}
@@ -281,6 +275,12 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onSeagullSpawn.remove(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.remove(onServerSeagullPoop);
 		GameManager.ME.net.onSeagullDespawn.remove(onServerSeagullDespawn);
+		GameManager.ME.net.onDogSpawn.remove(onDogSpawn);
+		GameManager.ME.net.onDogUpdate.remove(onDogUpdate);
+		GameManager.ME.net.onDogCaught.remove(onDogCaught);
+		GameManager.ME.net.onDogDespawn.remove(onDogDespawn);
+		GameManager.ME.net.onDogItemLanded.remove(onDogItemLanded);
+		GameManager.ME.net.onDogAteFish.remove(onDogAteFish);
 		GameManager.ME.net.onCloudSync.remove(onServerCloudSync);
 		GameManager.ME.net.onGroundFishSpawn.remove(onRemoteGroundFishSpawn);
 		GameManager.ME.net.onGroundFishPickup.remove(onRemoteGroundFishPickup);
@@ -316,6 +316,12 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
 		GameManager.ME.net.onSeagullDespawn.add(onServerSeagullDespawn);
+		GameManager.ME.net.onDogSpawn.add(onDogSpawn);
+		GameManager.ME.net.onDogUpdate.add(onDogUpdate);
+		GameManager.ME.net.onDogCaught.add(onDogCaught);
+		GameManager.ME.net.onDogDespawn.add(onDogDespawn);
+		GameManager.ME.net.onDogItemLanded.add(onDogItemLanded);
+		GameManager.ME.net.onDogAteFish.add(onDogAteFish);
 
 		// Fish may have been added to the schema before we subscribed
 		// (server spawns fish on room creation, before clients join PlayState).
@@ -993,6 +999,7 @@ class PlayState extends FlxTransitionableState {
 		}
 
 		ySortGroup.sort((order, a, b) -> {
+			if (a == null || b == null) { return 0; }
 			var objA:flixel.FlxObject = cast a;
 			var objB:flixel.FlxObject = cast b;
 			return FlxSort.byValues(order, objA.y + objA.height, objB.y + objB.height);
@@ -1006,7 +1013,7 @@ class PlayState extends FlxTransitionableState {
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
-		if (!insideShop) {
+		if (!insideShop && !player.frozen) {
 			// Bobber checks are handled server-side now; no need to set bobbers on fish
 			rockGroup.checkPickup(player);
 			groundFishGroup.checkPickup(player);
@@ -1014,6 +1021,127 @@ class PlayState extends FlxTransitionableState {
 			pepperPickup.checkPickup(player);
 
 			updateSparkles(elapsed);
+		}
+	}
+
+	// --- Dog handlers ---
+
+	function onDogSpawn(data:Dynamic) {
+		var id:Int = data.id;
+		if (serverDogs.exists(id)) { return; }
+		var dog = new entities.Dog(id, data.x, data.y);
+		serverDogs.set(id, dog);
+		ySortGroup.add(dog);
+	}
+
+	function onDogUpdate(data:Dynamic) {
+		var dog = serverDogs.get(Std.int(data.id));
+		if (dog != null) {
+			dog.serverUpdate(data.x, data.y, data.velX, data.velY);
+		}
+	}
+
+	function onDogCaught(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		var dogId:Int = data.id;
+
+		if (sessionId == player.sessionId) {
+			// Cancel any active cast — reel in the line
+			if (player.isCasting()) {
+				player.catchFish(false);
+			}
+			// Freeze + blink
+			player.frozen = true;
+			flixel.effects.FlxFlicker.flicker(player, 3.0, 0.13);
+			flixel.util.FlxTimer.wait(3.0, () -> {
+				player.frozen = false;
+			});
+
+			// Explode all inventory items off the player
+			var items:Array<Dynamic> = [];
+			for (item in player.inventory.getItems()) {
+				switch (item) {
+					case Fish(spriteIndex, lengthCm):
+						items.push({type: "fish", data: {fishType: spriteIndex, lengthCm: lengthCm}});
+					case Rock:
+						items.push({type: "rock", data: {big: false}});
+					case BigRock:
+						items.push({type: "rock", data: {big: true}});
+					case Waders:
+						items.push({type: "waders", data: {}});
+				}
+			}
+			player.inventory.clear();
+
+			if (items.length > 0) {
+				GameManager.ME.net.sendMessage("dog_item_drop", {
+					dogId: dogId,
+					playerX: player.x + 8,
+					playerY: player.y - 14,
+					items: items
+				});
+			} else {
+				// No items — tell server so dog flees immediately
+				GameManager.ME.net.sendMessage("dog_no_fish", {dogId: dogId});
+			}
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				flixel.effects.FlxFlicker.flicker(remote, 3.0, 0.13);
+			}
+		}
+	}
+
+	function onDogItemLanded(data:Dynamic) {
+		var startX:Float = data.startX;
+		var startY:Float = data.startY;
+		var landX:Float = data.landX;
+		var landY:Float = data.landY;
+		var itemType:String = data.itemType;
+		var itemData:Dynamic = data.itemData;
+
+		switch (itemType) {
+			case "fish":
+				var fishType:Int = itemData.fishType != null ? Std.int(itemData.fishType) : 0;
+				var lengthCm:Int = itemData.lengthCm != null ? Std.int(itemData.lengthCm) : 10;
+				groundFishGroup.add(new entities.GroundFish(startX, startY, landX, landY, fishType, lengthCm));
+			case "rock":
+				var big:Bool = itemData.big == true;
+				rockGroup.addRock(landX, landY, big);
+			case "waders":
+				wadersPickup.spawnAt(landX, landY);
+		}
+	}
+
+	function onDogAteFish(data:Dynamic) {
+		// Remove the ground fish closest to where the dog picked it up
+		var fx:Float = data.x;
+		var fy:Float = data.y;
+		var closest:entities.GroundFish = null;
+		var closestDist = Math.POSITIVE_INFINITY;
+		for (gf in groundFishGroup) {
+			if (gf == null || !gf.alive) { continue; }
+			var fish:entities.GroundFish = cast gf;
+			var dx = fish.x - fx;
+			var dy = fish.y - fy;
+			var dist = dx * dx + dy * dy;
+			if (dist < closestDist) {
+				closestDist = dist;
+				closest = fish;
+			}
+		}
+		if (closest != null) {
+			closest.kill();
+		}
+	}
+
+	function onDogDespawn(data:Dynamic) {
+		var id:Int = data.id;
+		var dog = serverDogs.get(id);
+		if (dog != null) {
+			ySortGroup.remove(dog);
+			dog.destroy();
+			serverDogs.remove(id);
 		}
 	}
 

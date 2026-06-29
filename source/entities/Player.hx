@@ -1096,11 +1096,16 @@ class Player extends FlxSprite {
 					frozen = true;
 					playMovementAnim(true);
 					TODO.sfx("bobber_land");
-					if (onBobberLanded != null)
-						onBobberLanded(castTarget.x + 4, castTarget.y + 4);
+					if (onBobberLanded != null) {
+						var mid = castBobber.getMidpoint();
+						onBobberLanded(mid.x, mid.y);
+						mid.put();
+					}
 					// Tell server where the bobber landed so fish AI can detect it
 					if (!isRemote) {
-						GameManager.ME.net.sendMessage("bobber_landed", {x: castTarget.x + 4, y: castTarget.y + 4});
+						var mid = castBobber.getMidpoint();
+						GameManager.ME.net.sendMessage("bobber_landed", {x: mid.x, y: mid.y});
+						mid.put();
 					}
 				}
 			case CAST_ANIM:
@@ -1172,6 +1177,10 @@ class Player extends FlxSprite {
 			default:
 				// nothing to do
 		}
+	}
+
+	public function isCasting():Bool {
+		return castState != IDLE;
 	}
 
 	public function isBobberLanded():Bool {

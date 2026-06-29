@@ -158,6 +158,7 @@ class LobbyState extends FlxTransitionableState {
 		GameManager.ME.net.onSkinChanged.add(onSkinChanged);
 		GameManager.ME.net.onPlayerNameChanged.add(onNameChanged);
 		GameManager.ME.net.onPlayerReadyChanged.add(onReadyChanged);
+		GameManager.ME.net.onSkinAssigned.add(onSkinAssigned);
 		GameManager.ME.net.onPlayersReady.add(onAllPlayersReady);
 		GameManager.ME.net.onKicked.addOnce(handleKicked);
 
@@ -177,21 +178,27 @@ class LobbyState extends FlxTransitionableState {
 		_inputField.text = _playerName;
 		localNameLabel.text = _playerName;
 
-		// On join
+		// On join — use addOnce so it doesn't stack across state recreations
 		var alreadyConnected = GameManager.ME.net.mySessionId != "";
-		var onJoin = (_:Dynamic) -> {
-			trace('LobbyState: room joined');
+		if (alreadyConnected) {
+			trace('LobbyState: already connected, running setup');
 			player.sessionId = GameManager.ME.net.mySessionId;
 			GameManager.ME.net.sendMessage("set_position", {x: lx, y: ly});
 			GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
 			GameManager.ME.net.sendMessage("player_name_changed", {name: _playerName});
 			GameManager.ME.net.sendMessage("skin_changed", {skinIndex: skinIdx});
 			updatePlayerList();
-		};
-		if (alreadyConnected) {
-			onJoin(null);
 		} else {
-			GameManager.ME.net.onJoined.add(onJoin);
+			GameManager.ME.net.onJoined.addOnce((_) -> {
+				trace('LobbyState: room joined');
+				if (player == null) { return; } // guard against destroyed state
+				player.sessionId = GameManager.ME.net.mySessionId;
+				GameManager.ME.net.sendMessage("set_position", {x: lx, y: ly});
+				GameManager.ME.setStatus(RoundState.STATUS_LOBBY);
+				GameManager.ME.net.sendMessage("player_name_changed", {name: _playerName});
+				GameManager.ME.net.sendMessage("skin_changed", {skinIndex: skinIdx});
+				updatePlayerList();
+			});
 		}
 	}
 
@@ -568,6 +575,17 @@ class LobbyState extends FlxTransitionableState {
 		refreshBorders();
 	}
 
+	function onSkinAssigned(skinIndex:Int) {
+		// Server confirmed our skin — update local player if it differs
+		if (player.skinIndex != skinIndex) {
+			trace('LobbyState: server reassigned skin ${player.skinIndex} -> ${skinIndex}');
+			player.skinIndex = skinIndex;
+			player.swapSkin();
+			GameManager.ME.mySkinIndex = skinIndex;
+			refreshBorders();
+		}
+	}
+
 	function onReadyChanged(sessionId:String, ready:Bool) {
 		// Don't update labels during countdown (server resets ready flags)
 		if (_countdownActive) { return; }
@@ -687,6 +705,7 @@ class LobbyState extends FlxTransitionableState {
 		GameManager.ME.net.onPlayerNameChanged.remove(onNameChanged);
 		GameManager.ME.net.onPlayerReadyChanged.remove(onReadyChanged);
 		GameManager.ME.net.onPlayersReady.remove(onAllPlayersReady);
+		GameManager.ME.net.onSkinAssigned.remove(onSkinAssigned);
 		super.destroy();
 	}
 }

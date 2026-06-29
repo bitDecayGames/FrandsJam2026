@@ -46,6 +46,27 @@ class GameLogic {
 	var wormTimer:Float;
 	var nextWormId:Int;
 
+	// Dog AI data — states: "chasing", "waiting", "seeking", "fleeing"
+	var dogs:Array<{
+		id:Int, x:Float, y:Float, velX:Float, velY:Float,
+		targetSession:String, state:String, fleeTimer:Float,
+		fishTargetX:Float, fishTargetY:Float, waitTimer:Float
+	}>;
+	var nextDogId:Int;
+	var dogSpawnTimer:Float;
+	static var DOG_SPEED:Float = 50;
+	static var DOG_SEEK_SPEED:Float = 40;
+	static var DOG_FLEE_SPEED:Float = 80;
+	static var DOG_CATCH_DIST:Float = 10;
+	static var DOG_FISH_PICKUP_DIST:Float = 6;
+	static var DOG_SPAWN_INTERVAL_MIN:Float = 15;
+	static var DOG_SPAWN_INTERVAL_MAX:Float = 30;
+	static var DOG_UPDATE_RATE:Float = 0.15;
+	static var DOG_FLEE_DURATION:Float = 5.0;
+	static var DOG_WAIT_TIMEOUT:Float = 2.0; // max time to wait for item drop response
+	static var DOG_ITEM_DROP_RADIUS:Float = 36.0;
+	var dogUpdateTimer:Float;
+
 	// Round timer
 	public var roundTimerSec:Float;
 	public var roundDurationSec:Float;
@@ -104,6 +125,11 @@ class GameLogic {
 
 		wormTimer = 999;
 		nextWormId = 1;
+
+		dogs = [];
+		nextDogId = 1;
+		dogSpawnTimer = 10.0; // first dog after 10 seconds
+		dogUpdateTimer = 0;
 
 		roundTimerSec = 0;
 		roundDurationSec = 90;
@@ -227,8 +253,25 @@ class GameLogic {
 				scareFish(data.x, data.y);
 
 			case "skin_changed":
+				var requestedSkin:Int = data.skinIndex;
+				// Enforce one skin per player
+				var taken = false;
+				for (sId => p in players) {
+					if (sId != clientId && p.skinIndex == requestedSkin) { taken = true; break; }
+				}
+				if (taken) {
+					for (i in 0...8) {
+						var inUse = false;
+						for (sId => p in players) {
+							if (sId != clientId && p.skinIndex == i) { inUse = true; break; }
+						}
+						if (!inUse) { requestedSkin = i; break; }
+					}
+				}
 				var ps = players.get(clientId);
-				if (ps != null) { ps.skinIndex = data.skinIndex; }
+				if (ps != null) { ps.skinIndex = requestedSkin; }
+				// Tell the client what skin they actually got
+				sendToClient(clientId, "skin_assigned", {skinIndex: requestedSkin});
 			case "score_update":
 				var ps = players.get(clientId);
 				if (ps != null) { ps.score = data.score; }
@@ -263,6 +306,67 @@ class GameLogic {
 				var ps = players.get(clientId);
 				if (ps != null) { ps.speed = isStart ? 150 : 100; }
 				broadcast("hot_pepper", {sessionId: clientId, isStart: isStart});
+
+			case "dog_item_drop":
+				// Client tells server what items to drop after dog bite.
+				// Server computes landing positions, broadcasts, and tells the dog where fish landed.
+				var px:Float = data.playerX;
+				var py:Float = data.playerY;
+				var dogId:Int = data.dogId;
+				var items:Array<Dynamic> = data.items;
+				var firstFishX:Float = 0;
+				var firstFishY:Float = 0;
+				var hasFish = false;
+				if (items != null) {
+					var count = items.length;
+					for (j in 0...count) {
+						var angle = (j / count) * Math.PI * 2 + Math.random() * 0.3;
+						var dist = DOG_ITEM_DROP_RADIUS + Math.random() * 12;
+						var landX = px + Math.cos(angle) * dist;
+						var landY = py + Math.sin(angle) * dist;
+						broadcast("dog_item_landed", {
+							startX: px, startY: py,
+							landX: landX, landY: landY,
+							itemType: items[j].type,
+							itemData: items[j].data
+						});
+						// Track first fish for dog to seek
+						if (!hasFish && items[j].type == "fish") {
+							firstFishX = landX;
+							firstFishY = landY;
+							hasFish = true;
+						}
+					}
+				}
+				// Tell the dog where to go
+				for (dog in dogs) {
+					if (dog.id == dogId) {
+						if (hasFish) {
+							dog.state = "seeking";
+							dog.fishTargetX = firstFishX;
+							dog.fishTargetY = firstFishY;
+							broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: dog.velX, velY: dog.velY});
+						} else {
+							startDogFlee(dog);
+						}
+						break;
+					}
+				}
+
+			case "dog_no_fish":
+				// Player had no fish — dog flees immediately
+				var dogId:Int = data.dogId;
+				for (dog in dogs) {
+					if (dog.id == dogId) {
+						startDogFlee(dog);
+						break;
+					}
+				}
+
+			case "debug_spawn_dog":
+				var worldW:Float = collision.cols * collision.tileSize;
+				var worldH:Float = collision.rows * collision.tileSize;
+				spawnDog(worldW, worldH);
 
 			case "debug_end_round":
 				if (gameplayStarted) {
@@ -349,6 +453,7 @@ class GameLogic {
 		updateFish(t);
 		updateSeagulls(t);
 		updateWorms(t);
+		updateDogs(t);
 
 		if (gameplayStarted) {
 			roundTimerSec += t;
@@ -630,9 +735,9 @@ class GameLogic {
 			var closestBX:Float = 0;
 			var closestBY:Float = 0;
 			var hasBobbers = false;
-			// Fish sprite is ~16x8; use center for distance checks
+			// Fish shadow sprite is 16x16; use center for distance checks
 			var fcx = f.x + 8;
-			var fcy = f.y + 4;
+			var fcy = f.y + 8;
 			for (sid => bpos in bobberPositions) {
 				hasBobbers = true;
 				var dx = bpos.x - fcx;
@@ -650,8 +755,9 @@ class GameLogic {
 			}
 			if (hasBobbers && closestDist < FISH_ATTRACT_DIST) {
 				f.attracted = true; f.pauseTimer = 0;
-				var dx = closestBX - f.x; var dy = closestBY - f.y;
-				if (closestDist > 0.1) { f.velX = (dx / closestDist) * FISH_ATTRACT_SPEED; f.velY = (dy / closestDist) * FISH_ATTRACT_SPEED; }
+				var dx = closestBX - fcx; var dy = closestBY - fcy;
+				var aDist = Math.sqrt(dx * dx + dy * dy);
+				if (aDist > 0.1) { f.velX = (dx / aDist) * FISH_ATTRACT_SPEED; f.velY = (dy / aDist) * FISH_ATTRACT_SPEED; }
 				f.x += f.velX * t; f.y += f.velY * t;
 				continue;
 			}
@@ -807,5 +913,157 @@ class GameLogic {
 			broadcast("worm_spawn", {id: nextWormId++, srcX: srcX, srcY: srcY, destX: destCx * grid + Math.random() * grid, destY: cy * grid + Math.random() * grid});
 			break;
 		}
+	}
+
+	// --- Dogs ---
+
+	function updateDogs(t:Float) {
+		if (!gameplayStarted) { return; }
+
+		var worldW:Float = collision.cols * collision.tileSize;
+		var worldH:Float = collision.rows * collision.tileSize;
+
+		// Spawn timer
+		dogSpawnTimer -= t;
+		if (dogSpawnTimer <= 0) {
+			dogSpawnTimer = DOG_SPAWN_INTERVAL_MIN + Math.random() * (DOG_SPAWN_INTERVAL_MAX - DOG_SPAWN_INTERVAL_MIN);
+			spawnDog(worldW, worldH);
+		}
+
+		// Periodic position broadcast
+		dogUpdateTimer -= t;
+		var shouldBroadcast = dogUpdateTimer <= 0;
+		if (shouldBroadcast) { dogUpdateTimer = DOG_UPDATE_RATE; }
+
+		// Update each dog
+		var i = dogs.length - 1;
+		while (i >= 0) {
+			var dog = dogs[i];
+
+			switch (dog.state) {
+				case "fleeing":
+					dog.x += dog.velX * t;
+					dog.y += dog.velY * t;
+					dog.fleeTimer -= t;
+					if (dog.fleeTimer <= 0) {
+						broadcast("dog_despawn", {id: dog.id});
+						dogs.splice(i, 1);
+					} else if (shouldBroadcast) {
+						broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: dog.velX, velY: dog.velY});
+					}
+
+				case "waiting":
+					// Waiting for client to send item drop info
+					dog.waitTimer -= t;
+					dog.velX = 0;
+					dog.velY = 0;
+					if (dog.waitTimer <= 0) {
+						// Timed out — no items, just flee
+						startDogFlee(dog);
+					}
+
+				case "seeking":
+					// Walk toward the fish
+					var dx = dog.fishTargetX - dog.x;
+					var dy = dog.fishTargetY - dog.y;
+					var dist = Math.sqrt(dx * dx + dy * dy);
+					if (dist <= DOG_FISH_PICKUP_DIST) {
+						// Reached the fish — eat it and flee
+						broadcast("dog_ate_fish", {id: dog.id, x: dog.fishTargetX, y: dog.fishTargetY});
+						startDogFlee(dog);
+					} else {
+						dog.velX = (dx / dist) * DOG_SEEK_SPEED;
+						dog.velY = (dy / dist) * DOG_SEEK_SPEED;
+						dog.x += dog.velX * t;
+						dog.y += dog.velY * t;
+					}
+					if (shouldBroadcast) {
+						broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: dog.velX, velY: dog.velY});
+					}
+
+				default: // "chasing"
+					var closestDist = 1e20;
+					var closestSid:String = null;
+					var closestX:Float = dog.x;
+					var closestY:Float = dog.y;
+					for (sid => p in players) {
+						var dx = p.x - dog.x;
+						var dy = p.y - dog.y;
+						var dist = Math.sqrt(dx * dx + dy * dy);
+						if (dist < closestDist) {
+							closestDist = dist;
+							closestSid = sid;
+							closestX = p.x;
+							closestY = p.y;
+						}
+					}
+					dog.targetSession = closestSid;
+
+					if (closestDist > DOG_CATCH_DIST) {
+						var dx = closestX - dog.x;
+						var dy = closestY - dog.y;
+						dog.velX = (dx / closestDist) * DOG_SPEED;
+						dog.velY = (dy / closestDist) * DOG_SPEED;
+						dog.x += dog.velX * t;
+						dog.y += dog.velY * t;
+					}
+
+					if (closestDist <= DOG_CATCH_DIST && closestSid != null) {
+						broadcast("dog_caught", {id: dog.id, sessionId: closestSid});
+						dog.state = "waiting";
+						dog.waitTimer = DOG_WAIT_TIMEOUT;
+						dog.velX = 0;
+						dog.velY = 0;
+					}
+
+					if (shouldBroadcast) {
+						broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: dog.velX, velY: dog.velY});
+					}
+			}
+
+			i--;
+		}
+	}
+
+	function startDogFlee(dog:{id:Int, x:Float, y:Float, velX:Float, velY:Float, targetSession:String, state:String, fleeTimer:Float, fishTargetX:Float, fishTargetY:Float, waitTimer:Float}) {
+		dog.state = "fleeing";
+		dog.fleeTimer = DOG_FLEE_DURATION;
+		var fleeLen = Math.sqrt(dog.velX * dog.velX + dog.velY * dog.velY);
+		if (fleeLen > 0.1) {
+			dog.velX = (-dog.velX / fleeLen) * DOG_FLEE_SPEED;
+			dog.velY = (-dog.velY / fleeLen) * DOG_FLEE_SPEED;
+		} else {
+			// No velocity — flee toward nearest world edge
+			var worldW:Float = collision.cols * collision.tileSize;
+			var distLeft = dog.x;
+			var distRight = worldW - dog.x;
+			if (distLeft < distRight) {
+				dog.velX = -DOG_FLEE_SPEED;
+			} else {
+				dog.velX = DOG_FLEE_SPEED;
+			}
+			dog.velY = 0;
+		}
+		broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: dog.velX, velY: dog.velY});
+	}
+
+	public function spawnDog(worldW:Float, worldH:Float) {
+		// Spawn from a random world edge
+		var edge = Std.int(Math.random() * 4);
+		var sx:Float = 0;
+		var sy:Float = 0;
+		switch (edge) {
+			case 0: sx = -16; sy = Math.random() * worldH; // left
+			case 1: sx = worldW + 16; sy = Math.random() * worldH; // right
+			case 2: sx = Math.random() * worldW; sy = -16; // top
+			case 3: sx = Math.random() * worldW; sy = worldH + 16; // bottom
+		}
+		var did = nextDogId++;
+		dogs.push({
+			id: did, x: sx, y: sy, velX: 0, velY: 0,
+			targetSession: null, state: "chasing", fleeTimer: 0,
+			fishTargetX: 0, fishTargetY: 0, waitTimer: 0
+		});
+		broadcast("dog_spawn", {id: did, x: sx, y: sy});
 	}
 }

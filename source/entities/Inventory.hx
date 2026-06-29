@@ -83,6 +83,15 @@ class Inventory {
 		return items.length;
 	}
 
+	public function getItems():Array<InventoryItem> {
+		return items.copy();
+	}
+
+	public function clear() {
+		items = [];
+		onChange.dispatch();
+	}
+
 	public function hasWaders():Bool {
 		return has(Waders);
 	}
