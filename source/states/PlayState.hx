@@ -208,7 +208,15 @@ class PlayState extends FlxTransitionableState {
 
 	function checkDebugButtons() {
 		if (FlxG.mouse.justPressedRight) {
-			player.setPosition(FlxG.mouse.x, FlxG.mouse.y);
+			var mx = FlxG.mouse.x;
+			var my = FlxG.mouse.y;
+			player.setPosition(mx, my);
+			if (player.playerState != null) {
+				player.playerState.x = mx;
+				player.playerState.y = my;
+			}
+			player.clearPendingInputs();
+			GameManager.ME.net.sendMessage("set_position", {x: mx, y: my});
 		}
 		if (!FlxG.mouse.justPressed) {
 			return;
@@ -1617,7 +1625,11 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onInventoryUpdate(data:Dynamic) {
+		var prevCount = player.inventory.count();
 		player.inventory.syncFromServer(data.items);
+		if (player.inventory.count() > prevCount) {
+			FmodManager.PlaySoundOneShot(FmodSFX.ItemCollect);
+		}
 	}
 
 	function onServerCloudSync(data:Dynamic) {

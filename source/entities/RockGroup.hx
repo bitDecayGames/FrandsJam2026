@@ -70,7 +70,7 @@ class RockGroup extends FlxTypedGroup<Rock> {
 			var index = members.indexOf(rock);
 			rock.kill();
 			if (onPickup != null) {
-				onPickup("rock", index);
+				onPickup(rock.big ? "big_rock" : "rock", index);
 			}
 		} else {
 			player.showInventoryFull(rock);
