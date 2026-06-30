@@ -98,33 +98,20 @@ class Player extends FlxSprite {
 	public var lastInputDir:Cardinal = E;
 
 	static inline var SHALLOW_WATER_OFFSET:Float = 8;
-	var shallowOffsetCurrent:Float = 0; // smoothed wading offset
 
 	public var inShallowWater(default, set):Bool = false;
 
 	function set_inShallowWater(value:Bool):Bool {
-		inShallowWater = value;
-		// Visual offset is applied smoothly in updateShallowOffset(), not here
-		return value;
-	}
-
-	function updateShallowOffset(dt:Float) {
-		var target = if (inShallowWater) SHALLOW_WATER_OFFSET else 0.0;
-		var prev = shallowOffsetCurrent;
-		if (Math.abs(target - shallowOffsetCurrent) < 0.5) {
-			shallowOffsetCurrent = target;
-		} else {
-			shallowOffsetCurrent += (target - shallowOffsetCurrent) * Math.min(1, dt * 10);
+		if (value == inShallowWater) {
+			return value;
 		}
-		// Apply delta to offset
-		offset.y -= (shallowOffsetCurrent - prev);
-		// Clip sprite when wading
-		if (shallowOffsetCurrent > 1) {
-			var clipH = Std.int(48 - shallowOffsetCurrent * 2.5);
-			clipRect = flixel.math.FlxRect.get(0, 0, 48, Math.max(16, clipH));
+		inShallowWater = value;
+		if (inShallowWater) {
+			clipRect = flixel.math.FlxRect.get(0, 0, 48, 28);
 		} else {
 			clipRect = null;
 		}
+		return value;
 	}
 
 	public var frozen:Bool = false;
@@ -646,7 +633,6 @@ class Player extends FlxSprite {
 		// Tick timers (both local and remote)
 		if (knockbackTimer > 0) { knockbackTimer -= delta; }
 		if (inventoryFullCooldown > 0) { inventoryFullCooldown -= delta; }
-		updateShallowOffset(delta);
 
 		if (isRemote) {
 			updateRemoteInterpolation();

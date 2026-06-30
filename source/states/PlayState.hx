@@ -238,11 +238,8 @@ class PlayState extends FlxTransitionableState {
 					case 2:
 						GameManager.ME.net.sendHotPepper(!player.hotModeActive, 99);
 					case 3:
-						if (player.inventory.hasWaders()) {
-							GameManager.ME.net.sendItemPickup("waders_remove", 0);
-						} else {
-							GameManager.ME.net.sendItemPickup("waders", 0);
-						}
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.hasWaders()) "remove" else "add", type: "waders"});
 					case 4:
 						GameManager.ME.net.sendMessage("debug_end_round", {});
 					case 5:

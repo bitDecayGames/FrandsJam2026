@@ -599,8 +599,10 @@ class GameLogic {
 					if (data.fishType != null) { item.fishType = Std.int(data.fishType); }
 					if (data.lengthCm != null) { item.lengthCm = Std.int(data.lengthCm); }
 					serverAddItem(clientId, item);
+					if (type == "waders") { wadersPlayers.set(clientId, true); }
 				} else if (action == "remove") {
 					serverRemoveItem(clientId, type);
+					if (type == "waders") { wadersPlayers.remove(clientId); }
 				}
 
 			case "debug_end_round":
