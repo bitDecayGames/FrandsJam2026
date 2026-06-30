@@ -230,23 +230,17 @@ class PlayState extends FlxTransitionableState {
 			if (my >= by && my < by + btnH) {
 				switch (i) {
 					case 0:
-						if (player.inventory.has(Rock)) { player.inventory.remove(Rock); }
-						else { player.inventory.add(Rock); }
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(Rock)) "remove" else "add", type: "rock"});
 					case 1:
-						if (player.inventory.has(BigRock)) { player.inventory.remove(BigRock); }
-						else { player.inventory.add(BigRock); }
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(BigRock)) "remove" else "add", type: "big_rock"});
 					case 2:
-						if (player.hotModeActive) {
-							player.deactivateHotMode();
-						} else {
-							player.activateHotMode(99);
-						}
+						GameManager.ME.net.sendHotPepper(!player.hotModeActive, 99);
 					case 3:
 						if (player.inventory.hasWaders()) {
-							player.inventory.remove(Waders);
 							GameManager.ME.net.sendItemPickup("waders_remove", 0);
 						} else {
-							player.inventory.add(Waders);
 							GameManager.ME.net.sendItemPickup("waders", 0);
 						}
 					case 4:
@@ -254,18 +248,17 @@ class PlayState extends FlxTransitionableState {
 					case 5:
 						GameManager.ME.net.sendMessage("debug_spawn_dog", {});
 					case 6:
-						if (player.inventory.has(Rocket)) { player.inventory.remove(Rocket); }
-						else { player.inventory.add(Rocket); }
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(Rocket)) "remove" else "add", type: "rocket"});
 					case 7:
-						if (player.inventory.has(HungerPotion)) { player.inventory.remove(HungerPotion); }
-						else { player.inventory.add(HungerPotion); }
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(HungerPotion)) "remove" else "add", type: "hunger_potion"});
 					case 8:
-						var ftype = FlxG.random.int(0, 11);
-						var flen = FlxG.random.int(20, 60);
-						player.inventory.add(Fish(ftype, flen));
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: "add", type: "fish", fishType: FlxG.random.int(0, 11), lengthCm: FlxG.random.int(20, 60)});
 					case 9:
-						if (player.inventory.has(FishBait)) { player.inventory.remove(FishBait); }
-						else { player.inventory.add(FishBait); }
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(FishBait)) "remove" else "add", type: "fish_bait"});
 				}
 				return;
 			}
@@ -299,6 +292,8 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onSeagullSpawn.remove(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.remove(onServerSeagullPoop);
 		GameManager.ME.net.onSeagullDespawn.remove(onServerSeagullDespawn);
+		GameManager.ME.net.onPepperExtinguish.remove(onPepperExtinguish);
+		GameManager.ME.net.onInventoryUpdate.remove(onInventoryUpdate);
 		GameManager.ME.net.onDogSpawn.remove(onDogSpawn);
 		GameManager.ME.net.onDogUpdate.remove(onDogUpdate);
 		GameManager.ME.net.onDogCaught.remove(onDogCaught);
@@ -353,6 +348,8 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
 		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
 		GameManager.ME.net.onSeagullDespawn.add(onServerSeagullDespawn);
+		GameManager.ME.net.onPepperExtinguish.add(onPepperExtinguish);
+		GameManager.ME.net.onInventoryUpdate.add(onInventoryUpdate);
 		GameManager.ME.net.onDogSpawn.add(onDogSpawn);
 		GameManager.ME.net.onDogUpdate.add(onDogUpdate);
 		GameManager.ME.net.onDogCaught.add(onDogCaught);
@@ -640,20 +637,13 @@ class PlayState extends FlxTransitionableState {
 		var isMe = sessionId == player.sessionId;
 		switch (itemType) {
 			case "rock":
-				if (isMe) {
-					// Server confirmed — read rock type before removing
-					if (index >= 0 && index < rockGroup.members.length) {
-						var rock = rockGroup.members[index];
-						player.pickupItem((rock != null && rock.big) ? BigRock : Rock);
-					}
-				}
 				rockGroup.removeByIndex(index);
 			case "waders":
 				wadersPickup.remotePickup();
-				if (isMe) { player.pickupItem(Waders); }
+				// Inventory update comes from server via inventory_update
 			case "pepper":
 				pepperPickup.remotePickup();
-				if (isMe) { player.activateHotMode(99); }
+				// Hot mode activation comes from server via onRemoteHotPepper
 		}
 	}
 
@@ -721,29 +711,79 @@ class PlayState extends FlxTransitionableState {
 
 	function onRemotePlayerDrown(sessionId:String, x:Float, y:Float) {
 		if (sessionId == player.sessionId) {
-			// Server says we drowned
 			if (!player.drowned) {
-				add(new Splash(player.x + player.width / 2, player.y + player.height, true));
+				// Offset splash into the water (forward in facing direction)
+				var dir = player.lastInputDir.asVector();
+				var splashX = player.x + player.width / 2 + dir.x * 12;
+				var splashY = player.y + player.height + dir.y * 12;
+				dir.put();
+				add(new Splash(splashX, splashY, true));
 				player.drown();
 			}
 		} else {
 			var remote = remotePlayers.get(sessionId);
 			if (remote != null) {
-				add(new Splash(x + remote.width / 2, y + remote.height, true));
+				var dir = remote.lastInputDir.asVector();
+				var splashX = x + remote.width / 2 + dir.x * 12;
+				var splashY = y + remote.height + dir.y * 12;
+				dir.put();
+				add(new Splash(splashX, splashY, true));
 				remote.drown(x, y);
 			}
 		}
 	}
 
-	function onRemoteHotPepper(sessionId:String, isStart:Bool) {
-		var remote = remotePlayers.get(sessionId);
-		if (remote == null) {
-			return;
-		}
-		if (isStart) {
-			remote.activateHotMode();
+	var steamEmitter:flixel.effects.particles.FlxEmitter;
+	var steamTarget:Player;
+	var steamTimer:Float = 0;
+
+	function onPepperExtinguish(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		// Deactivate hot mode
+		if (sessionId == player.sessionId) {
+			player.deactivateHotMode();
+			steamTarget = player;
 		} else {
-			remote.deactivateHotMode();
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				remote.deactivateHotMode();
+				steamTarget = remote;
+			}
+		}
+		TODO.sfx("sizzle");
+		// Create emitter that follows the player's butt for 2 seconds
+		if (steamEmitter != null) { remove(steamEmitter); steamEmitter.destroy(); }
+		steamEmitter = new flixel.effects.particles.FlxEmitter(0, 0, 60);
+		steamEmitter.makeParticles(6, 6, 0xFFDDDDDD, 60);
+		steamEmitter.lifespan.set(0.6, 1.2);
+		steamEmitter.speed.set(15, 35);
+		steamEmitter.alpha.set(0.8, 0.9, 0.0, 0.0);
+		steamEmitter.scale.set(1.5, 2.5, 0.4, 0.6);
+		steamEmitter.launchMode = flixel.effects.particles.FlxEmitter.FlxEmitterMode.CIRCLE;
+		steamEmitter.launchAngle.set(250, 290); // upward (270° = straight up, ±20° spread)
+		steamEmitter.frequency = 0.03;
+		steamEmitter.start(false);
+		add(steamEmitter);
+		steamTimer = 2.0;
+	}
+
+	function onRemoteHotPepper(sessionId:String, isStart:Bool) {
+		// Server-authoritative hot mode — applies to ALL players including local
+		if (sessionId == player.sessionId) {
+			if (isStart) {
+				player.activateHotMode();
+			} else {
+				player.deactivateHotMode();
+			}
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				if (isStart) {
+					remote.activateHotMode();
+				} else {
+					remote.deactivateHotMode();
+				}
+			}
 		}
 	}
 
@@ -770,8 +810,9 @@ class PlayState extends FlxTransitionableState {
 		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
 		if (catcherSessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
-					// tell server to compute and broadcast landing position
+				// Server already added fish to inventory via inventory_update.
+				// If inventory was full at catch time, server didn't add — drop ground fish.
+				if (player.inventory.isFull()) {
 					GameManager.ME.net.sendMessage("ground_fish_drop", {
 						playerX: player.x + 8,
 						playerY: player.y - 14,
@@ -1069,6 +1110,22 @@ class PlayState extends FlxTransitionableState {
 			// (local player reads it in onServerAck, remotes in handleChange)
 		}
 
+		// Update steam emitter (pepper extinguish — follows player butt)
+		if (steamTimer > 0 && steamEmitter != null && steamTarget != null) {
+			steamTimer -= elapsed;
+			steamEmitter.setPosition(steamTarget.x + steamTarget.width / 2, steamTarget.y + 2);
+			if (steamTimer <= 0) {
+				steamEmitter.emitting = false;
+				var capturedEmitter = steamEmitter;
+				flixel.util.FlxTimer.wait(1.5, () -> {
+					remove(capturedEmitter);
+					capturedEmitter.destroy();
+				});
+				steamEmitter = null;
+				steamTarget = null;
+			}
+		}
+
 		// Update arcing items (dog-dropped gear)
 		var ai = arcingItems.length;
 		while (ai-- > 0) {
@@ -1145,7 +1202,12 @@ class PlayState extends FlxTransitionableState {
 				}
 				if (FlxG.overlap(player, gItem.sprite)) {
 					if (!player.inventory.isFull()) {
-						player.inventory.add(gItem.item);
+						// Tell server about the pickup — inventory_update will sync
+						var encoded = entities.Inventory.encodeItem(gItem.item);
+						GameManager.ME.net.sendMessage("ground_item_pickup", {
+							x: gItem.sprite.x, y: gItem.sprite.y,
+							itemType: encoded.type, fishType: encoded.fishType, lengthCm: encoded.lengthCm
+						});
 						remove(gItem.sprite);
 						gItem.sprite.destroy();
 						groundItems.splice(gi, 1);
@@ -1194,39 +1256,12 @@ class PlayState extends FlxTransitionableState {
 				player.frozen = false;
 			});
 
-			// Explode all inventory items off the player
-			var items:Array<Dynamic> = [];
-			for (item in player.inventory.getItems()) {
-				switch (item) {
-					case Fish(spriteIndex, lengthCm):
-						items.push({type: "fish", data: {fishType: spriteIndex, lengthCm: lengthCm}});
-					case Rock:
-						items.push({type: "rock", data: {big: false}});
-					case BigRock:
-						items.push({type: "rock", data: {big: true}});
-					case Waders:
-						items.push({type: "waders", data: {}});
-					case Rocket:
-						items.push({type: "rocket", data: {}});
-					case HungerPotion:
-						items.push({type: "potion", data: {}});
-					case FishBait:
-						items.push({type: "bait", data: {}});
-				}
-			}
-			player.inventory.clear();
-
-			if (items.length > 0) {
-				GameManager.ME.net.sendMessage("dog_item_drop", {
-					dogId: dogId,
-					playerX: player.x + 8,
-					playerY: player.y - 14,
-					items: items
-				});
-			} else {
-				// No items — tell server so dog flees immediately
-				GameManager.ME.net.sendMessage("dog_no_fish", {dogId: dogId});
-			}
+			// Server reads inventory and computes drops — just send position
+			GameManager.ME.net.sendMessage("dog_item_drop", {
+				dogId: dogId,
+				playerX: player.x + 8,
+				playerY: player.y - 14
+			});
 		} else {
 			var remote = remotePlayers.get(sessionId);
 			if (remote != null) {
@@ -1362,7 +1397,7 @@ class PlayState extends FlxTransitionableState {
 			powerUpSprite = null;
 		}
 		if (sessionId == player.sessionId) {
-			player.inventory.add(Rocket);
+			// Inventory update comes from server via inventory_update
 			TODO.sfx("powerup_pickup");
 		}
 	}
@@ -1444,36 +1479,12 @@ class PlayState extends FlxTransitionableState {
 				player.frozen = false;
 			});
 
-			// Explode inventory
-			var items:Array<Dynamic> = [];
-			for (item in player.inventory.getItems()) {
-				switch (item) {
-					case Fish(spriteIndex, lengthCm):
-						items.push({type: "fish", data: {fishType: spriteIndex, lengthCm: lengthCm}});
-					case Rock:
-						items.push({type: "rock", data: {big: false}});
-					case BigRock:
-						items.push({type: "rock", data: {big: true}});
-					case Waders:
-						items.push({type: "waders", data: {}});
-					case Rocket:
-						items.push({type: "rocket", data: {}});
-					case HungerPotion:
-						items.push({type: "potion", data: {}});
-					case FishBait:
-						items.push({type: "bait", data: {}});
-				}
-			}
-			player.inventory.clear();
-
-			if (items.length > 0) {
-				GameManager.ME.net.sendMessage("dog_item_drop", {
-					dogId: -1,
-					playerX: player.x + 8,
-					playerY: player.y - 14,
-					items: items
-				});
-			}
+			// Server reads inventory and computes drops
+			GameManager.ME.net.sendMessage("dog_item_drop", {
+				dogId: -1,
+				playerX: player.x + 8,
+				playerY: player.y - 14
+			});
 		} else {
 			var remote = remotePlayers.get(targetSessionId);
 			if (remote != null) {
@@ -1606,6 +1617,10 @@ class PlayState extends FlxTransitionableState {
 			baitOverlay.destroy();
 			baitOverlay = null;
 		}
+	}
+
+	function onInventoryUpdate(data:Dynamic) {
+		player.inventory.syncFromServer(data.items);
 	}
 
 	function onServerCloudSync(data:Dynamic) {

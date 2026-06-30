@@ -102,7 +102,7 @@ class LocalRoom {
 			case "player_drown":
 				net.onPlayerDrown.dispatch(data.sessionId, data.x, data.y);
 			case "hot_pepper":
-				// single player — handled locally
+				net.onHotPepper.dispatch(data.sessionId, data.isStart);
 			case "spawn_locations":
 				net.onSpawnLocations.dispatch(data);
 			case "timer_sync":
@@ -140,6 +140,10 @@ class LocalRoom {
 				net.onSkinAssigned.dispatch(Std.int(data.skinIndex));
 			case "dog_steal_fish":
 				// deprecated — handled by dog_ate_fish now
+			case "pepper_extinguish":
+				net.onPepperExtinguish.dispatch(data);
+			case "inventory_update":
+				net.onInventoryUpdate.dispatch(data);
 			case "players_ready":
 				net.onPlayersReady.dispatch();
 			case "powerup_spawn":

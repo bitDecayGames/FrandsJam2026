@@ -96,6 +96,8 @@ class NetworkManager {
 	public var onHungerActive = new FlxTypedSignal<Dynamic->Void>();
 	public var onHungerExpired = new FlxTypedSignal<Dynamic->Void>();
 	public var onPlayerKnockback = new FlxTypedSignal<Dynamic->Void>();
+	public var onPepperExtinguish = new FlxTypedSignal<Dynamic->Void>();
+	public var onInventoryUpdate = new FlxTypedSignal<Dynamic->Void>();
 	public var onThrowBait = new FlxTypedSignal<Dynamic->Void>();
 	public var onBaitActive = new FlxTypedSignal<Dynamic->Void>();
 	public var onBaitExpired = new FlxTypedSignal<Dynamic->Void>();
@@ -441,6 +443,8 @@ class NetworkManager {
 			onMsg("hunger_active", (message:Dynamic) -> { onHungerActive.dispatch(message); });
 			onMsg("hunger_expired", (message:Dynamic) -> { onHungerExpired.dispatch(message); });
 			onMsg("player_knockback", (message:Dynamic) -> { onPlayerKnockback.dispatch(message); });
+			onMsg("pepper_extinguish", (message:Dynamic) -> { onPepperExtinguish.dispatch(message); });
+			onMsg("inventory_update", (message:Dynamic) -> { onInventoryUpdate.dispatch(message); });
 			onMsg("throw_bait", (message:Dynamic) -> { onThrowBait.dispatch(message); });
 			onMsg("bait_active", (message:Dynamic) -> { onBaitActive.dispatch(message); });
 			onMsg("bait_expired", (message:Dynamic) -> { onBaitExpired.dispatch(message); });
@@ -494,8 +498,8 @@ class NetworkManager {
 		sendMessage("item_pickup", {itemType: itemType, index: index});
 	}
 
-	public function sendHotPepper(isStart:Bool) {
-		sendMessage("hot_pepper", {isStart: isStart});
+	public function sendHotPepper(isStart:Bool, duration:Float = 3.0) {
+		sendMessage("hot_pepper", {isStart: isStart, duration: duration});
 	}
 
 	public function sendWeedBurst(index:Int) {

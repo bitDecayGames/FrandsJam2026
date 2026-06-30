@@ -39,6 +39,9 @@ class GameLogic {
 	var waterBodies:Array<Array<{x:Float, y:Float}>>;
 	var bobberPositions:Map<String, {x:Float, y:Float}>;
 	var hotModePlayers:Map<String, Bool>;
+	var hotModeTimers:Map<String, Float>;
+	var inventories:Map<String, Array<{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool}>>;
+	static inline var MAX_INVENTORY:Int = 4;
 	var wadersPlayers:Map<String, Bool>;
 	public var bushRects:Array<{x:Float, y:Float, w:Float, h:Float}>;
 	var pickedUpItems:Map<String, Bool>; // tracks which world items have been picked up
@@ -157,6 +160,8 @@ class GameLogic {
 		waterBodies = [];
 		bobberPositions = new Map();
 		hotModePlayers = new Map();
+		hotModeTimers = new Map();
+		inventories = new Map();
 		wadersPlayers = new Map();
 		bushRects = [];
 		pickedUpItems = new Map();
@@ -221,6 +226,7 @@ class GameLogic {
 		if (spawnY != null) { ps.y = spawnY; }
 		players.set(sessionId, ps);
 		inputQueue.set(sessionId, []);
+		inventories.set(sessionId, []);
 		onPlayerAdded(sessionId, ps);
 	}
 
@@ -230,6 +236,7 @@ class GameLogic {
 		bobberPositions.remove(sessionId);
 		hotModePlayers.remove(sessionId);
 		wadersPlayers.remove(sessionId);
+		inventories.remove(sessionId);
 		onPlayerRemoved(sessionId);
 	}
 
@@ -307,6 +314,13 @@ class GameLogic {
 			case "ground_fish_pickup":
 				broadcast("ground_fish_pickup", {x: data.x, y: data.y, sessionId: clientId});
 
+			case "ground_item_pickup":
+				// Server adds the item to inventory
+				var itemData:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool} = {type: data.itemType};
+				if (data.fishType != null) { itemData.fishType = Std.int(data.fishType); }
+				if (data.lengthCm != null) { itemData.lengthCm = Std.int(data.lengthCm); }
+				serverAddItem(clientId, itemData);
+
 			case "player_name_changed":
 				var ps = players.get(clientId);
 				if (ps != null) { ps.name = data.name; }
@@ -317,7 +331,11 @@ class GameLogic {
 				bobberPositions.remove(clientId);
 
 			case "throw_rock":
-				broadcast("throw_rock", {sessionId: clientId, targetX: data.targetX, targetY: data.targetY, big: data.big, dir: data.dir});
+				var isBig:Bool = data.big == true;
+				var rockType = if (isBig) "big_rock" else "rock";
+				if (!serverHasItem(clientId, rockType)) { return; }
+				serverRemoveItem(clientId, rockType);
+				broadcast("throw_rock", {sessionId: clientId, targetX: data.targetX, targetY: data.targetY, big: isBig, dir: data.dir});
 			case "rock_splash":
 				broadcast("rock_splash", {x: data.x, y: data.y, big: data.big});
 				scareFish(data.x, data.y);
@@ -347,18 +365,31 @@ class GameLogic {
 				if (ps != null) { ps.score = data.score; }
 
 			case "item_pickup":
-				// Server validates — reject if item already taken
 				var itemType:String = data.itemType;
 				var index:Int = Std.int(data.index);
 				var key = '${itemType}_${index}';
-				if (pickedUpItems.exists(key)) {
-					// Already taken by someone else — reject silently
-					return;
-				}
+				if (pickedUpItems.exists(key)) { return; }
+				// Check inventory space (waders_remove is a removal, not a pickup)
+				if (itemType != "waders_remove" && itemType != "pepper" && serverInventoryFull(clientId)) { return; }
 				pickedUpItems.set(key, true);
-				if (itemType == "waders") { wadersPlayers.set(clientId, true); }
-				else if (itemType == "waders_remove") { wadersPlayers.remove(clientId); }
-				// Broadcast to ALL (including sender) so sender gets confirmation
+				// Add to server inventory + handle side effects
+				if (itemType == "rock") {
+					serverAddItem(clientId, {type: "rock"});
+				} else if (itemType == "big_rock") {
+					serverAddItem(clientId, {type: "big_rock"});
+				} else if (itemType == "waders") {
+					wadersPlayers.set(clientId, true);
+					serverAddItem(clientId, {type: "waders"});
+				} else if (itemType == "waders_remove") {
+					wadersPlayers.remove(clientId);
+					serverRemoveItem(clientId, "waders");
+				} else if (itemType == "pepper") {
+					hotModePlayers.set(clientId, true);
+					hotModeTimers.set(clientId, 3.0);
+					var ps2 = players.get(clientId);
+					if (ps2 != null) { ps2.speed = 150; }
+					broadcast("hot_pepper", {sessionId: clientId, isStart: true});
+				}
 				broadcast("item_pickup", {sessionId: clientId, itemType: itemType, index: index});
 
 			case "weed_burst":
@@ -382,18 +413,25 @@ class GameLogic {
 
 			case "hot_pepper":
 				var isStart:Bool = data.isStart;
+				var duration:Float = data.duration != null ? data.duration : 3.0;
 				hotModePlayers.set(clientId, isStart);
+				if (isStart) {
+					hotModeTimers.set(clientId, duration);
+				} else {
+					hotModeTimers.remove(clientId);
+				}
 				var ps = players.get(clientId);
 				if (ps != null) { ps.speed = isStart ? 150 : 100; }
 				broadcast("hot_pepper", {sessionId: clientId, isStart: isStart});
 
 			case "dog_item_drop":
-				// Client tells server what items to drop after dog bite.
-				// Server computes landing positions, broadcasts, and tells the dog where fish landed.
+				// Server reads items from its own inventory — don't trust client
 				var px:Float = data.playerX;
 				var py:Float = data.playerY;
 				var dogId:Int = data.dogId;
-				var items:Array<Dynamic> = data.items;
+				var items = serverClearInventory(clientId);
+				// Also clear waders flag
+				wadersPlayers.remove(clientId);
 				var firstFishX:Float = 0;
 				var firstFishY:Float = 0;
 				var hasFish = false;
@@ -423,28 +461,30 @@ class GameLogic {
 							// Try a different angle on next attempt
 							baseAngle += 0.5;
 						}
+						var item = items[j];
 						broadcast("dog_item_landed", {
 							startX: px, startY: py,
 							landX: landX, landY: landY,
-							itemType: items[j].type,
-							itemData: items[j].data
+							itemType: item.type,
+							itemData: item
 						});
-						// Track first fish for dog to seek
-						if (!hasFish && items[j].type == "fish") {
+						if (!hasFish && item.type == "fish") {
 							firstFishX = landX;
 							firstFishY = landY;
 							hasFish = true;
 						}
 					}
 				}
-				// Tell the dog where to go
+				// Tell the dog where to go — delay seeking so items have time to land
 				for (dog in dogs) {
 					if (dog.id == dogId) {
 						if (hasFish) {
-							dog.state = "seeking";
 							dog.fishTargetX = firstFishX;
 							dog.fishTargetY = firstFishY;
-							broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: dog.velX, velY: dog.velY});
+							// Stay in "waiting" for a moment to let items arc and land,
+							// then transition to seeking when waitTimer expires
+							dog.state = "waiting";
+							dog.waitTimer = 0.5; // brief pause before chasing the fish
 						} else {
 							startDogFlee(dog);
 						}
@@ -468,9 +508,13 @@ class GameLogic {
 				spawnDog(worldW, worldH);
 
 			case "throw_potion":
+				if (!serverHasItem(clientId, "hunger_potion")) { return; }
+				serverRemoveItem(clientId, "hunger_potion");
 				broadcast("throw_potion", {sessionId: clientId, targetX: data.targetX, targetY: data.targetY, dir: data.dir});
 
 			case "throw_bait":
+				if (!serverHasItem(clientId, "fish_bait")) { return; }
+				serverRemoveItem(clientId, "fish_bait");
 				broadcast("throw_bait", {sessionId: clientId, targetX: data.targetX, targetY: data.targetY, dir: data.dir});
 
 			case "bait_landed":
@@ -520,6 +564,8 @@ class GameLogic {
 				}
 
 			case "fire_rocket":
+				if (!serverHasItem(clientId, "rocket")) { return; }
+				serverRemoveItem(clientId, "rocket");
 				var p = players.get(clientId);
 				if (p != null) {
 					var dir:Int = data.dir; // 0=up, 1=right, 2=down, 3=left
@@ -543,6 +589,18 @@ class GameLogic {
 						knockbacks.set(clientId, {velX: -dx * 300, velY: -dy * 300, timer: 0.3});
 						broadcast("player_knockback", {sessionId: clientId, duration: 0.3});
 					}
+				}
+
+			case "debug_inventory":
+				var action:String = data.action;
+				var type:String = data.type;
+				if (action == "add") {
+					var item:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool} = {type: type};
+					if (data.fishType != null) { item.fishType = Std.int(data.fishType); }
+					if (data.lengthCm != null) { item.lengthCm = Std.int(data.lengthCm); }
+					serverAddItem(clientId, item);
+				} else if (action == "remove") {
+					serverRemoveItem(clientId, type);
 				}
 
 			case "debug_end_round":
@@ -654,34 +712,54 @@ class GameLogic {
 			if (p.x + p.width > worldW) { p.x = worldW - p.width; }
 			if (p.y + p.height > worldH) { p.y = worldH - p.height; }
 
-			// Server-authoritative shallow water state
-			var hasWaders2 = wadersPlayers.exists(id) && wadersPlayers.get(id);
-			if (hasWaders2) {
-				p.inShallowWater = collision.isShallowAt(p.x, p.y)
-					&& collision.isShallowAt(p.x + p.width - 1, p.y)
-					&& collision.isShallowAt(p.x, p.y + p.height - 1)
-					&& collision.isShallowAt(p.x + p.width - 1, p.y + p.height - 1);
+			// Shallow water: use center point for stable detection (no oscillation at edges)
+			if (hasWaders) {
+				p.inShallowWater = collision.isShallowAt(p.x + p.width / 2, p.y + p.height / 2);
 			} else {
 				p.inShallowWater = false;
 			}
+			p.speed = if (isHot) 150 else if (p.inShallowWater) 50 else 100;
 
 			// Server-authoritative hot mode drown check
 			var isHot2 = hotModePlayers.exists(id) && hotModePlayers.get(id);
 			if (isHot2) {
-				var pcx = Std.int((p.x + p.width / 2) / collision.tileSize);
-				var pcy = Std.int((p.y + p.height / 2) / collision.tileSize);
-				var inWater = collision.isSwimmableAt(pcx, pcy)
-					|| collision.isShallowAt(p.x + p.width / 2, p.y + p.height / 2);
-				if (inWater) {
-					var hasW = wadersPlayers.exists(id) && wadersPlayers.get(id);
+				var cx = p.x + p.width / 2;
+				var cy = p.y + p.height / 2;
+				var pcx = Std.int(cx / collision.tileSize);
+				var pcy = Std.int(cy / collision.tileSize);
+				var inDeepWater = collision.isSwimmableAt(pcx, pcy);
+				var onShallowTile = collision.isShallowAt(cx, cy);
+				var hasW = wadersPlayers.exists(id) && wadersPlayers.get(id);
+				if (inDeepWater || (onShallowTile && !hasW)) {
 					if (hasW) {
 						hotModePlayers.set(id, false);
+						hotModeTimers.remove(id);
 						broadcast("hot_pepper", {sessionId: id, isStart: false});
 					} else {
 						hotModePlayers.set(id, false);
+						hotModeTimers.remove(id);
 						broadcast("player_drown", {sessionId: id, x: p.x, y: p.y});
 					}
+				} else if (p.inShallowWater && hasW) {
+					hotModePlayers.set(id, false);
+					hotModeTimers.remove(id);
+					broadcast("pepper_extinguish", {sessionId: id, x: p.x, y: p.y});
 				}
+			}
+		}
+
+		// Tick hot mode timers (server-authoritative)
+		for (pid in [for (k in hotModeTimers.keys()) k]) {
+			var timer = hotModeTimers.get(pid);
+			timer -= t;
+			if (timer <= 0) {
+				hotModeTimers.remove(pid);
+				hotModePlayers.set(pid, false);
+				var ps = players.get(pid);
+				if (ps != null) { ps.speed = if (ps.inShallowWater) 50 else 100; }
+				broadcast("hot_pepper", {sessionId: pid, isStart: false});
+			} else {
+				hotModeTimers.set(pid, timer);
 			}
 		}
 
@@ -748,6 +826,12 @@ class GameLogic {
 
 		seagulls = [];
 		seagullSpawnTimer = 3.0;
+
+		// Clear all inventories
+		for (pid in inventories.keys()) {
+			serverClearInventory(pid);
+		}
+		wadersPlayers = new Map();
 
 		// Clear dogs and reset spawn timer
 		for (d in dogs) {
@@ -955,6 +1039,7 @@ class GameLogic {
 					var f = new FishState(tile.x, tile.y, ftype);
 					f.bodyIndex = bIdx;
 					fish.set(fid, f);
+					pickFishTarget(f); // start moving immediately
 					onFishAdded(fid, f);
 				}
 				bodyIndex++;
@@ -1034,7 +1119,9 @@ class GameLogic {
 			if (hasBobbers && closestDist < FISH_CATCH_DIST) {
 				f.alive = false; f.velX = 0; f.velY = 0; f.attracted = false; f.respawnTimer = 3.0;
 				f.aiState = FishState.STATE_DEAD;
-				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: f.fishType});
+				var fishLen = 20 + Std.int(Math.random() * 40);
+				var addedToInv = serverAddItem(closestSid, {type: "fish", fishType: f.fishType, lengthCm: fishLen});
+				broadcast("fish_caught", {sessionId: closestSid, fishId: fid, fishType: f.fishType, inventoryFull: !addedToInv});
 				bobberPositions.remove(closestSid);
 				continue;
 			}
@@ -1333,13 +1420,18 @@ class GameLogic {
 					}
 
 				case "waiting":
-					// Waiting for client to send item drop info
+					// Waiting for items to land, or for client to send item drop info
 					dog.waitTimer -= t;
 					dog.velX = 0;
 					dog.velY = 0;
 					if (dog.waitTimer <= 0) {
-						// Timed out — no items, just flee
-						startDogFlee(dog);
+						// If a fish target was set, go seek it; otherwise flee
+						if (dog.fishTargetX != 0 || dog.fishTargetY != 0) {
+							dog.state = "seeking";
+							broadcast("dog_update", {id: dog.id, x: dog.x, y: dog.y, velX: 0, velY: 0});
+						} else {
+							startDogFlee(dog);
+						}
 					}
 
 				case "seeking":
@@ -1393,6 +1485,8 @@ class GameLogic {
 						dog.waitTimer = DOG_WAIT_TIMEOUT;
 						dog.velX = 0;
 						dog.velY = 0;
+						dog.fishTargetX = 0;
+						dog.fishTargetY = 0;
 					}
 
 					if (shouldBroadcast) {
@@ -1653,6 +1747,7 @@ class GameLogic {
 			if (dx * dx + dy * dy < 14 * 14) {
 				powerUpAlive = false;
 				powerUpRespawnTimer = POWERUP_RESPAWN_DELAY;
+				serverAddItem(id, {type: "rocket"});
 				broadcast("powerup_pickup", {sessionId: id});
 				break;
 			}
@@ -1713,5 +1808,59 @@ class GameLogic {
 
 			// Fish scare is handled inside updateFish() so it takes priority over wander
 		}
+	}
+
+	// ── Server Inventory ──
+
+	function serverAddItem(clientId:String, item:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool}):Bool {
+		var inv = inventories.get(clientId);
+		if (inv == null) { return false; }
+		if (inv.length >= MAX_INVENTORY) { return false; }
+		inv.push(item);
+		sendInventoryUpdate(clientId);
+		return true;
+	}
+
+	function serverRemoveItem(clientId:String, type:String):Bool {
+		var inv = inventories.get(clientId);
+		if (inv == null) { return false; }
+		for (i in 0...inv.length) {
+			if (inv[i].type == type) {
+				inv.splice(i, 1);
+				sendInventoryUpdate(clientId);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function serverHasItem(clientId:String, type:String):Bool {
+		var inv = inventories.get(clientId);
+		if (inv == null) { return false; }
+		for (item in inv) {
+			if (item.type == type) { return true; }
+		}
+		return false;
+	}
+
+	function serverInventoryFull(clientId:String):Bool {
+		var inv = inventories.get(clientId);
+		if (inv == null) { return true; }
+		return inv.length >= MAX_INVENTORY;
+	}
+
+	function serverClearInventory(clientId:String):Array<{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool}> {
+		var inv = inventories.get(clientId);
+		if (inv == null) { return []; }
+		var items = inv.copy();
+		inv.splice(0, inv.length);
+		sendInventoryUpdate(clientId);
+		return items;
+	}
+
+	function sendInventoryUpdate(clientId:String) {
+		var inv = inventories.get(clientId);
+		if (inv == null) { return; }
+		sendToClient(clientId, "inventory_update", {items: inv});
 	}
 }

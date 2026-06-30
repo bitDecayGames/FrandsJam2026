@@ -72,7 +72,7 @@ class Player extends FlxSprite {
 	public var hotModeActive:Bool = false;
 	public var drowned:Bool = false;
 
-	var hotModeTimer:Float = 0;
+	// hotModeTimer removed — server owns the duration via hotModeTimers map
 	var fireEmitTimer:Float = 0;
 	var botTimer:Float = 0;
 	var drownTimer:Float = 0;
@@ -98,33 +98,33 @@ class Player extends FlxSprite {
 	public var lastInputDir:Cardinal = E;
 
 	static inline var SHALLOW_WATER_OFFSET:Float = 8;
+	var shallowOffsetCurrent:Float = 0; // smoothed wading offset
 
 	public var inShallowWater(default, set):Bool = false;
 
 	function set_inShallowWater(value:Bool):Bool {
-		if (value == inShallowWater) {
-			return value;
-		}
 		inShallowWater = value;
-		if (inShallowWater) {
-			if (hotModeActive && inventory.hasWaders()) {
-				hotModeActive = false;
-
-				if (!isRemote) {
-					GameManager.ME.net.sendHotPepper(false);
-				}
-
-			}
-			offset.y -= SHALLOW_WATER_OFFSET;
-			clipRect = flixel.math.FlxRect.get(0, 0, 48, 28);
-		} else {
-			offset.y += SHALLOW_WATER_OFFSET;
-			clipRect = null;
-			if (animation != null && animation.curAnim != null) {
-				playMovementAnim(true);
-			}
-		}
+		// Visual offset is applied smoothly in updateShallowOffset(), not here
 		return value;
+	}
+
+	function updateShallowOffset(dt:Float) {
+		var target = if (inShallowWater) SHALLOW_WATER_OFFSET else 0.0;
+		var prev = shallowOffsetCurrent;
+		if (Math.abs(target - shallowOffsetCurrent) < 0.5) {
+			shallowOffsetCurrent = target;
+		} else {
+			shallowOffsetCurrent += (target - shallowOffsetCurrent) * Math.min(1, dt * 10);
+		}
+		// Apply delta to offset
+		offset.y -= (shallowOffsetCurrent - prev);
+		// Clip sprite when wading
+		if (shallowOffsetCurrent > 1) {
+			var clipH = Std.int(48 - shallowOffsetCurrent * 2.5);
+			clipRect = flixel.math.FlxRect.get(0, 0, 48, Math.max(16, clipH));
+		} else {
+			clipRect = null;
+		}
 	}
 
 	public var frozen:Bool = false;
@@ -522,7 +522,8 @@ class Player extends FlxSprite {
 			}
 
 			var inp:PInput.P_Input = {seq: 0, dir: dirAngle, buttons: 0, elapsed: FlxG.elapsed};
-			simulation.tickPlayer(remoteSimState, [inp], FlxG.elapsed);
+			var remoteBlockFlags = if (inShallowWater || hotModeActive) CollisionMap.FLAG_SOLID else 0;
+			simulation.tickPlayer(remoteSimState, [inp], FlxG.elapsed, remoteBlockFlags);
 			lastHitEntityIndices = simulation.hitEntityIndices;
 			setPosition(remoteSimState.x, remoteSimState.y);
 			velocity.set(0, 0);
@@ -597,17 +598,9 @@ class Player extends FlxSprite {
 		updateFishingLine();
 		updateRock(delta);
 
-		// Hot mode timer and butt fire — run for both local and remote players
+		// Hot mode butt fire — server owns the timer and broadcasts deactivation
 		if (hotModeActive) {
-			// Only tick the timer for the local player — remote players deactivate via network signal
-			if (!isRemote) {
-				hotModeTimer -= delta;
-				if (hotModeTimer <= 0) {
-					hotModeActive = false;
-					GameManager.ME.net.sendHotPepper(false);
-				}
-			}
-			if (hotModeActive) {
+			{
 				fireEmitTimer += delta;
 				if (fireEmitTimer >= 0.03) {
 					fireEmitTimer = 0;
@@ -653,6 +646,7 @@ class Player extends FlxSprite {
 		// Tick timers (both local and remote)
 		if (knockbackTimer > 0) { knockbackTimer -= delta; }
 		if (inventoryFullCooldown > 0) { inventoryFullCooldown -= delta; }
+		updateShallowOffset(delta);
 
 		if (isRemote) {
 			updateRemoteInterpolation();
@@ -668,11 +662,7 @@ class Player extends FlxSprite {
 		}
 
 		if (FlxG.keys.justPressed.P || FlxG.keys.justPressed.NUMPADTHREE) {
-			if (hotModeActive) {
-				deactivateHotMode();
-			} else {
-				activateHotMode(99);
-			}
+			GameManager.ME.net.sendHotPepper(!hotModeActive, 99);
 		}
 
 		// Gather input — always, even when frozen (simulation needs continuous seq numbers)
@@ -693,8 +683,7 @@ class Player extends FlxSprite {
 				moveDir = lastInputDir;
 			}
 			var dirAngle = if (frozen) -1 else cardinalToAngle(moveDir);
-			// Hot mode speed boost (1.5x)
-			playerState.speed = if (hotModeActive) 150 else 100;
+			// Speed is set server-side (GameLogic.fixedTick) based on hot mode + shallow water
 			var inp:PInput.P_Input = {
 				seq: ++inputSeq,
 				dir: dirAngle,
@@ -706,10 +695,14 @@ class Player extends FlxSprite {
 				// Local mode: GameLogic is the authority, just read position after it ticks
 				setPosition(playerState.x, playerState.y);
 				lastHitEntityIndices = simulation.hitEntityIndices;
+				// Sync shallow water state from server's PlayerState
+				inShallowWater = playerState.inShallowWater;
 			} else {
 				// Networked mode: predict locally, reconcile from server later
 				pendingInputs.push(inp);
 				var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
+				// Match server speed computation so prediction doesn't fight reconciliation
+				playerState.speed = if (hotModeActive) 150 else if (inShallowWater) 50 else 100;
 				simulation.tickPlayer(playerState, [inp], delta, blockFlags);
 				lastHitEntityIndices = simulation.hitEntityIndices;
 				setPosition(playerState.x, playerState.y);
@@ -741,7 +734,7 @@ class Player extends FlxSprite {
 
 		// Fire rocket with C key
 		if (!frozen && !throwing && castState == IDLE && FlxG.keys.justPressed.C && inventory.has(Rocket)) {
-			#if !db inventory.remove(Rocket); #end
+			// Server removes from inventory
 			// Convert facing to direction index: 0=up, 1=right, 2=down, 3=left
 			var dirIdx = switch (lastInputDir) {
 				case N: 0;
@@ -761,7 +754,7 @@ class Player extends FlxSprite {
 
 		// Throw hunger potion with B button (priority over rock, same arc)
 		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(HungerPotion)) {
-			#if !db inventory.remove(HungerPotion); #end
+			// Server removes from inventory
 			throwingPotion = true;
 			throwingBait = false;
 			throwingBigRock = false;
@@ -783,7 +776,7 @@ class Player extends FlxSprite {
 
 		// Throw fish bait with B button (same arc as rock)
 		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(FishBait)) {
-			#if !db inventory.remove(FishBait); #end
+			// Server removes from inventory
 			throwingBait = true;
 			throwingPotion = false;
 			throwingBigRock = false;
@@ -878,10 +871,10 @@ class Player extends FlxSprite {
 			// Press B again to throw
 			if (SimpleController.just_pressed(B)) {
 				if (inventory.has(BigRock)) {
-					#if !db inventory.remove(BigRock); #end
+					// Server removes from inventory
 					throwingBigRock = true;
 				} else {
-					#if !db inventory.remove(Rock); #end
+					// Server removes from inventory
 					throwingBigRock = false;
 				}
 				throwingPotion = false;
@@ -1524,25 +1517,12 @@ class Player extends FlxSprite {
 	public function activateHotMode(duration:Float = 3.0) {
 		if (!hotModeActive) {
 			hotModeActive = true;
-			hotModeTimer = duration;
 			TODO.sfx("hot_mode_activate");
-
-			if (!isRemote) {
-				GameManager.ME.net.sendHotPepper(true);
-			}
-
 		}
 	}
 
 	public function deactivateHotMode() {
-		if (hotModeActive) {
-			hotModeActive = false;
-
-			if (!isRemote) {
-				GameManager.ME.net.sendHotPepper(false);
-			}
-
-		}
+		hotModeActive = false;
 	}
 
 	public function drown(?drownX:Float, ?drownY:Float) {
@@ -1673,6 +1653,8 @@ class Player extends FlxSprite {
 		playerState.velocityY = serverState.velocityY;
 		if (simulation != null) {
 			var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
+			// Use server's speed so replay matches server computation
+			playerState.speed = serverState.speed;
 			for (inp in pendingInputs) {
 				simulation.tickPlayer(playerState, [inp], inp.elapsed, blockFlags);
 			}
