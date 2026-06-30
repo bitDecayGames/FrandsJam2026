@@ -161,7 +161,7 @@ Server build output is tee'd to `build.log` with `[server-build]` prefix (haxe p
 - `play` — start directly in `LobbyState` (real networked multiplayer: connect → character select → ready → round). This is the flag for testing multiplayer. Without it the game boots to `SplashScreenState`.
 - `play_solo` — start in `LobbyState` with the in-process `LocalRoom` (single-player: no Colyseus server needed). Lobby shows "Single Player" title, auto-picks skin and readies immediately. Used by `watch_solo.sh`.
 - `forcelocal` — point the networked client at the **local** Colyseus dev server: `Configure` hardcodes `ws://localhost:2567`, overriding `config.json` and the `SERVER_URL`/`SERVER_PORT`/`SERVER_PROTOCOL` env/defines. NOT the same as `local` (which removes networking entirely). `forcelocal` is still a real client — use it with `play` to test against a local server. The `#if forcelocal` branches in `Configure.hx` come *before* `#elseif sys`, so they correctly win on native builds.
-- `db` — enables in-game debug buttons/tools in `PlayState` (spawn rock/pepper/waders, etc.). Used by `watch_net.sh`. Only touches `PlayState`, nothing network-related.
+- `db` — enables in-game debug buttons/tools in `PlayState` (Rock, Big Rock, Pepper, Waders, End Round, Dog, Rocket, Potion, Fish, Bait). Items not consumed on use. Fish state labels + scare radius circles shown. Also enables lobby auto-ready when another player joins. Used by `watch_net.sh`.
 - `bot` — makes the local `Player` ignore input and just walk left/right on a timer (`Player.hx`, `#if bot`). Used for the second window in `watch_net.sh`. The bot does NOT auto-play (no casting/throwing/readying) — when testing, the bot window should ONLY walk left/right.
 - `rocks` — debug flag: fills player inventory with `MAX_SLOTS` rocks at construction time
 
@@ -182,6 +182,39 @@ Server build output is tee'd to `build.log` with `[server-build]` prefix (haxe p
   - **Tier 1 (cosmetic)**: Client-only, no network message. Bush rustle, particles, footsteps. Each client detects overlap locally — including for remote players' interpolated positions.
   - **Tier 2 (stateful)**: Client predicts cosmetics immediately, server validates and broadcasts state change. Bush ignite, weed burst (score), item pickup, fish catch. Score/inventory changes only on server confirmation.
   - SFX always plays immediately on the client that caused the interaction. Never wait for server.
+
+## Inventory Items (source/entities/Inventory.hx)
+`InventoryItem` enum: `Rock`, `BigRock`, `Fish(fishSpriteIndex, lengthCm)`, `Waders`, `Rocket`, `HungerPotion`, `FishBait`. Max 4 slots. In `#if db` mode, items are NOT consumed on use (`#if !db inventory.remove(...)` guards). Debug buttons toggle add/remove.
+
+### Rock Throw (Two-Phase Aiming)
+Press B to enter aiming mode — player freezes, reticle turns red and scales 3x, blast radius circle appears. Directional input moves reticle freely (200px/s, any distance). Press B again to throw. Press A to cancel. Server validates and broadcasts `throw_rock`.
+
+### Rocket
+Press C to fire in facing direction. Server creates projectile (40→350 px/s acceleration). Smoke trail (500 particles, backward cone). On hit: same stun as dog (3s freeze + flicker + inventory explode). Server applies decelerating knockback slide (0.3s) + broadcasts `player_knockback` to suppress movement animation. Camera shake on fire (client-only). Fish near rocket path flee perpendicular at 2x speed (FEARED state, 1s duration + 1s pause).
+
+### Hunger Potion
+Thrown like rock (B button, same arc). Lands in water → server activates hunger in that water body for 10s. All fish in that body chase bobbers from any distance. Client shows green tint overlay on affected water tiles (flood-filled from landing point).
+
+### Fish Bait
+Thrown like rock (B button). Lands in water → server activates 15s bait zone (64x44px oval). Fish in same body pick roam targets within oval (including shallow water). No separation enforcement during BAIT_ROAMING state. Client shows golden oval overlay.
+
+### Power-Up Item Box
+Server spawns at random walkable tile. Respawns 5s after pickup. Walking within 14px picks up → adds Rocket to inventory.
+
+## Dog System (source/entities/Dog.hx, shared/GameLogic.hx)
+12x12 brown placeholder with `offset.set(6, 6)` for centered rendering. A* pathfinding with line-of-sight smoothing (avoids water, bushes, shallow tiles). States: chasing→waiting→seeking→fleeing. Speed: 100/80/160 px/s. Catches at player visual center. Items drop to walkable tiles only, arc from player, land after 0.5s delay before dog seeks. Auto-spawn disabled (debug button only). Cleared between rounds.
+
+## Fish AI (schema/FishState.hx, shared/GameLogic.hx)
+Synced `aiState` field: ROAMING, ATTRACTED, SCARED, FEARED, SPAWNING, DEAD, BAIT_ROAMING. Fish spawn with immediate `pickFishTarget` (no initial pause). Bobber check runs BEFORE pause timer (no delayed attraction). Scared fish fade over 0.5s (client visual). Feared fish stop at shore, allowed into shallow water. Separation skipped for BAIT_ROAMING and FEARED states. Debug state labels under fish silhouettes (`#if db`).
+
+## Entity Architecture Rules
+- ONE sprite group per entity type — no duplicate local + server representations
+- Bush lookup via `bushByRectIndex: Map<Int, Bush>` — never use FlxGroup array index
+- Fish in single `fishSpawner` group — no serverFishGroup, no remoteFish map
+- `serverFishState` set for ALL clients (not just local mode)
+- All entity state changes must set synced schema fields (e.g., `aiState`)
+- `FishSpawner` is a pure container — no AI, no scareFish, no setBobbers
+- RockGroup, SeagullPoop, Seagull have no fishSpawner dependency
 
 ## Key Sprite Assets
 - `assets/aseprite/characters/playerA.json` (and playerB-H) — player skins, 48x48 frames, Aseprite JSON atlas with frame tags for animations
