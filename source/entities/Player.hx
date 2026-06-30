@@ -168,6 +168,8 @@ class Player extends FlxSprite {
 	public var caughtFishSpriteIndex:Int = 0;
 	public var caughtFishLengthCm:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
+	public var onInventoryFull:Null<() -> Void> = null;
+	var inventoryFullCooldown:Float = 0;
 
 	// Cast sprites
 	var reticle:FlxSprite;
@@ -450,7 +452,7 @@ class Player extends FlxSprite {
 			if (speedSq < 100) { // < ~10px/s  — player is frozen/stationary
 				remoteWasStationary = true;
 			} else if (remoteWasStationary) { // was stationary, now moving → catch anim done
-				state.remove(castBobber);
+				if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 				castBobber.destroy();
 				castBobber = null;
 				castState = IDLE;
@@ -648,10 +650,9 @@ class Player extends FlxSprite {
 			fireEmitTimer = 0;
 		}
 
-		// Tick knockback timer (both local and remote)
-		if (knockbackTimer > 0) {
-			knockbackTimer -= delta;
-		}
+		// Tick timers (both local and remote)
+		if (knockbackTimer > 0) { knockbackTimer -= delta; }
+		if (inventoryFullCooldown > 0) { inventoryFullCooldown -= delta; }
 
 		if (isRemote) {
 			updateRemoteInterpolation();
@@ -1171,7 +1172,7 @@ class Player extends FlxSprite {
 		var dist = Math.sqrt(dx * dx + dy * dy);
 		castFlightTime = if (dist > 0) dist / 150 else 0.01;
 		castElapsed = 0;
-		state.add(castBobber);
+		if (groundEffectsGroup != null) { groundEffectsGroup.add(castBobber); } else { state.add(castBobber); }
 	}
 
 	function launchBobber() {
@@ -1235,7 +1236,7 @@ class Player extends FlxSprite {
 	public function remoteStartCast(targetX:Float, targetY:Float, dir:String) {
 		// Clean up any bobber still retracting from a previous catch
 		if (castBobber != null) {
-			state.remove(castBobber);
+			if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 			castBobber.destroy();
 			castBobber = null;
 		}
@@ -1358,7 +1359,7 @@ class Player extends FlxSprite {
 				if (castBobber != null) {
 					if (retractHasFish && castTarget != null) {
 						if (updateCastArc(elapsed)) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 							if (onFishDelivered != null)
@@ -1373,7 +1374,7 @@ class Player extends FlxSprite {
 						var dy = py - castBobber.y;
 						var dist = Math.sqrt(dx * dx + dy * dy);
 						if (dist < 4) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 						}
@@ -1383,7 +1384,7 @@ class Player extends FlxSprite {
 				if (castBobber != null) {
 					if (retractHasFish && castTarget != null) {
 						if (updateCastArc(elapsed)) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 							castState = IDLE;
@@ -1401,7 +1402,7 @@ class Player extends FlxSprite {
 						var dy = py - castBobber.y;
 						var dist = Math.sqrt(dx * dx + dy * dy);
 						if (dist < 4) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 							castState = IDLE;
@@ -1561,6 +1562,31 @@ class Player extends FlxSprite {
 		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
 	}
 
+	public function showInventoryFull(?itemSprite:FlxSprite) {
+		if (inventoryFullCooldown > 0) { return; }
+		inventoryFullCooldown = 0.5;
+		TODO.sfx("inventory_full");
+		var label = new FloatingLabel(x + width / 2, y - 20, "Full!", flixel.util.FlxColor.RED);
+		state.add(label);
+		if (itemSprite != null) {
+			var origX = itemSprite.x;
+			var capturedSprite = itemSprite;
+			var shakeAmount = 3.0;
+			var shakeDuration = 0.3;
+			var shakeTime:Float = 0;
+			new flixel.util.FlxTimer().start(0.02, (_) -> {
+				if (capturedSprite == null || !capturedSprite.alive) { return; }
+				shakeTime += 0.02;
+				if (shakeTime >= shakeDuration) {
+					capturedSprite.x = origX;
+					return;
+				}
+				capturedSprite.x = origX + (Math.random() * 2 - 1) * shakeAmount;
+			}, Std.int(shakeDuration / 0.02) + 1);
+		}
+		if (onInventoryFull != null) { onInventoryFull(); }
+	}
+
 	public function pickupItem(item:InventoryItem):Bool {
 		var added = inventory.add(item);
 		if (added) {
@@ -1607,7 +1633,7 @@ class Player extends FlxSprite {
 	public function cancelAllActions() {
 		// Cancel casting and clean up bobber
 		if (castBobber != null) {
-			state.remove(castBobber);
+			if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 			castBobber.destroy();
 			castBobber = null;
 		}
@@ -1678,18 +1704,21 @@ class FloatingLabel extends flixel.text.FlxText {
 		super(0, 0, 0, text, 8);
 		color = textColor;
 		setPosition(cx - width / 2, cy);
-		velocity.y = -20;
 		allowCollisions = NONE;
 	}
 
+	var startY:Float;
+
 	override public function update(dt:Float) {
 		super.update(dt);
+		if (elapsed == 0) { startY = y; }
 		elapsed += dt;
 		var t = elapsed / DURATION;
 		if (t >= 1) {
 			kill();
 			return;
 		}
+		y = startY - t * 30; // float upward 30px over duration
 		alpha = 1 - t;
 	}
 }

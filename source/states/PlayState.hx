@@ -67,6 +67,7 @@ class PlayState extends FlxTransitionableState {
 	var bushGroup = new FlxTypedGroup<Bush>();
 	var localBushContacts = new Map<Int, Bool>(); // entityRect index -> in contact
 	var remoteBushContacts = new Map<String, Map<Int, Bool>>(); // sessionId -> bushIndex -> inContact
+	var bushByRectIndex = new Map<Int, Bush>(); // entityRect index -> bush sprite
 	var serverDogs = new Map<Int, entities.Dog>(); // dogId -> Dog sprite
 	var powerUpSprite:FlxSprite;
 	var rocketSprites = new Map<Int, FlxSprite>();
@@ -669,19 +670,16 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onRemoteBushIgnite(index:Int) {
-		if (index >= 0 && index < bushGroup.members.length) {
-			var bush = bushGroup.members[index];
-			if (bush != null && bush.alive && !bush.burning) {
-				bush.ignite();
-			}
+		var bush = bushByRectIndex.get(index);
+		if (bush != null && bush.alive && !bush.burning) {
+			bush.ignite();
 		}
 	}
 
 	/** Process bush hits from Simulation.hitEntityIndices for any player. */
 	function processBushHits(p:Player, contacts:Map<Int, Bool>, isLocal:Bool) {
 		for (entityIdx in p.lastHitEntityIndices) {
-			if (entityIdx < 0 || entityIdx >= bushGroup.members.length) { continue; }
-			var bush = bushGroup.members[entityIdx];
+			var bush = bushByRectIndex.get(entityIdx);
 			if (bush == null || !bush.alive) { continue; }
 			if (isLocal && p.hotModeActive && !bush.burning) {
 				bush.ignite();
@@ -793,6 +791,7 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function placeBushAt(bx:Float, by:Float) {
+		trace('placeBushAt(${bx}, ${by}) bushGroup.length=${bushGroup.length} entityRects=${simulation != null ? simulation.entityRects.length : -1}');
 		var bush = new Bush(bx, by, this);
 		bush.groundGroup = midGroundGroup;
 		bushGroup.add(bush);
@@ -800,9 +799,13 @@ class PlayState extends FlxTransitionableState {
 		if (simulation != null) {
 			var rectIdx = simulation.entityRects.length;
 			simulation.entityRects.push({x: bx + 2, y: by + 2, w: 10.0, h: 2.0});
+			bushByRectIndex.set(rectIdx, bush);
 			bush.onDeath = () -> {
 				removeEntityRect(rectIdx);
+				bushByRectIndex.remove(rectIdx);
 				GameManager.ME.net.sendMessage("bush_dead", {index: rectIdx});
+				bushGroup.remove(bush, true);
+				ySortGroup.remove(bush, true);
 			};
 		}
 	}
@@ -1140,12 +1143,16 @@ class PlayState extends FlxTransitionableState {
 					groundItems.splice(gi, 1);
 					continue;
 				}
-				if (!player.inventory.isFull() && FlxG.overlap(player, gItem.sprite)) {
-					player.inventory.add(gItem.item);
-					remove(gItem.sprite);
-					gItem.sprite.destroy();
-					groundItems.splice(gi, 1);
-					break; // one per frame
+				if (FlxG.overlap(player, gItem.sprite)) {
+					if (!player.inventory.isFull()) {
+						player.inventory.add(gItem.item);
+						remove(gItem.sprite);
+						gItem.sprite.destroy();
+						groundItems.splice(gi, 1);
+						break;
+					} else {
+						player.showInventoryFull(gItem.sprite);
+					}
 				}
 			}
 

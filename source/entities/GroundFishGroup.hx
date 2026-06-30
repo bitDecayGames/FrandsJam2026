@@ -38,6 +38,8 @@ class GroundFishGroup extends FlxTypedGroup<GroundFish> {
 				onPickedUp(fish.x, fish.y);
 			}
 			fish.kill();
+		} else {
+			player.showInventoryFull(fish);
 		}
 	}
 

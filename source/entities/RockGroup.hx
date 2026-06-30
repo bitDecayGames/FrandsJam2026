@@ -68,12 +68,12 @@ class RockGroup extends FlxTypedGroup<Rock> {
 	function handleOverlap(player:Player, rock:Rock) {
 		if (!player.inventory.isFull()) {
 			var index = members.indexOf(rock);
-			// Don't add to inventory locally — wait for server confirmation.
-			// Kill visually to prevent double-overlap on next frame.
 			rock.kill();
 			if (onPickup != null) {
 				onPickup("rock", index);
 			}
+		} else {
+			player.showInventoryFull(rock);
 		}
 	}
 

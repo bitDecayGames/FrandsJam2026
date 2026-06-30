@@ -1119,10 +1119,10 @@ class GameLogic {
 		// Separation
 		for (i in 0...fishStates.length) {
 			var a = fishStates[i];
-			if (!a.alive || a.aiState == FishState.STATE_BAIT_ROAMING) { continue; }
+			if (!a.alive || a.aiState == FishState.STATE_BAIT_ROAMING || a.aiState == FishState.STATE_FEARED) { continue; }
 			for (j in (i + 1)...fishStates.length) {
 				var b = fishStates[j];
-				if (!b.alive || b.aiState == FishState.STATE_BAIT_ROAMING) { continue; }
+				if (!b.alive || b.aiState == FishState.STATE_BAIT_ROAMING || b.aiState == FishState.STATE_FEARED) { continue; }
 				var dx = a.x - b.x; var dy = a.y - b.y;
 				if (dx * dx + dy * dy < FISH_SEPARATION_DIST * FISH_SEPARATION_DIST) {
 					fleeFromFish(a, b.x, b.y); fleeFromFish(b, a.x, a.y);
