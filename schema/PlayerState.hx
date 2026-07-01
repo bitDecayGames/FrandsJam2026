@@ -11,6 +11,11 @@ import io.colyseus.serializer.schema.types.MapSchema;
 #end
 
 class PlayerState extends Schema {
+	public static final FACING_UP = 1;
+	public static final FACING_RIGHT = 2;
+	public static final FACING_DOWN = 3;
+	public static final FACING_LEFT = 4;
+
 	@:type("float32") public var x:Float;
 	@:type("float32") public var y:Float;
 	@:type("float32") public var velocityX:Float;
@@ -19,6 +24,12 @@ class PlayerState extends Schema {
 	@:type("string") public var name:String;
 	@:type("int8") public var skinIndex:Int;
 	@:type("int32") public var score:Int;
+	@:type("int32") public var lastProcessedSeq:Int;
+	@:type("float32") public var speed:Float;
+	@:type("float32") public var width:Float;
+	@:type("float32") public var height:Float;
+	@:type("uint8") public var facing:Int;
+	@:type("boolean") public var inShallowWater:Bool;
 
 	public function new() {
 		super();
@@ -30,5 +41,30 @@ class PlayerState extends Schema {
 		name = "";
 		skinIndex = -1;
 		score = 0;
+		lastProcessedSeq = 0;
+		speed = 100;
+		width = 16;
+		height = 8;
+		facing = FACING_DOWN;
+		inShallowWater = false;
+	}
+
+	public static function copy(source:PlayerState):PlayerState {
+		var s = new PlayerState();
+		s.x = source.x;
+		s.y = source.y;
+		s.velocityX = source.velocityX;
+		s.velocityY = source.velocityY;
+		s.speed = source.speed;
+		s.width = source.width;
+		s.height = source.height;
+		s.name = source.name;
+		s.skinIndex = source.skinIndex;
+		s.score = source.score;
+		s.lastProcessedSeq = source.lastProcessedSeq;
+		s.ready = source.ready;
+		s.facing = source.facing;
+		s.inShallowWater = source.inShallowWater;
+		return s;
 	}
 }

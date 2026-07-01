@@ -52,13 +52,45 @@ class Player extends FlxSprite {
 
 	public var skinIndex:Int = 0;
 
+	public static function cardinalToAngle(dir:Cardinal):Int {
+		return switch (dir) {
+			case N: 0;
+			case NE: 45;
+			case E: 90;
+			case SE: 135;
+			case S: 180;
+			case SW: 225;
+			case W: 270;
+			case NW: 315;
+			default: -1;
+		};
+	}
+
 	var speed:Float = 100;
 	var playerNum = 0;
 
 	public var hotModeActive:Bool = false;
+	public var drowned:Bool = false;
 
-	var hotModeTimer:Float = 0;
+	// hotModeTimer removed — server owns the duration via hotModeTimers map
 	var fireEmitTimer:Float = 0;
+	var botTimer:Float = 0;
+	var drownTimer:Float = 0;
+	var drownBlinkTimer:Float = 0;
+	var drownBlinksLeft:Int = 0;
+	var drownReturnX:Float = 0;
+	var drownReturnY:Float = 0;
+
+	static inline var DROWN_HIDE_DURATION:Float = 2.0;
+	static inline var DROWN_BLINK_RATE:Float = 0.15;
+	static inline var DROWN_BLINK_COUNT:Int = 3;
+
+	// Client-side prediction
+	public var simulation:Simulation;
+	public var playerState:schema.PlayerState;
+
+	var pendingInputs:Array<PInput.P_Input> = [];
+	var inputSeq:Int = 0;
 
 	public var inventory = new Inventory();
 	public var score:Int = 0;
@@ -75,27 +107,14 @@ class Player extends FlxSprite {
 		}
 		inShallowWater = value;
 		if (inShallowWater) {
-			if (hotModeActive && inventory.hasWaders()) {
-				hotModeActive = false;
-				#if !local
-				if (!isRemote) {
-					GameManager.ME.net.sendHotPepper(false);
-				}
-				#end
-			}
-			offset.y -= SHALLOW_WATER_OFFSET;
 			clipRect = flixel.math.FlxRect.get(0, 0, 48, 28);
 		} else {
-			offset.y += SHALLOW_WATER_OFFSET;
 			clipRect = null;
-			if (animation != null && animation.curAnim != null) {
-				playMovementAnim(true);
-			}
 		}
 		return value;
 	}
 
-	var frozen:Bool = false;
+	public var frozen:Bool = false;
 
 	public var sessionId:String = "";
 
@@ -122,8 +141,8 @@ class Player extends FlxSprite {
 	var remoteWasStationary:Bool = false;
 
 	// Interpolation targets for smooth remote player movement
-	var remoteTargetX:Float = 0;
-	var remoteTargetY:Float = 0;
+	public var remoteTargetX:Float = 0;
+	public var remoteTargetY:Float = 0;
 	var remoteServerVelX:Float = 0;
 	var remoteServerVelY:Float = 0;
 
@@ -136,6 +155,8 @@ class Player extends FlxSprite {
 	public var caughtFishSpriteIndex:Int = 0;
 	public var caughtFishLengthCm:Int = 0;
 	public var onFishDelivered:Null<() -> Void> = null;
+	public var onInventoryFull:Null<() -> Void> = null;
+	var inventoryFullCooldown:Float = 0;
 
 	// Cast sprites
 	var reticle:FlxSprite;
@@ -149,8 +170,13 @@ class Player extends FlxSprite {
 	// Group for ground-level effects (dust, footprints) — set by PlayState
 	public var groundEffectsGroup:FlxGroup;
 
+
 	// Factory for creating thrown rocks — set by PlayState
 	public var makeRock:(Float, Float, Bool) -> Rock;
+	public var makePotion:(Float, Float) -> Rock;
+	public var makeBait:(Float, Float) -> Rock;
+	var throwingPotion:Bool = false;
+	var throwingBait:Bool = false;
 
 	// Effect callbacks — set by PlayState
 	public var onBobberLanded:Null<(Float, Float) -> Void> = null;
@@ -158,6 +184,12 @@ class Player extends FlxSprite {
 	// Throw state
 	var throwing:Bool = false;
 	var throwingBigRock:Bool = false;
+	var aimingRock:Bool = false;
+	public var knockbackTimer:Float = 0;
+	var aimReticleX:Float = 0;
+	var aimReticleY:Float = 0;
+	var blastRadiusSprite:FlxSprite;
+	static inline var AIM_RETICLE_SPEED:Float = 200;
 	var rockSprite:Rock;
 	var rockTarget:FlxPoint;
 	var rockStartPos:FlxPoint;
@@ -229,6 +261,9 @@ class Player extends FlxSprite {
 		}
 
 		// Footstep effects on foot-plant frames of run animations
+		if (drowned) {
+			return;
+		}
 		if (StringTools.startsWith(animName, "run_") && (frameNumber == 2 || frameNumber == 6)) {
 			var fx = x + width / 2;
 			var fy = y + 4;
@@ -337,7 +372,14 @@ class Player extends FlxSprite {
 	}
 
 	function playMovementAnim(force:Bool = false) {
-		var moving = velocity.x != 0 || velocity.y != 0;
+		// Determine if player is moving — check different sources depending on mode
+		var moving = if (isRemote) {
+			remoteServerVelX != 0 || remoteServerVelY != 0;
+		} else if (playerState != null) {
+			playerState.velocityX != 0 || playerState.velocityY != 0;
+		} else {
+			velocity.x != 0 || velocity.y != 0;
+		};
 		if (!force && moving == lastMoving && lastInputDir == lastAnimDir && !inShallowWater)
 			return;
 
@@ -371,6 +413,7 @@ class Player extends FlxSprite {
 		remoteTargetY = data.state.y;
 		remoteServerVelX = data.state.velocityX;
 		remoteServerVelY = data.state.velocityY;
+		inShallowWater = data.state.inShallowWater;
 
 		// Update facing direction: server velocity is most accurate; fall back to position delta
 		if (remoteServerVelX != 0 || remoteServerVelY != 0) {
@@ -396,7 +439,7 @@ class Player extends FlxSprite {
 			if (speedSq < 100) { // < ~10px/s  — player is frozen/stationary
 				remoteWasStationary = true;
 			} else if (remoteWasStationary) { // was stationary, now moving → catch anim done
-				state.remove(castBobber);
+				if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 				castBobber.destroy();
 				castBobber = null;
 				castState = IDLE;
@@ -404,6 +447,11 @@ class Player extends FlxSprite {
 			}
 		}
 	}
+
+	// Temp PlayerState for remote simulation — avoids allocation per frame
+	var remoteSimState:schema.PlayerState;
+	// Entity indices hit during the last simulation tick (for bush rustle etc.)
+	public var lastHitEntityIndices:Array<Int> = [];
 
 	function updateRemoteInterpolation() {
 		// Freeze during cast/catch animations, same as local player
@@ -418,35 +466,74 @@ class Player extends FlxSprite {
 		var serverStopped = remoteServerVelX == 0 && remoteServerVelY == 0;
 
 		if (distSq > REMOTE_TELEPORT_DIST_SQ) {
-			// Way off — snap and sync velocity
-			setPosition(remoteTargetX, remoteTargetY);
-			velocity.set(remoteServerVelX, remoteServerVelY);
-		} else if (serverStopped && distSq <= REMOTE_SNAP_DIST_SQ) {
-			// Server stopped and we're close — snap exactly so position aligns and idle anim plays
 			setPosition(remoteTargetX, remoteTargetY);
 			velocity.set(0, 0);
-		} else {
+		} else if (serverStopped && distSq <= REMOTE_SNAP_DIST_SQ) {
+			setPosition(remoteTargetX, remoteTargetY);
+			velocity.set(0, 0);
+		} else if (simulation != null) {
+			// Use the shared Simulation to move with proper collision
+			if (remoteSimState == null) {
+				remoteSimState = new schema.PlayerState();
+				remoteSimState.width = 16;
+				remoteSimState.height = 8;
+			}
+			remoteSimState.x = x;
+			remoteSimState.y = y;
+
+			// Compute interpolation velocity
 			var dist = Math.sqrt(distSq);
-			var corrVx = 0.0;
-			var corrVy = 0.0;
-			if (distSq > 0.25) {
+			var interpVx:Float = 0;
+			var interpVy:Float = 0;
+			if (dist > 0.5) {
 				var corrSpeed = Math.min(dist * REMOTE_SPRING_K, REMOTE_MAX_CORRECTION);
-				corrVx = (dx / dist) * corrSpeed;
-				corrVy = (dy / dist) * corrSpeed;
+				var corrVx = (dx / dist) * corrSpeed;
+				var corrVy = (dy / dist) * corrSpeed;
+				if (serverStopped) {
+					interpVx = corrVx;
+					interpVy = corrVy;
+				} else {
+					var errorWeight = Math.min(dist / REMOTE_BLEND_RANGE, 1.0);
+					interpVx = remoteServerVelX + (corrVx - remoteServerVelX) * errorWeight;
+					interpVy = remoteServerVelY + (corrVy - remoteServerVelY) * errorWeight;
+				}
 			}
 
-			if (serverStopped) {
-				// Stopped but not yet close — spring directly without blend dampening the correction
-				velocity.set(corrVx, corrVy);
+			// Compute direction angle from velocity for the simulation input
+			remoteSimState.speed = Math.sqrt(interpVx * interpVx + interpVy * interpVy);
+			var dirAngle:Int = -1;
+			if (remoteSimState.speed > 0.1) {
+				dirAngle = Std.int(Math.atan2(interpVy, interpVx) * 180 / Math.PI);
+				// atan2 gives -180..180 with 0=right; Simulation expects 0=up
+				dirAngle = (dirAngle + 90 + 360) % 360;
+			}
+
+			var inp:PInput.P_Input = {seq: 0, dir: dirAngle, buttons: 0, elapsed: FlxG.elapsed};
+			var remoteBlockFlags = if (inShallowWater || hotModeActive) CollisionMap.FLAG_SOLID else 0;
+			simulation.tickPlayer(remoteSimState, [inp], FlxG.elapsed, remoteBlockFlags);
+			lastHitEntityIndices = simulation.hitEntityIndices;
+			setPosition(remoteSimState.x, remoteSimState.y);
+			velocity.set(0, 0);
+			// Drive animation from simulation velocity
+			remoteServerVelX = remoteSimState.velocityX;
+			remoteServerVelY = remoteSimState.velocityY;
+			if (remoteSimState.velocityX != 0 || remoteSimState.velocityY != 0) {
+				var velPt = new flixel.math.FlxPoint(remoteSimState.velocityX, remoteSimState.velocityY);
+				lastInputDir = Cardinal.closest(velPt);
+			}
+		} else {
+			// Fallback: no simulation available, use velocity (old behavior)
+			var dist = Math.sqrt(distSq);
+			if (dist > 0.5) {
+				var corrSpeed = Math.min(dist * REMOTE_SPRING_K, REMOTE_MAX_CORRECTION);
+				velocity.x = (dx / dist) * corrSpeed;
+				velocity.y = (dy / dist) * corrSpeed;
 			} else {
-				// Moving — blend server velocity (correct direction/anim) with correction (position fix)
-				var errorWeight = Math.min(dist / REMOTE_BLEND_RANGE, 1.0);
-				velocity.x = remoteServerVelX + (corrVx - remoteServerVelX) * errorWeight;
-				velocity.y = remoteServerVelY + (corrVy - remoteServerVelY) * errorWeight;
+				velocity.set(0, 0);
 			}
 		}
 
-		if (!throwing) {
+		if (!throwing && knockbackTimer <= 0) {
 			playMovementAnim();
 		}
 	}
@@ -454,22 +541,53 @@ class Player extends FlxSprite {
 	override public function update(delta:Float) {
 		super.update(delta);
 
+		// drown recovery — hidden phase blocks everything
+		if (drowned) {
+			if (drownTimer > 0) {
+				drownTimer -= delta;
+				// emit smoke at the splash spot
+				fireEmitTimer += delta;
+				if (fireEmitTimer >= 0.05) {
+					fireEmitTimer = 0;
+					for (_ in 0...2) {
+						var smoke = new ButtFire(drownReturnX + width / 2 + FlxG.random.float(-4, 4), drownReturnY + height / 2 + FlxG.random.float(-2, 2), FlxG.random.float(-0.5, 0.5), -1, true);
+						state.add(smoke);
+					}
+				}
+				if (drownTimer <= 0) {
+					// respawn at water entry point
+					setPosition(drownReturnX, drownReturnY);
+					visible = true;
+					frozen = false;
+					fireEmitTimer = 0;
+					drownBlinkTimer = DROWN_BLINK_RATE;
+				}
+				return;
+			}
+			// blink phase — player can move, just toggle visibility
+			drownBlinkTimer -= delta;
+			if (drownBlinkTimer <= 0) {
+				drownBlinkTimer = DROWN_BLINK_RATE;
+				visible = !visible;
+				if (visible) {
+					drownBlinksLeft--;
+				}
+				if (drownBlinksLeft <= 0) {
+					visible = true;
+					drowned = false;
+				}
+			}
+			// fall through to normal update
+		}
+
 		// Run for both local and remote players
 		updateCast(delta);
 		updateFishingLine();
 		updateRock(delta);
 
-		// Hot mode timer and butt fire — run for both local and remote players
+		// Hot mode butt fire — server owns the timer and broadcasts deactivation
 		if (hotModeActive) {
-			hotModeTimer -= delta;
-			if (hotModeTimer <= 0) {
-				hotModeActive = false;
-				#if !local
-				if (!isRemote) {
-					GameManager.ME.net.sendHotPepper(false);
-				}
-				#end
-			} else {
+			{
 				fireEmitTimer += delta;
 				if (fireEmitTimer >= 0.03) {
 					fireEmitTimer = 0;
@@ -512,6 +630,10 @@ class Player extends FlxSprite {
 			fireEmitTimer = 0;
 		}
 
+		// Tick timers (both local and remote)
+		if (knockbackTimer > 0) { knockbackTimer -= delta; }
+		if (inventoryFullCooldown > 0) { inventoryFullCooldown -= delta; }
+
 		if (isRemote) {
 			updateRemoteInterpolation();
 			return;
@@ -525,16 +647,58 @@ class Player extends FlxSprite {
 			swapSkin();
 		}
 
-		if (frozen) {
+		if (FlxG.keys.justPressed.P || FlxG.keys.justPressed.NUMPADTHREE) {
+			GameManager.ME.net.sendHotPepper(!hotModeActive, 99);
+		}
+
+		// Gather input — always, even when frozen (simulation needs continuous seq numbers)
+		#if bot
+		var inputDir:Cardinal = NONE;
+		#else
+		var inputDir = InputCalculator.getInputCardinal(playerNum);
+		#end
+		if (!frozen && (inputDir == N || inputDir == S || inputDir == E || inputDir == W)) {
+			lastInputDir = inputDir;
+		}
+
+		if (simulation != null && playerState != null) {
+			// Server-authoritative mode: send movement input, predict locally
+			var moveDir = inputDir;
+			// Hot mode: force running in last direction even without input
+			if (hotModeActive && moveDir == NONE && lastInputDir != NONE) {
+				moveDir = lastInputDir;
+			}
+			var dirAngle = if (frozen) -1 else cardinalToAngle(moveDir);
+			// Speed is set server-side (GameLogic.fixedTick) based on hot mode + shallow water
+			var inp:PInput.P_Input = {
+				seq: ++inputSeq,
+				dir: dirAngle,
+				buttons: 0,
+				elapsed: delta
+			};
+			GameManager.ME.net.sendInput(inp);
+			if (GameManager.ME.net.isLocal()) {
+				// Local mode: GameLogic is the authority, just read position after it ticks
+				setPosition(playerState.x, playerState.y);
+				lastHitEntityIndices = simulation.hitEntityIndices;
+				// Sync shallow water state from server's PlayerState
+				inShallowWater = playerState.inShallowWater;
+			} else {
+				// Networked mode: predict locally, reconcile from server later
+				pendingInputs.push(inp);
+				var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
+				// Match server speed computation so prediction doesn't fight reconciliation
+				playerState.speed = if (hotModeActive) 150 else if (inShallowWater) 50 else 100;
+				simulation.tickPlayer(playerState, [inp], delta, blockFlags);
+				lastHitEntityIndices = simulation.hitEntityIndices;
+				setPosition(playerState.x, playerState.y);
+			}
+			velocity.set(0, 0);
+		} else if (frozen) {
 			velocity.set();
 		} else {
-			var inputDir = InputCalculator.getInputCardinal(playerNum);
-			if (inputDir == N || inputDir == S || inputDir == E || inputDir == W) {
-				lastInputDir = inputDir;
-			}
-
+			// Local/offline mode: direct velocity (existing behavior)
 			var moveSpeed = inShallowWater ? speed * 0.5 : speed;
-			// Timer already ticked in the shared hot mode block above; just apply the velocity boost
 			if (hotModeActive) {
 				var moveDir = if (inputDir != NONE) inputDir else lastInputDir;
 				if (moveDir != NONE) {
@@ -549,43 +713,208 @@ class Player extends FlxSprite {
 			}
 		}
 
-		// Only update movement animations when fully idle (not casting, catching, or throwing)
-		if (castState == IDLE && !throwing) {
+		// Only update movement animations when fully idle (not casting, catching, throwing, or in knockback)
+		if (castState == IDLE && !throwing && knockbackTimer <= 0) {
 			playMovementAnim();
 		}
 
-		// Throw rock with B button (prefers big rock, falls back to small)
-		if (!throwing && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
-			if (inventory.has(BigRock)) {
-				inventory.remove(BigRock);
-				throwingBigRock = true;
-			} else {
-				inventory.remove(Rock);
-				throwingBigRock = false;
-			}
+		// Fire rocket with C key
+		if (!frozen && !throwing && castState == IDLE && FlxG.keys.justPressed.C && inventory.has(Rocket)) {
+			// Server removes from inventory
+			// Convert facing to direction index: 0=up, 1=right, 2=down, 3=left
+			var dirIdx = switch (lastInputDir) {
+				case N: 0;
+				case E: 1;
+				case S: 2;
+				case W: 3;
+				case NE: 1;
+				case SE: 1;
+				case NW: 3;
+				case SW: 3;
+				default: 2; // default down
+			};
+			GameManager.ME.net.sendMessage("fire_rocket", {dir: dirIdx, knockback: true});
+			// Server applies knockback; camera shake is client-only cosmetic
+			FlxG.camera.shake(0.012, 0.2);
+		}
+
+		// Throw hunger potion with B button (priority over rock, same arc)
+		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(HungerPotion)) {
+			// Server removes from inventory
+			throwingPotion = true;
+			throwingBait = false;
+			throwingBigRock = false;
 			throwing = true;
 			frozen = true;
 			sendAnimUpdate("throw_" + getDirSuffix(), true);
-			// Capture reticle target for the rock
 			var dir = lastInputDir.asVector();
 			var rawX = x + dir.x * 96 + 4;
 			var rawY = y + dir.y * 96 - 8;
 			var bounds = FlxG.worldBounds;
 			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
 			dir.put();
-			GameManager.ME.net.sendMessage("throw_rock", {
+			GameManager.ME.net.sendMessage("throw_potion", {
 				targetX: rockTarget.x,
 				targetY: rockTarget.y,
-				big: throwingBigRock,
 				dir: getDirSuffix()
 			});
 		}
 
-		updateReticle();
+		// Throw fish bait with B button (same arc as rock)
+		if (!frozen && !throwing && castState == IDLE && SimpleController.just_pressed(B) && inventory.has(FishBait)) {
+			// Server removes from inventory
+			throwingBait = true;
+			throwingPotion = false;
+			throwingBigRock = false;
+			throwing = true;
+			frozen = true;
+			sendAnimUpdate("throw_" + getDirSuffix(), true);
+			var dir = lastInputDir.asVector();
+			var rawX = x + dir.x * 96 + 4;
+			var rawY = y + dir.y * 96 - 8;
+			var bounds = FlxG.worldBounds;
+			rockTarget = FlxPoint.get(Math.max(bounds.left, Math.min(bounds.right, rawX)), Math.max(bounds.top, Math.min(bounds.bottom, rawY)));
+			dir.put();
+			GameManager.ME.net.sendMessage("throw_bait", {
+				targetX: rockTarget.x,
+				targetY: rockTarget.y,
+				dir: getDirSuffix()
+			});
+		}
+
+		// Rock throw: two-phase aiming system
+		// Phase 1: Press B to enter aiming mode — player freezes, reticle moves freely
+		if (!frozen && !throwing && !aimingRock && castState == IDLE && SimpleController.just_pressed(B) && (inventory.has(BigRock) || inventory.has(Rock))) {
+			aimingRock = true;
+			frozen = true;
+			// Start reticle at current facing position (96px away)
+			var dir = lastInputDir.asVector();
+			aimReticleX = x + dir.x * 96 + 4;
+			aimReticleY = y + dir.y * 96 - 8;
+			dir.put();
+			if (reticle != null) {
+				reticle.scale.set(3, 3);
+				reticle.color = 0xFFFF0000; // red
+				reticle.setPosition(aimReticleX - reticle.width / 2, aimReticleY - reticle.height / 2);
+			}
+			// Draw blast radius circle
+			var isBig = inventory.has(BigRock);
+			var radius = if (isBig) 160 else 80;
+			var diam = radius * 2;
+			blastRadiusSprite = new FlxSprite();
+			blastRadiusSprite.makeGraphic(diam, diam, 0x00000000);
+			// Draw circle outline
+			var cx = radius;
+			var cy = radius;
+			for (angle in 0...360) {
+				var rad = angle * Math.PI / 180;
+				var px = Std.int(cx + Math.cos(rad) * (radius - 1));
+				var py = Std.int(cy + Math.sin(rad) * (radius - 1));
+				if (px >= 0 && px < diam && py >= 0 && py < diam) {
+					blastRadiusSprite.pixels.setPixel32(px, py, 0x44FF0000);
+				}
+				// thicker line
+				var px2 = Std.int(cx + Math.cos(rad) * (radius - 2));
+				var py2 = Std.int(cy + Math.sin(rad) * (radius - 2));
+				if (px2 >= 0 && px2 < diam && py2 >= 0 && py2 < diam) {
+					blastRadiusSprite.pixels.setPixel32(px2, py2, 0x44FF0000);
+				}
+			}
+			blastRadiusSprite.pixels.lock();
+			blastRadiusSprite.pixels.unlock();
+			blastRadiusSprite.dirty = true;
+			blastRadiusSprite.setPosition(aimReticleX - radius, aimReticleY - radius);
+			state.add(blastRadiusSprite);
+		}
+
+		// Phase 2: While aiming, move reticle with directional input (skip first frame to avoid double-fire)
+		else if (aimingRock && !throwing) {
+			var aimDx:Float = 0;
+			var aimDy:Float = 0;
+			if (SimpleController.pressed(LEFT)) { aimDx -= 1; }
+			if (SimpleController.pressed(RIGHT)) { aimDx += 1; }
+			if (SimpleController.pressed(UP)) { aimDy -= 1; }
+			if (SimpleController.pressed(DOWN)) { aimDy += 1; }
+			// Normalize diagonal
+			if (aimDx != 0 && aimDy != 0) {
+				aimDx *= 0.7071;
+				aimDy *= 0.7071;
+			}
+			aimReticleX += aimDx * AIM_RETICLE_SPEED * delta;
+			aimReticleY += aimDy * AIM_RETICLE_SPEED * delta;
+			// Clamp to world bounds
+			var bounds = FlxG.worldBounds;
+			aimReticleX = Math.max(bounds.left, Math.min(bounds.right, aimReticleX));
+			aimReticleY = Math.max(bounds.top, Math.min(bounds.bottom, aimReticleY));
+			// Position reticle and blast radius at aim point
+			if (reticle != null) {
+				reticle.setPosition(aimReticleX - reticle.width / 2, aimReticleY - reticle.height / 2);
+			}
+			if (blastRadiusSprite != null) {
+				blastRadiusSprite.setPosition(aimReticleX - blastRadiusSprite.width / 2, aimReticleY - blastRadiusSprite.height / 2);
+			}
+
+			// Press B again to throw
+			if (SimpleController.just_pressed(B)) {
+				if (inventory.has(BigRock)) {
+					// Server removes from inventory
+					throwingBigRock = true;
+				} else {
+					// Server removes from inventory
+					throwingBigRock = false;
+				}
+				throwingPotion = false;
+				throwingBait = false;
+				throwing = true;
+				aimingRock = false;
+				// Face toward the target
+				var tdx = aimReticleX - x;
+				var tdy = aimReticleY - y;
+				if (Math.abs(tdx) > Math.abs(tdy)) {
+					lastInputDir = if (tdx > 0) Cardinal.E else Cardinal.W;
+				} else {
+					lastInputDir = if (tdy > 0) Cardinal.S else Cardinal.N;
+				}
+				sendAnimUpdate("throw_" + getDirSuffix(), true);
+				rockTarget = FlxPoint.get(aimReticleX, aimReticleY);
+				GameManager.ME.net.sendMessage("throw_rock", {
+					targetX: rockTarget.x,
+					targetY: rockTarget.y,
+					big: throwingBigRock,
+					dir: getDirSuffix()
+				});
+				if (reticle != null) {
+					reticle.scale.set(1, 1);
+					reticle.color = 0xFFFFFFFF; // reset to white
+				}
+				if (blastRadiusSprite != null) {
+					state.remove(blastRadiusSprite);
+					blastRadiusSprite.destroy();
+					blastRadiusSprite = null;
+				}
+			}
+
+			// Press A to cancel aiming
+			if (SimpleController.just_pressed(A)) {
+				aimingRock = false;
+				frozen = false;
+				if (reticle != null) {
+					reticle.scale.set(1, 1);
+					reticle.color = 0xFFFFFFFF;
+				}
+				if (blastRadiusSprite != null) {
+					state.remove(blastRadiusSprite);
+					blastRadiusSprite.destroy();
+					blastRadiusSprite = null;
+				}
+			}
+		}
+
+		if (!aimingRock) {
+			updateReticle();
+		}
 
 		clampToWorldBounds();
-
-		GameManager.ME.net.sendMove(x, y, velocity.x, velocity.y);
 	}
 
 	function clampToWorldBounds() {
@@ -742,7 +1071,15 @@ class Player extends FlxSprite {
 	function launchRock() {
 		TODO.sfx("rock_throw");
 		var rockWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
-		rockSprite = if (makeRock != null) makeRock(x + 4, y - 8 + rockWy, throwingBigRock) else new Rock(x + 4, y - 8 + rockWy, throwingBigRock);
+		rockSprite = if (throwingBait && makeBait != null) {
+			makeBait(x + 4, y - 8 + rockWy);
+		} else if (throwingPotion && makePotion != null) {
+			makePotion(x + 4, y - 8 + rockWy);
+		} else if (makeRock != null) {
+			makeRock(x + 4, y - 8 + rockWy, throwingBigRock);
+		} else {
+			new Rock(x + 4, y - 8 + rockWy, throwingBigRock);
+		};
 		rockStartPos = FlxPoint.get(rockSprite.x, rockSprite.y);
 		var dx = rockTarget.x - rockStartPos.x;
 		var dy = rockTarget.y - rockStartPos.y;
@@ -814,7 +1151,7 @@ class Player extends FlxSprite {
 		var dist = Math.sqrt(dx * dx + dy * dy);
 		castFlightTime = if (dist > 0) dist / 150 else 0.01;
 		castElapsed = 0;
-		state.add(castBobber);
+		if (groundEffectsGroup != null) { groundEffectsGroup.add(castBobber); } else { state.add(castBobber); }
 	}
 
 	function launchBobber() {
@@ -824,7 +1161,8 @@ class Player extends FlxSprite {
 		var targetY = y + reticleDir.y * castDist - 8;
 		reticleDir.put();
 		castTarget = FlxPoint.get(targetX, targetY);
-		GameManager.ME.net.sendMessage("cast_line", {x: castTarget.x, y: castTarget.y, dir: getDirSuffix()});
+		// tell server the cast details — server validates and broadcasts to other clients
+		GameManager.ME.net.sendMessage("cast_release", {power: castPower, dir: getDirSuffix(), targetX: castTarget.x, targetY: castTarget.y});
 		FmodManager.PlaySoundOneShot(FmodSFX.FishingRodCast);
 		spawnBobberArc();
 	}
@@ -857,10 +1195,27 @@ class Player extends FlxSprite {
 		sendAnimUpdate("cast_" + castDirSuffix, true);
 	}
 
+	public function remoteStartCharge(dir:String) {
+		castDirSuffix = dir;
+		lastInputDir = switch (dir) {
+			case "up": N;
+			case "down": S;
+			case "left": W;
+			case "right": E;
+			default: S;
+		};
+		castState = CHARGING;
+		frozen = true;
+		sendAnimUpdate("cast_" + castDirSuffix, false);
+		if (animation.curAnim != null) {
+			animation.curAnim.pause();
+		}
+	}
+
 	public function remoteStartCast(targetX:Float, targetY:Float, dir:String) {
 		// Clean up any bobber still retracting from a previous catch
 		if (castBobber != null) {
-			state.remove(castBobber);
+			if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 			castBobber.destroy();
 			castBobber = null;
 		}
@@ -884,10 +1239,10 @@ class Player extends FlxSprite {
 			switch (castState) {
 				// --- START: Local player handling
 				case IDLE:
-					if (SimpleController.just_pressed(A)) {
+					if (frozen) { /* skip input while frozen (e.g. typing) */ }
+					else if (SimpleController.just_pressed(A)) {
 						castState = CHARGING;
 						frozen = true;
-						// FmodManager.PlaySoundAndAssignId(FmodSFX.FishingRodCharge2, fishingRodChargeSound);
 						castDirSuffix = getDirSuffix();
 						sendAnimUpdate("cast_" + castDirSuffix, false);
 						if (animation.curAnim != null) {
@@ -896,11 +1251,13 @@ class Player extends FlxSprite {
 						castPower = 0;
 						castPowerDir = 1;
 						var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
-						powerBarBg.setPosition(x - 8, y + 20 + barWy);
-						powerBarFill.setPosition(x - 8, y + 20 + barWy);
+						powerBarBg.setPosition(x - 8, y + 8 + barWy);
+						powerBarFill.setPosition(x - 8, y + 8 + barWy);
 						powerBarBg.visible = true;
 						powerBarFill.visible = true;
 						powerBarFill.scale.x = 0;
+						// tell server we started charging
+						GameManager.ME.net.sendMessage("cast_start", {dir: castDirSuffix});
 					}
 				case CHARGING:
 					castPower += castPowerDir * elapsed * 2.0;
@@ -911,14 +1268,12 @@ class Player extends FlxSprite {
 						castPower = 0;
 						castPowerDir = 1;
 					}
-					// FmodManager.SetEventParameterOnSound(fishingRodChargeSound, "PitchShift", castPower);
 					powerBarFill.scale.x = castPower;
 					var barWy = inShallowWater ? SHALLOW_WATER_OFFSET : 0.0;
 					powerBarBg.setPosition(x - 8, y + 8 + barWy);
 					powerBarFill.setPosition(x - 8, y + 8 + barWy);
 
 					if (SimpleController.just_released(A)) {
-						// FmodManager.StopSoundImmediately(fishingRodChargeSound);
 						powerBarBg.visible = false;
 						powerBarFill.visible = false;
 
@@ -926,6 +1281,7 @@ class Player extends FlxSprite {
 							castState = IDLE;
 							frozen = false;
 							playMovementAnim(true);
+							GameManager.ME.net.sendMessage("cast_cancel", {});
 						} else {
 							startCast();
 						}
@@ -935,7 +1291,9 @@ class Player extends FlxSprite {
 						catchFish();
 					}
 				case LANDED:
-					if (SimpleController.just_pressed(A) || velocity.x != 0 || velocity.y != 0) {
+					if (SimpleController.just_pressed(A)
+						|| SimpleController.pressed(UP) || SimpleController.pressed(DOWN)
+						|| SimpleController.pressed(LEFT) || SimpleController.pressed(RIGHT)) {
 						catchFish();
 					}
 				default:
@@ -954,11 +1312,20 @@ class Player extends FlxSprite {
 						castStartPos = null;
 					}
 					castState = LANDED;
-					frozen = false;
+					frozen = true;
 					playMovementAnim(true);
 					TODO.sfx("bobber_land");
-					if (onBobberLanded != null)
-						onBobberLanded(castTarget.x + 4, castTarget.y + 4);
+					if (onBobberLanded != null) {
+						var mid = castBobber.getMidpoint();
+						onBobberLanded(mid.x, mid.y);
+						mid.put();
+					}
+					// Tell server where the bobber landed so fish AI can detect it
+					if (!isRemote) {
+						var mid = castBobber.getMidpoint();
+						GameManager.ME.net.sendMessage("bobber_landed", {x: mid.x, y: mid.y});
+						mid.put();
+					}
 				}
 			case CAST_ANIM:
 				// TODO: We can
@@ -971,7 +1338,7 @@ class Player extends FlxSprite {
 				if (castBobber != null) {
 					if (retractHasFish && castTarget != null) {
 						if (updateCastArc(elapsed)) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 							if (onFishDelivered != null)
@@ -986,7 +1353,7 @@ class Player extends FlxSprite {
 						var dy = py - castBobber.y;
 						var dist = Math.sqrt(dx * dx + dy * dy);
 						if (dist < 4) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 						}
@@ -996,7 +1363,7 @@ class Player extends FlxSprite {
 				if (castBobber != null) {
 					if (retractHasFish && castTarget != null) {
 						if (updateCastArc(elapsed)) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 							castState = IDLE;
@@ -1014,7 +1381,7 @@ class Player extends FlxSprite {
 						var dy = py - castBobber.y;
 						var dist = Math.sqrt(dx * dx + dy * dy);
 						if (dist < 4) {
-							state.remove(castBobber);
+							if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
 							castBobber.destroy();
 							castBobber = null;
 							castState = IDLE;
@@ -1031,14 +1398,27 @@ class Player extends FlxSprite {
 		}
 	}
 
+	public function clearPendingInputs() {
+		pendingInputs = [];
+	}
+
+	public function isCasting():Bool {
+		return castState != IDLE;
+	}
+
 	public function isBobberLanded():Bool {
 		return castState == LANDED && castBobber != null;
 	}
 
 	public function catchFish(hasFish:Bool = false, catcherId:String = null, fishId:String = null, fishType:Int = 0) {
 		if (castState == LANDED || castState == CASTING) {
-			if (!isRemote && !hasFish) {
-				GameManager.ME.net.sendLinePulled();
+			if (!isRemote) {
+				if (!hasFish) {
+					GameManager.ME.net.sendLinePulled();
+				}
+				// Tell server to unfreeze player and clear bobber position
+				GameManager.ME.net.sendMessage("cast_retract", {});
+				GameManager.ME.net.sendMessage("bobber_retracted", {});
 			}
 			if (hasFish) {
 				TODO.sfx("fish_caught");
@@ -1120,21 +1500,57 @@ class Player extends FlxSprite {
 		}
 	}
 
-	public function activateHotMode() {
+	public function activateHotMode(duration:Float = 3.0) {
 		if (!hotModeActive) {
 			hotModeActive = true;
-			hotModeTimer = 3.0;
 			TODO.sfx("hot_mode_activate");
-			#if !local
-			if (!isRemote) {
-				GameManager.ME.net.sendHotPepper(true);
-			}
-			#end
 		}
 	}
 
 	public function deactivateHotMode() {
 		hotModeActive = false;
+	}
+
+	public function drown(?drownX:Float, ?drownY:Float) {
+		if (drowned) {
+			return;
+		}
+		drowned = true;
+		drownReturnX = drownX != null ? drownX : x;
+		drownReturnY = drownY != null ? drownY : y;
+		deactivateHotMode();
+		frozen = true;
+		visible = false;
+		velocity.set();
+		drownTimer = DROWN_HIDE_DURATION;
+		drownBlinksLeft = DROWN_BLINK_COUNT;
+		drownBlinkTimer = 0;
+		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
+	}
+
+	public function showInventoryFull(?itemSprite:FlxSprite) {
+		if (inventoryFullCooldown > 0) { return; }
+		inventoryFullCooldown = 0.5;
+		TODO.sfx("inventory_full");
+		var label = new FloatingLabel(x + width / 2, y - 20, "Full!", flixel.util.FlxColor.RED);
+		state.add(label);
+		if (itemSprite != null) {
+			var origX = itemSprite.x;
+			var capturedSprite = itemSprite;
+			var shakeAmount = 3.0;
+			var shakeDuration = 0.3;
+			var shakeTime:Float = 0;
+			new flixel.util.FlxTimer().start(0.02, (_) -> {
+				if (capturedSprite == null || !capturedSprite.alive) { return; }
+				shakeTime += 0.02;
+				if (shakeTime >= shakeDuration) {
+					capturedSprite.x = origX;
+					return;
+				}
+				capturedSprite.x = origX + (Math.random() * 2 - 1) * shakeAmount;
+			}, Std.int(shakeDuration / 0.02) + 1);
+		}
+		if (onInventoryFull != null) { onInventoryFull(); }
 	}
 
 	public function pickupItem(item:InventoryItem):Bool {
@@ -1147,8 +1563,8 @@ class Player extends FlxSprite {
 
 	function getDirSuffix():String {
 		return switch (lastInputDir) {
-			case N: "up";
-			case S: "down";
+			case N, NE, NW: "up";
+			case S, SE, SW: "down";
 			case W: "left";
 			case E: "right";
 			default: "down";
@@ -1180,6 +1596,58 @@ class Player extends FlxSprite {
 		super.destroy();
 	}
 
+	public function cancelAllActions() {
+		// Cancel casting and clean up bobber
+		if (castBobber != null) {
+			if (groundEffectsGroup != null) { groundEffectsGroup.remove(castBobber); } else { state.remove(castBobber); }
+			castBobber.destroy();
+			castBobber = null;
+		}
+		if (castTarget != null) {
+			castTarget.put();
+			castTarget = null;
+		}
+		if (castStartPos != null) {
+			castStartPos.put();
+			castStartPos = null;
+		}
+		castState = IDLE;
+		powerBarBg.visible = false;
+		powerBarFill.visible = false;
+
+		// Cancel throwing
+		throwing = false;
+		if (rockTarget != null) {
+			rockTarget.put();
+			rockTarget = null;
+		}
+
+		frozen = false;
+		velocity.set(0, 0);
+	}
+
+	public function reconcileFromServer(serverState:schema.PlayerState) {
+		var ack = serverState.lastProcessedSeq;
+		// drop all inputs the server has already processed
+		while (pendingInputs.length > 0 && pendingInputs[0].seq <= ack) {
+			pendingInputs.shift();
+		}
+		// snap to server-authoritative position and replay unacked inputs
+		playerState.x = serverState.x;
+		playerState.y = serverState.y;
+		playerState.velocityX = serverState.velocityX;
+		playerState.velocityY = serverState.velocityY;
+		if (simulation != null) {
+			var blockFlags = if (hotModeActive || inventory.hasWaders()) CollisionMap.FLAG_SOLID else 0;
+			// Use server's speed so replay matches server computation
+			playerState.speed = serverState.speed;
+			for (inp in pendingInputs) {
+				simulation.tickPlayer(playerState, [inp], inp.elapsed, blockFlags);
+			}
+		}
+		setPosition(playerState.x, playerState.y);
+	}
+
 	private function cleanupNetwork() {
 		GameManager.ME.net.onPlayerChanged.remove(handleChange);
 	}
@@ -1204,18 +1672,21 @@ class FloatingLabel extends flixel.text.FlxText {
 		super(0, 0, 0, text, 8);
 		color = textColor;
 		setPosition(cx - width / 2, cy);
-		velocity.y = -20;
 		allowCollisions = NONE;
 	}
 
+	var startY:Float;
+
 	override public function update(dt:Float) {
 		super.update(dt);
+		if (elapsed == 0) { startY = y; }
 		elapsed += dt;
 		var t = elapsed / DURATION;
 		if (t >= 1) {
 			kill();
 			return;
 		}
+		y = startY - t * 30; // float upward 30px over duration
 		alpha = 1 - t;
 	}
 }

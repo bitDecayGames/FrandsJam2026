@@ -30,8 +30,13 @@
 
 	<set name="BUILD_DIR" value="export" />
 	<classpath name="source" />
+	<classpath name="shared" />
 	<classpath name="tools" />
 	<assets path="assets" />
+
+	<!-- Suppress deprecation warnings from third-party libraries -->
+	<haxeflag name="-w" value="-WDeprecated" />
+	<haxeflag name="-w" value="-WDeprecatedEnumAbstract" />
 
 	<!-- _______________________________ Libraries _______________________________ -->
 

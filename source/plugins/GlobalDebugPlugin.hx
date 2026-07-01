@@ -13,7 +13,7 @@ class GlobalDebugPlugin extends FlxBasic {
 	override function update(elapsed:Float) {
 		super.update(elapsed);
 
-		if (FlxG.keys.justPressed.P) {
+		if (FlxG.keys.justPressed.O) {
 			FlxG.state.openSubState(new DemoSelectorState());
 		}
 

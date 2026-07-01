@@ -53,11 +53,12 @@ class WadersPickup extends FlxSprite {
 
 	function handleOverlap(player:Player, waders:WadersPickup) {
 		if (!player.inventory.isFull()) {
-			player.pickupItem(Waders);
 			kill();
 			if (onPickup != null) {
 				onPickup();
 			}
+		} else {
+			player.showInventoryFull(waders);
 		}
 	}
 

@@ -1,0 +1,177 @@
+package net;
+
+import schema.FishState;
+import schema.PlayerState;
+import schema.RoundState;
+
+/**
+ * In-process game server for single-player / local mode.
+ * Runs the same GameLogic as the Colyseus server, but with direct
+ * function calls instead of websocket messages.
+**/
+class LocalRoom {
+	var logic:GameLogic;
+	var net:NetworkManager;
+	var sessionId:String;
+
+	public function new(net:NetworkManager) {
+		this.net = net;
+		sessionId = "local_player";
+
+		logic = new GameLogic();
+
+		// Wire broadcast/send — dispatch directly to NetworkManager signals
+		logic.broadcast = (topic, data) -> dispatchMessage(topic, data);
+		logic.sendToClient = (_, topic, data) -> dispatchMessage(topic, data);
+
+		// Wire schema-like callbacks for fish/bush additions
+		logic.onFishAdded = (id, fish) -> net.onFishAdded.dispatch(id, fish);
+		logic.onFishRemoved = (id) -> {};
+		logic.onBushAdded = (id, x, y) -> net.onBushAdded.dispatch(x, y);
+		logic.onBushRemoved = (id) -> {};
+		logic.onPlayerAdded = (id, ps) -> {};
+		logic.onPlayerRemoved = (id) -> {};
+		logic.onRoundChanged = (round) -> net.onRoundUpdate.dispatch(round);
+
+		// Build collision map from level data (client-side asset loading)
+		var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
+		var ldtkProject = new levels.ldtk.Ldtk();
+		var raw = ldtkProject.all_worlds.Default.all_levels.Level_0;
+		var col = CollisionMap.fromLevel(raw, hitboxJson);
+		logic.init(col, raw);
+
+		// Simulate join
+		logic.addPlayer(sessionId);
+
+		// Tell NetworkManager we've "connected"
+		net.mySessionId = sessionId;
+		net.onJoined.dispatch(sessionId);
+	}
+
+	/** Called each frame */
+	public function update(elapsed:Float) {
+		logic.update(elapsed * 1000);
+	}
+
+	/** Route a client message through GameLogic */
+	public function sendMessage(topic:String, data:Dynamic) {
+		logic.handleMessage(sessionId, topic, data);
+	}
+
+	public function getSimulation():Simulation {
+		return logic.simulation;
+	}
+
+	public function getCollision():CollisionMap {
+		return logic.collision;
+	}
+
+	public function getPlayerState():PlayerState {
+		return logic.players.get(sessionId);
+	}
+
+	/** Dispatch a "server" message to the local client's NetworkManager signals */
+	function dispatchMessage(topic:String, data:Dynamic) {
+		switch (topic) {
+			case "cast_start":
+				// single player — no remote players to notify
+			case "cast_line":
+				// single player — no remote players to notify
+			case "fish_caught":
+				net.onFishCaught.dispatch(data.sessionId, data.fishId, data.fishType);
+			case "line_pulled":
+				// single player — no remote players to notify
+			case "rock_splash":
+				// handled locally
+			case "throw_rock":
+				// single player — no remote players to notify
+			case "fish_sold":
+				// single player — no remote players to notify
+			case "weed_burst":
+				net.onWeedBurst.dispatch(data.sessionId, Std.int(data.index));
+			case "world_items":
+				net.onWorldItems.dispatch(data);
+			case "item_pickup":
+				net.onItemPickup.dispatch(data.sessionId, data.itemType, Std.int(data.index));
+			case "bush_ignite":
+				// single player — handled locally
+			case "weed_ignite":
+				// single player — handled locally
+			case "worm_killed":
+				// single player — handled locally
+			case "player_drown":
+				net.onPlayerDrown.dispatch(data.sessionId, data.x, data.y);
+			case "hot_pepper":
+				net.onHotPepper.dispatch(data.sessionId, data.isStart);
+			case "spawn_locations":
+				net.onSpawnLocations.dispatch(data);
+			case "timer_sync":
+				net.onTimerSync.dispatch(data.runTimeSec, data.totalSec);
+			case "round_time_up":
+				net.onRoundTimeUp.dispatch();
+			case "ground_fish_spawn":
+				net.onGroundFishSpawn.dispatch(data);
+			case "ground_fish_pickup":
+				net.onGroundFishPickup.dispatch(data.x, data.y, data.sessionId);
+			case "cloud_sync":
+				entities.CloudShadow.windAngle = data.angle;
+				net.onCloudSync.dispatch(data);
+			case "seagull_spawn":
+				net.onSeagullSpawn.dispatch(data);
+			case "seagull_poop":
+				net.onSeagullPoop.dispatch(data);
+			case "seagull_despawn":
+				net.onSeagullDespawn.dispatch(data);
+			case "worm_spawn":
+				net.onWormSpawn.dispatch(data);
+			case "dog_spawn":
+				net.onDogSpawn.dispatch(data);
+			case "dog_update":
+				net.onDogUpdate.dispatch(data);
+			case "dog_caught":
+				net.onDogCaught.dispatch(data);
+			case "dog_despawn":
+				net.onDogDespawn.dispatch(data);
+			case "dog_item_landed":
+				net.onDogItemLanded.dispatch(data);
+			case "dog_ate_fish":
+				net.onDogAteFish.dispatch(data);
+			case "skin_assigned":
+				net.onSkinAssigned.dispatch(Std.int(data.skinIndex));
+			case "dog_steal_fish":
+				// deprecated — handled by dog_ate_fish now
+			case "pepper_extinguish":
+				net.onPepperExtinguish.dispatch(data);
+			case "inventory_update":
+				net.onInventoryUpdate.dispatch(data);
+			case "players_ready":
+				net.onPlayersReady.dispatch();
+			case "powerup_spawn":
+				net.onPowerUpSpawn.dispatch(data);
+			case "powerup_pickup":
+				net.onPowerUpPickup.dispatch(data);
+			case "rocket_fired":
+				net.onRocketFired.dispatch(data);
+			case "rocket_update":
+				net.onRocketUpdate.dispatch(data);
+			case "rocket_hit":
+				net.onRocketHit.dispatch(data);
+			case "rocket_despawn":
+				net.onRocketDespawn.dispatch(data);
+			case "throw_potion":
+				net.onThrowPotion.dispatch(data);
+			case "hunger_active":
+				net.onHungerActive.dispatch(data);
+			case "hunger_expired":
+				net.onHungerExpired.dispatch(data);
+			case "player_knockback":
+				net.onPlayerKnockback.dispatch(data);
+			case "throw_bait":
+				net.onThrowBait.dispatch(data);
+			case "bait_active":
+				net.onBaitActive.dispatch(data);
+			case "bait_expired":
+				net.onBaitExpired.dispatch(data);
+		}
+	}
+}

@@ -1,4 +1,5 @@
 import schema.GameState;
+import PInput.P_Input;
 import schema.BushState;
 import schema.FishState;
 import schema.PlayerState;
@@ -9,331 +10,161 @@ import colyseus.server.Room.RoomOf;
 import colyseus.server.Room.CloseCode;
 import haxe.extern.EitherType;
 import js.lib.Promise;
+import Ldtk.LdtkProject;
 
+/**
+ * Thin Colyseus wrapper around GameLogic.
+ * All game simulation lives in shared/GameLogic.hx — this class only
+ * handles Colyseus-specific I/O (schema sync, client messaging, room lifecycle).
+**/
 class GameRoom extends RoomOf<GameState, Dynamic> {
+	var logic:GameLogic;
+	var elapsedTime:Float;
+	var ldtkRaw:Dynamic;
+
+	// Two collision maps — lobby and game level
+	var lobbyCollision:CollisionMap;
+	var gameCollision:CollisionMap;
+
 	override public function onCreate(options:Dynamic):Void {
+		elapsedTime = 0;
 		maxClients = 6;
 		setState(new GameState());
 
+		// Build collision maps for both levels
+		var hitboxJson = sys.io.File.getContent("../assets/data/tile-hitboxes.json");
+		var ldtkProject = new LdtkProject();
+
+		var lobbyRaw = ldtkProject.getLevel("Lobby");
+		lobbyCollision = CollisionMap.fromLevel(lobbyRaw, hitboxJson);
+
+		var raw = ldtkProject.getLevel("Level_0");
+		ldtkRaw = raw;
+		gameCollision = CollisionMap.fromLevel(raw, hitboxJson);
+		state.collision = gameCollision;
+
+		// Create single GameLogic instance — starts with lobby collision
+		logic = new GameLogic();
+		logic.init(lobbyCollision, raw);
+
+		// Wire callbacks
+		logic.broadcast = (topic:String, data:Dynamic) -> {
+			this.broadcast(topic, data);
+		};
+		logic.sendToClient = (clientId:String, topic:String, data:Dynamic) -> {
+			var c = clients.getById(clientId);
+			if (c != null) { c.send(topic, data); }
+		};
+		logic.onPlayerAdded = (id:String, ps:PlayerState) -> {
+			state.players.set(id, ps);
+		};
+		logic.onPlayerRemoved = (id:String) -> {
+			state.players.delete(id);
+		};
+		logic.onFishAdded = (id:String, fish:FishState) -> {
+			state.fish.set(id, fish);
+		};
+		logic.onFishRemoved = (id:String) -> {
+			state.fish.delete(id);
+		};
+		logic.onBushAdded = (id:String, x:Float, y:Float) -> {
+			state.bushes.set(id, new BushState(x, y));
+		};
+		logic.onBushRemoved = (id:String) -> {
+			state.bushes.delete(id);
+		};
+		logic.onRoundChanged = (round:RoundState) -> {
+			state.round = round;
+		};
+
+		// Start fixed-tick simulation loop
+		this.setSimulationInterval(this.serverUpdate);
+
 		trace('start room: ${roomId}:${roomName}');
 
-		// sent when a player moves
-		onMessage("move", (client:Client, data:{
-			x:Float,
-			y:Float,
-			velocityX:Float,
-			velocityY:Float
-		}) -> {
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.x = data.x;
-				player.y = data.y;
-				player.velocityX = data.velocityX;
-				player.velocityY = data.velocityY;
+		// --- Route ALL messages through GameLogic ---
+		var handledMessages = [
+			"player_input", "cast_start", "cast_release",
+			"cast_retract", "cast_cancel", "ground_fish_drop", "ground_fish_pickup",
+			"player_name_changed", "bobber_landed", "bobber_retracted",
+			"throw_rock", "rock_splash", "skin_changed", "score_update",
+			"item_pickup", "weed_burst", "player_drown", "bush_ignite",
+			"bush_dead", "weed_ignite", "worm_killed", "hot_pepper",
+			"debug_end_round", "debug_spawn_dog", "fish_sold", "cast_line",
+			"line_pulled", "round_update", "player_ready", "set_position",
+			"dog_item_drop", "dog_no_fish", "fire_rocket",
+			"throw_potion", "potion_landed", "throw_bait", "bait_landed",
+			"ground_item_pickup", "debug_inventory"
+		];
+		for (topic in handledMessages) {
+			var capturedTopic = topic;
+			onMessage(capturedTopic, (client:Client, data:Dynamic) -> {
+				logic.handleMessage(client.sessionId, capturedTopic, data);
+			});
+		}
+
+		// Special: start_gameplay switches collision to game level
+		onMessage("start_gameplay", (client:Client, data:Dynamic) -> {
+			if (!logic.gameplayStarted) {
+				// Switch to game-level collision map
+				logic.collision = gameCollision;
+				logic.simulation = new Simulation(gameCollision);
 			}
+			logic.handleMessage(client.sessionId, "start_gameplay", data);
 		});
 
-		onMessage("player_name_changed", (client:Client, data:{
-			name:String,
-		}) -> {
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.name = data.name;
-			}
-		});
-
-		// sent when a client spawns a fish
-		onMessage("fish_spawn", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_spawn" message: ${Json.stringify(data)}');
-			state.fish.set(data.id, new FishState(data.x, data.y, data.fishType != null ? Std.int(data.fishType) : 0));
-		});
-
-		// sent when a player throws a rock
-		onMessage("throw_rock", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "throw_rock": targetX=${data.targetX} targetY=${data.targetY} big=${data.big} dir=${data.dir}');
-			broadcast("throw_rock", {
-				sessionId: client.sessionId,
-				targetX: data.targetX,
-				targetY: data.targetY,
-				big: data.big,
-				dir: data.dir
-			}, {except: client});
-		});
-
-		// sent when a rock lands in water
-		onMessage("rock_splash", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "rock_splash": x=${data.x} y=${data.y} big=${data.big}');
-			broadcast("rock_splash", {x: data.x, y: data.y, big: data.big}, {except: client});
-		});
-
-		// sent when a fish moves
-		onMessage("fish_move", (client:Client, data:Dynamic) -> {
-			var fish:FishState = state.fish.get(data.id);
-			if (fish != null) {
-				fish.x = data.x;
-				fish.y = data.y;
-			}
-		});
-
-		// sent by the host when a scared fish finishes fading and despawns
-		onMessage("fish_despawn", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_despawn": id=${data.id} respawnTime=${data.respawnTime}');
-			broadcast("fish_despawn", {id: data.id, respawnTime: data.respawnTime}, {except: client});
-		});
-
-		// sent when a player changes their skin selection in the lobby
-		onMessage("skin_changed", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "skin_changed" message: skinIndex=${data.skinIndex}');
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.skinIndex = data.skinIndex;
-			}
-		});
-
-		// sent when a player's score changes
-		onMessage("score_update", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "score_update" message: score=${data.score}');
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.score = data.score;
-			}
-		});
-
-		// sent by the host to broadcast all world item positions
-		onMessage("world_items", (client:Client, data:Dynamic) -> {
-			if (client.sessionId != state.hostSessionId) {
-				return;
-			}
-			trace('${client.sessionId}: sent "world_items"');
-			broadcast("world_items", data, {except: client});
-		});
-
-		// sent when a player picks up a world item (rock, waders, pepper)
-		onMessage("item_pickup", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "item_pickup": itemType=${data.itemType} index=${data.index}');
-			broadcast("item_pickup", {sessionId: client.sessionId, itemType: data.itemType, index: data.index}, {except: client});
-		});
-
-		// sent when a player bursts a weed
-		onMessage("weed_burst", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "weed_burst": index=${data.index}');
-			broadcast("weed_burst", {sessionId: client.sessionId, index: data.index}, {except: client});
-		});
-
-		// sent when a player walks into a bush
-		onMessage("bush_rustle", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "bush_rustle": index=${data.index}');
-			broadcast("bush_rustle", {index: data.index, dirX: data.dirX, dirY: data.dirY}, {except: client});
-		});
-
-		// sent when a player kills a worm
-		onMessage("worm_killed", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "worm_killed"');
-			broadcast("worm_killed", {sessionId: client.sessionId}, {except: client});
-		});
-
-		// sent when a player activates or deactivates hot pepper mode
-		onMessage("hot_pepper", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "hot_pepper": isStart=${data.isStart}');
-			broadcast("hot_pepper", {sessionId: client.sessionId, isStart: data.isStart}, {except: client});
-		});
-
-		// host periodically broadcasts the timer state so non-host clients can sync
-		onMessage("timer_sync", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "timer_sync": runTimeSec=${data.runTimeSec} totalSec=${data.totalSec}');
-			broadcast("timer_sync", {runTimeSec: data.runTimeSec, totalSec: data.totalSec}, {except: client});
-		});
-
-		// sent when a player sells a fish — broadcast to other clients so they can track it
-		onMessage("fish_sold", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_sold" message: fishType=${data.fishType} lengthCm=${data.lengthCm} value=${data.value}');
-			broadcast("fish_sold", {
-				sessionId: client.sessionId,
-				fishType: data.fishType,
-				lengthCm: data.lengthCm,
-				value: data.value,
-			}, {except: client});
-		});
-
-		// sent when a player casts their line
-		onMessage("cast_line", (client, data) -> {
-			trace('${client.sessionId}: sent "cast_line" message: ${Json.stringify(data)}');
-			broadcast("cast_line", {
-				sessionId: client.sessionId,
-				x: data.x,
-				y: data.y,
-				dir: data.dir
-			}, {except: client});
-		});
-
-		// sent when a player catches a fish; catcherSessionId may differ from client.sessionId
-		// because the host reports catches on behalf of any player whose bobber a fish swam into
-		onMessage("fish_caught", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "fish_caught": fishId=${data.fishId} catcher=${data.catcherSessionId} fishType=${data.fishType}');
-			broadcast("fish_caught", {sessionId: data.catcherSessionId, fishId: data.fishId, fishType: data.fishType});
-		});
-
-		// sent when a player pulls in their line
-		onMessage("line_pulled", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "line_pulled" message');
-			broadcast("line_pulled", {sessionId: client.sessionId});
-		});
-
-		// sent by the host to assign random spawn positions for all players
-		onMessage("spawn_locations", (client:Client, data:Dynamic) -> {
-			if (client.sessionId != state.hostSessionId) {
-				return;
-			}
-			trace('${client.sessionId}: sent "spawn_locations"');
-			broadcast("spawn_locations", data, {except: client});
-		});
-
-		// sent by the host to establish shared world layout (bushes + shop)
-		onMessage("world_setup", (client:Client, data:Dynamic) -> {
-			if (client.sessionId != state.hostSessionId) {
-				return;
-			}
-			var bushArray:Array<Dynamic> = data.bushes;
-			for (i => bush in bushArray) {
-				state.bushes.set(Std.string(i), new BushState(bush.x, bush.y));
-			}
-			state.shopX = data.shopX;
-			state.shopY = data.shopY;
-			state.shopReady = true;
-		});
-
-		onMessage("round_update", (client:Client, data:Dynamic) -> {
-			trace('${client.sessionId}: sent "round_update" message: ${Json.stringify(data)}');
-			if (data != null) {
-				var newData = new RoundState();
-				newData.status = state.round.status;
-				newData.currentRound = state.round.currentRound;
-				newData.totalRounds = state.round.totalRounds;
-
-				if (data.status != null) {
-					trace('update round status: ${state.round.status} -> ${data.status}');
-					newData.status = data.status;
-
-					for (sId => pp in state.players) {
-						pp.ready = false;
-					}
-				}
-				if (data.currentRound != null) {
-					newData.currentRound = data.currentRound;
-				}
-				if (data.totalRounds != null) {
-					newData.totalRounds = data.totalRounds;
-				}
-				state.round = newData;
-			}
-		});
-
+		// Kick handling (needs Colyseus client reference)
 		onMessage("kick", (client:Client, data:{targetSessionId:String}) -> {
 			trace('${client.sessionId}: wants to kick ${data.targetSessionId}');
 			var target = clients.getById(data.targetSessionId);
-			if (target == null) {
+			if (target == null) { return; }
+			state.players.delete(data.targetSessionId);
+			logic.removePlayer(data.targetSessionId);
+			if (state.players.size <= 0) {
+				disconnect();
 				return;
 			}
-
-			// Remove the player from state immediately so other clients see it right away.
-			// onLeave will also fire after the WebSocket closes but will safely no-op.
-			state.players.delete(data.targetSessionId);
-
-			// Rotate host if the kicked player was the host
-			if (data.targetSessionId == state.hostSessionId) {
-				var remaining = [];
-				for (sId => _ in state.players) {
-					remaining.push(sId);
-				}
-				if (remaining.length > 0) {
-					state.hostSessionId = remaining[Std.random(remaining.length)];
-					trace('host changed ${data.targetSessionId} -> ${state.hostSessionId}');
-				} else {
-					disconnect();
-					return;
-				}
-			}
-
-			// Tell all remaining clients explicitly so they can update their player lists
-			// without relying on the schema patch cycle or background-thread schema callbacks
 			broadcast("player_kicked", {sessionId: data.targetSessionId}, {except: target});
-
-			// Notify the kicked client and disconnect them via standard Colyseus method
 			target.send("kicked", {});
 			target.leave(CloseCode.CONSENTED);
-		});
-
-		onMessage("player_ready", (client:Client, _) -> {
-			if (state.round.status != RoundState.STATUS_LOBBY
-				&& state.round.status != RoundState.STATUS_PRE_ROUND
-				&& state.round.status != RoundState.STATUS_POST_ROUND) {
-				return;
-			}
-
-			var player:PlayerState = state.players.get(client.sessionId);
-			if (player != null) {
-				player.ready = true;
-			}
-
-			var ready = true;
-			for (sId => pp in state.players) {
-				if (!pp.ready) {
-					ready = false;
-					break;
-				}
-			}
-			if (ready) {
-				broadcast("players_ready", true);
-				for (sId => pp in state.players) {
-					pp.ready = false;
-				}
-
-				if (state.round.status == RoundState.STATUS_LOBBY) {
-					// after we all ready up in the lobby, lock the room so no one can join
-					lock();
-				}
-			}
 		});
 	}
 
 	override public function onJoin(client:Client, ?options:Dynamic):EitherType<Void, Promise<Dynamic>> {
 		trace('player joined: ${client.sessionId}');
-		state.players.set(client.sessionId, new PlayerState());
 
-		// Set host
-		if (state.hostSessionId == null || state.hostSessionId == "") {
-			state.hostSessionId = client.sessionId;
-			trace('host set ${client.sessionId}');
+		// Use LDTK spawn point for initial position
+		var rawObjects:Dynamic = Reflect.getProperty(ldtkRaw, "l_Objects");
+		var allSpawn:Array<Dynamic> = Reflect.getProperty(rawObjects, "all_Spawn");
+		var spawnX:Float = 48;
+		var spawnY:Float = 48;
+		if (allSpawn != null && allSpawn.length > 0) {
+			spawnX = allSpawn[0].pixelX;
+			spawnY = allSpawn[0].pixelY;
 		}
 
+		logic.addPlayer(client.sessionId, spawnX, spawnY);
 		return null;
 	}
 
 	override public function onLeave(client:Client, ?code:CloseCode):EitherType<Void, Promise<Dynamic>> {
 		trace('player left: ${client.sessionId}');
-		trace('successful clear: ${state.players.delete(client.sessionId)}');
+		logic.removePlayer(client.sessionId);
 
-		// Clear/rotate host
-		if (client.sessionId == state.hostSessionId) {
-			if (state.players.size <= 0) {
-				state.hostSessionId = null;
-			} else {
-				var sIds = [];
-				for (sId => _ in state.players) {
-					sIds.push(sId);
-				}
-				var sIdx = Std.random(state.players.size);
-				state.hostSessionId = sIds[sIdx];
-			};
-
-			trace('host changed ${client.sessionId} -> ${state.hostSessionId}');
-			if (state.hostSessionId == null) {
-				// after the last person leaves a room, just close it down
-				trace('disconnect room: ${roomId}:${roomName}');
-				disconnect();
-			}
+		if (state.players.size <= 0) {
+			trace('disconnect room: ${roomId}:${roomName}');
+			disconnect();
 		}
 
 		return null;
+	}
+
+	function serverUpdate(delta:Float) {
+		elapsedTime += delta / 1000;
+		var fixedStep = Simulation.FIXED_STEP;
+		while (elapsedTime >= fixedStep) {
+			elapsedTime -= fixedStep;
+			logic.update(fixedStep * 1000);
+		}
 	}
 }

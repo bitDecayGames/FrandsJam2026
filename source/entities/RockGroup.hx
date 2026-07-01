@@ -11,14 +11,12 @@ class RockGroup extends FlxTypedGroup<Rock> {
 	static inline var SPAWN_CHANCE:Float = 0.0025;
 	static inline var BIG_SPAWN_CHANCE:Float = 0.0006;
 
-	var fishSpawner:FishSpawner;
 	var parentState:FlxState;
 
 	public var onPickup:(String, Int) -> Void;
 
-	public function new(fishSpawner:FishSpawner, state:FlxState) {
+	public function new(state:FlxState) {
 		super();
-		this.fishSpawner = fishSpawner;
 		this.parentState = state;
 	}
 
@@ -70,11 +68,12 @@ class RockGroup extends FlxTypedGroup<Rock> {
 	function handleOverlap(player:Player, rock:Rock) {
 		if (!player.inventory.isFull()) {
 			var index = members.indexOf(rock);
-			player.pickupItem(rock.big ? BigRock : Rock);
 			rock.kill();
 			if (onPickup != null) {
-				onPickup("rock", index);
+				onPickup(rock.big ? "big_rock" : "rock", index);
 			}
+		} else {
+			player.showInventoryFull(rock);
 		}
 	}
 
@@ -84,14 +83,12 @@ class RockGroup extends FlxTypedGroup<Rock> {
 
 	public function onLocalSplash(x:Float, y:Float, big:Bool) {
 		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
-		fishSpawner.scareFish(x, y, big ? 160 : 80);
 		GameManager.ME.net.sendMessage("rock_splash", {x: x, y: y, big: big});
 		spawnSplash(x, y, big);
 	}
 
 	public function onRemoteSplash(x:Float, y:Float, big:Bool) {
 		FmodManager.PlaySoundOneShot(FmodSFX.RockSplash);
-		fishSpawner.scareFish(x, y, big ? 160 : 80);
 		spawnSplash(x, y, big);
 	}
 

@@ -16,10 +16,8 @@ class SeagullPoop extends FlxSprite {
 	var parentState:FlxState;
 	var groundGroup:FlxGroup;
 	var terrain:BDTilemap;
-	var fishSpawner:FishSpawner;
-
 	public function new(worldX:Float, worldY:Float, fallDistance:Float, birdVelX:Float, state:FlxState, groundGroup:FlxGroup,
-			terrain:BDTilemap, fishSpawner:FishSpawner) {
+			terrain:BDTilemap) {
 		super(worldX, worldY);
 		makeGraphic(2, 2, FlxColor.WHITE);
 		x -= 1;
@@ -28,7 +26,6 @@ class SeagullPoop extends FlxSprite {
 		parentState = state;
 		this.groundGroup = groundGroup;
 		this.terrain = terrain;
-		this.fishSpawner = fishSpawner;
 		velocity.x = birdVelX;
 		velocity.y = 0;
 		acceleration.y = GRAVITY;
@@ -50,9 +47,7 @@ class SeagullPoop extends FlxSprite {
 			if (isWater) {
 				TODO.sfx("poop_water_splash");
 				parentState.add(new Splash(landX, landY, false));
-				if (fishSpawner != null) {
-					fishSpawner.scareFish(landX, landY, SCARE_RADIUS);
-				}
+				// Fish scare is handled server-side in GameLogic.updateSeagulls()
 			} else {
 				TODO.sfx("poop_splat");
 				groundGroup.add(new PoopSplat(landX, landY));

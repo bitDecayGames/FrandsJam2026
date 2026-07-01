@@ -35,3 +35,17 @@ dump/
 
 # claude
 .claude/settings.local.json
+
+# lime rebuild artifacts
+.rebuild
+
+# local FMOD SDK for testing
+/sdk
+colyseus.log
+game_player.log
+game_bot.log
+screenshots/
+.screenshot
+.pid_player
+.pid_bot
+build.log

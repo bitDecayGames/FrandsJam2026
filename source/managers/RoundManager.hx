@@ -56,6 +56,10 @@ class RoundManager {
 		}
 	}
 
+	public function getGoals():Array<goals.Goal> {
+		return round != null ? round.goals : [];
+	}
+
 	public function isComplete():Bool {
 		return complete;
 	}

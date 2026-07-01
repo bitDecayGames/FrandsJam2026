@@ -1,5 +1,7 @@
 -cp hxsrc
 -cp ..
+-cp ../shared
+-lib ldtk-haxe-api
 -lib colyseus-hxjs
 -lib hxnodejs
 -main Main

@@ -36,14 +36,11 @@ import openfl.ui.Keyboard;
 import openfl.utils.Assets;
 import states.MainMenuState;
 import states.SplashScreenState;
-#if play
+#if (play || local || play_solo)
 import states.LobbyState;
 #end
 #if credits
 import states.CreditsState;
-#end
-#if local
-import states.PlayState;
 #end
 #if FLX_DEBUG
 import plugins.GlobalDebugPlugin;
@@ -54,6 +51,7 @@ class Main extends Sprite {
 
 	public function new() {
 		super();
+		trace('BUILD: ${Macros.getBuildTimestamp()}');
 		Configure.initAnalytics(false);
 		Storage.load();
 
@@ -62,7 +60,7 @@ class Main extends Sprite {
 		new GameManager();
 
 		var startingState:Class<FlxState> = SplashScreenState;
-		#if play
+		#if (play || local || play_solo)
 		startingState = LobbyState;
 		#elseif credits
 		startingState = CreditsState;
@@ -78,9 +76,6 @@ class Main extends Sprite {
 			configureLogging();
 			initEvents();
 			Achievements.initAchievements();
-			#if local
-			FlxG.switchState(() -> new PlayState(null));
-			#end
 		});
 		addChild(new FlxGame(0, 0, startingState, 60, 60, true, false));
 		#if fullscreen

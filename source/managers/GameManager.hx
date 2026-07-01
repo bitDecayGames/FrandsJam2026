@@ -70,7 +70,7 @@ class GameManager {
 		net.onScoreChanged.add(onScoreChanged);
 		net.onFishSold.add(onFishSold);
 		net.onWormKilled.add(recordWormKill);
-		net.onHostChanged.add(onHostChange);
+
 		net.onKicked.add(handleKicked);
 	}
 
@@ -92,11 +92,13 @@ class GameManager {
 		totalRounds = rounds.length;
 		currentRoundNumber = 0;
 		setCurrentRound(new RoundManager(rounds[0]));
-		GameManager.ME.net.sendMessage("round_update", {
-			status: roundStatus,
-			currentRound: currentRoundNumber,
-			totalRounds: totalRounds,
-		});
+		// No round_update broadcast here — set up round data locally only.
+		// init() runs inside playersReady() immediately before setStatus(ACTIVE).
+		// Sending a *second* round_update produces a second server-side RoundState
+		// mutation that still carries the OLD status (lobby) — and the host, having
+		// already moved itself to active, syncs back down to it, bouncing everyone
+		// to character select forever. setStatus() now carries totalRounds, so the
+		// single status-transition message propagates the round metadata too.
 	}
 
 	private function handleKicked() {
@@ -169,7 +171,7 @@ class GameManager {
 	}
 
 	/** Record a worm kill for the current round. */
-	public function recordWormKill(sessionId:String) {
+	public function recordWormKill(sessionId:String, wormId:Int = 0) {
 		while (wormKills.length <= currentRoundNumber) {
 			wormKills.push(new Map<String, Int>());
 		}
@@ -242,13 +244,6 @@ class GameManager {
 		scores.remove(sessionId);
 	}
 
-	private function onHostChange(isHost:Bool, prevIsHost:Bool) {
-		// the host has just been changed to you
-		if (isHost && isHost != prevIsHost) {
-			// TODO: MW not sure what to do yet...
-		}
-	}
-
 	private function setCurrentRound(round:RoundManager) {
 		if (this.round != null) {
 			this.round.completed.remove(this.onRoundDone);
@@ -258,6 +253,7 @@ class GameManager {
 	}
 
 	private function onRoundDone() {
+		roundStatus = RoundState.STATUS_POST_ROUND;
 		FlxG.switchState(() -> new PostRoundState());
 	}
 
@@ -269,15 +265,13 @@ class GameManager {
 		var nextRoundNumber:Int = currentRoundNumber;
 		switch (roundStatus) {
 			case RoundState.STATUS_LOBBY:
-				if (NetworkManager.IS_HOST) {
-					init([
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
-						new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
-					]);
-					// needs to force this back to 0
-					nextRoundNumber = currentRoundNumber;
-				}
+				init([
+					new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+					new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+					new Round([new TimedGoal(), new PersonalFishSoldGoal(8), new KeypressGoal()]),
+				]);
+				// needs to force this back to 0
+				nextRoundNumber = currentRoundNumber;
 				nextStatus = RoundState.STATUS_ACTIVE;
 			case RoundState.STATUS_ACTIVE:
 				nextStatus = RoundState.STATUS_POST_ROUND;
@@ -303,7 +297,7 @@ class GameManager {
 			setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
 		}
 		if (wasLobby) {
-			FlxTimer.wait(2, () -> {
+			FlxTimer.wait(3, () -> {
 				switchStateBasedOnStatus();
 			});
 		} else {
@@ -329,7 +323,9 @@ class GameManager {
 			if (currentRoundNumber >= 0 && currentRoundNumber < totalRounds && currentRoundNumber != remoteState.currentRound) {
 				trace('sync current round: ${currentRoundNumber} -> ${remoteState.currentRound}');
 				currentRoundNumber = remoteState.currentRound;
-				setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
+				if (rounds != null && currentRoundNumber < rounds.length) {
+					setCurrentRound(new RoundManager(rounds[currentRoundNumber]));
+				}
 			}
 			if (roundStatus != remoteState.status) {
 				trace('sync status: ${roundStatus} -> ${remoteState.status}');
@@ -341,20 +337,20 @@ class GameManager {
 
 	public function setStatus(status:String, ?currentRound:Int = -1) {
 		roundStatus = status;
-		if (NetworkManager.IS_HOST) {
-			if (currentRound >= 0 && currentRound != currentRoundNumber) {
-				trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRoundNumber}');
-				currentRoundNumber = currentRound;
-				GameManager.ME.net.sendMessage("round_update", {
-					status: roundStatus,
-					currentRound: currentRound,
-				});
-			} else {
-				trace('set status: ${roundStatus} -> ${status}');
-				GameManager.ME.net.sendMessage("round_update", {
-					status: roundStatus,
-				});
-			}
+		if (currentRound >= 0 && currentRound != currentRoundNumber) {
+			trace('set status: ${roundStatus} -> ${status} and currentRound: ${currentRoundNumber} -> ${currentRound}');
+			currentRoundNumber = currentRound;
+			GameManager.ME.net.sendMessage("round_update", {
+				status: roundStatus,
+				currentRound: currentRound,
+				totalRounds: totalRounds,
+			});
+		} else {
+			trace('set status: ${roundStatus} -> ${status}');
+			GameManager.ME.net.sendMessage("round_update", {
+				status: roundStatus,
+				totalRounds: totalRounds,
+			});
 		}
 	}
 

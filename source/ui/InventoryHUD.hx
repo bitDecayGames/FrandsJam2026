@@ -59,6 +59,18 @@ class InventoryHUD extends FlxSpriteGroup {
 						slots[i].animation.play("waders");
 						slots[i].scale.set(1, 1);
 						slots[i].offset.set(0, 0);
+					case Rocket:
+						slots[i].makeGraphic(16, 16, 0xFFFF4400);
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
+					case HungerPotion:
+						slots[i].makeGraphic(16, 16, 0xFF00CC66);
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
+					case FishBait:
+						slots[i].makeGraphic(16, 16, 0xFFDDAA00);
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
 				}
 			} else {
 				// slots[i].loadGraphic(null);

@@ -1,178 +1,24 @@
 package entities;
 
-import entities.FishTypes;
-import net.NetworkManager;
-import flixel.FlxG;
-import flixel.FlxSprite;
-import flixel.math.FlxPoint;
 import flixel.group.FlxGroup.FlxTypedGroup;
-import levels.ldtk.Level;
 
+/**
+ * Simple container for WaterFish sprites with an ID→sprite lookup map.
+ * All fish AI runs server-side in GameLogic. This class only holds the
+ * client-side sprites for rendering.
+ **/
 class FishSpawner extends FlxTypedGroup<WaterFish> {
-	static inline var SEPARATION_DIST:Float = 20;
-
-	var nextFishID:Int = 1;
-
 	public var fishMap = new Map<String, WaterFish>();
 
-	var net:NetworkManager;
-
-	var catchCallback:(String, String, Int) -> Void;
-
-	public function new(onCatch:(String, String, Int) -> Void) {
+	public function new() {
 		super();
-		catchCallback = onCatch;
-	}
-
-	public function setNet(net:NetworkManager) {
-		this.net = net;
-	}
-
-	override public function update(elapsed:Float) {
-		super.update(elapsed);
-
-		// Keep fish spread out — if two get too close, one flees
-		var members = this.members;
-		for (i in 0...members.length) {
-			var a = members[i];
-			if (a == null || !a.alive)
-				continue;
-			for (j in (i + 1)...members.length) {
-				var b = members[j];
-				if (b == null || !b.alive)
-					continue;
-				var dx = a.x - b.x;
-				var dy = a.y - b.y;
-				if (dx * dx + dy * dy < SEPARATION_DIST * SEPARATION_DIST) {
-					a.fleeFrom(b.x, b.y);
-					b.fleeFrom(a.x, a.y);
-				}
-			}
-		}
-	}
-
-	public function spawn(level:Level) {
-		var layer = level.waterGrid;
-		var w = layer.cWid;
-		var h = layer.cHei;
-		var grid = layer.gridSize;
-		var visited = new Array<Bool>();
-		visited.resize(w * h);
-		for (i in 0...visited.length) {
-			visited[i] = false;
-		}
-
-		// Collect FishSpawner entities keyed by their grid index
-		var spawnerCounts = new Map<Int, Int>();
-		for (spawner in level.raw.l_Objects.all_FishSpawner) {
-			var idx = spawner.cx + spawner.cy * w;
-			spawnerCounts.set(idx, spawner.f_numFish);
-		}
-
-		// Flood-fill to find connected groups of value-1 tiles in the FishSpawner IntGrid
-		for (sy in 0...h) {
-			for (sx in 0...w) {
-				var startIdx = sx + sy * w;
-				if (visited[startIdx] || layer.getInt(sx, sy) != 1)
-					continue;
-
-				var body = new Array<Int>();
-				var stack = [startIdx];
-				while (stack.length > 0) {
-					var idx = stack.pop();
-					if (idx < 0 || idx >= w * h || visited[idx])
-						continue;
-					var cx = idx % w;
-					var cy = Std.int(idx / w);
-					if (layer.getInt(cx, cy) != 1)
-						continue;
-					visited[idx] = true;
-					body.push(idx);
-					if (cx > 0)
-						stack.push(idx - 1);
-					if (cx < w - 1)
-						stack.push(idx + 1);
-					if (cy > 0)
-						stack.push(idx - w);
-					if (cy < h - 1)
-						stack.push(idx + w);
-				}
-
-				// Find the FishSpawner entity in this body to get numFish
-				var numFish = 0;
-				for (idx in body) {
-					if (spawnerCounts.exists(idx)) {
-						numFish = spawnerCounts.get(idx);
-						break;
-					}
-				}
-
-				if (numFish <= 0)
-					continue;
-
-				// Build shared water tile pixel positions for this body
-				var waterTiles = new Array<FlxPoint>();
-				for (idx in body) {
-					var cx = idx % w;
-					var cy = Std.int(idx / w);
-					waterTiles.push(FlxPoint.weak(cx * grid + 2, cy * grid + 2));
-				}
-
-				for (_ in 0...numFish) {
-					var fid = '${nextFishID++}';
-					var tile = waterTiles[FlxG.random.int(0, waterTiles.length - 1)];
-					var ftype = FlxG.random.int(0, FishTypes.TYPES.length - 1);
-					if (net != null) {
-						var data:Dynamic = {
-							id: fid,
-							x: tile.x,
-							y: tile.y,
-							fishType: ftype
-						};
-						QLog.notice('sending fish_spawn message: $data');
-						net.sendMessage("fish_spawn", data);
-					}
-					var fish = new WaterFish(fid, tile.x, tile.y, waterTiles, false, ftype);
-					fishMap.set(fid, fish);
-					fish.onCatch = catchCallback;
-					add(fish);
-				}
-			}
-		}
-	}
-
-	static inline var Y_SQUASH:Float = 0.55;
-
-	public function scareFish(splashX:Float, splashY:Float, radius:Float = 80) {
-		var radiusY = radius * Y_SQUASH;
-		#if FLX_DEBUG
-		if (FlxG.state != null) {
-			FlxG.state.add(new DebugCircle(splashX, splashY, radius, radiusY));
-		}
-		#end
-		for (fish in members) {
-			if (fish == null || !fish.alive)
-				continue;
-			var dx = (fish.x + fish.width / 2) - splashX;
-			var dy = (fish.y + fish.height / 2) - splashY;
-			if (dx * dx / (radius * radius) + dy * dy / (radiusY * radiusY) < 1) {
-				fish.scare(splashX, splashY);
-			}
-		}
-	}
-
-	public function setBobbers(bobbers:Map<String, FlxSprite>) {
-		for (fish in members) {
-			if (fish == null || !fish.alive)
-				continue;
-			fish.bobbers = bobbers;
-		}
 	}
 
 	public function clearAll() {
 		for (f in this) {
 			f.destroy();
 		}
+		fishMap.clear();
 		clear();
 	}
 }

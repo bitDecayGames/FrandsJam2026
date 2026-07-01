@@ -51,7 +51,7 @@ class PepperPickup extends FlxSprite {
 	}
 
 	function handleOverlap(player:Player, pepper:PepperPickup) {
-		player.activateHotMode();
+		// Don't activate hot mode — wait for server confirmation
 		kill();
 		if (onPickup != null) {
 			onPickup();

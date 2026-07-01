@@ -83,8 +83,53 @@ class Inventory {
 		return items.length;
 	}
 
+	public function getItems():Array<InventoryItem> {
+		return items.copy();
+	}
+
+	public function clear() {
+		items = [];
+		onChange.dispatch();
+	}
+
 	public function hasWaders():Bool {
 		return has(Waders);
+	}
+
+	/** Replace local inventory with server state */
+	public function syncFromServer(serverItems:Array<Dynamic>) {
+		items = [];
+		if (serverItems != null) {
+			for (s in serverItems) {
+				var decoded = decodeItem(s);
+				if (decoded != null) { items.push(decoded); }
+			}
+		}
+		onChange.dispatch();
+	}
+
+	public static function encodeItem(item:InventoryItem):Dynamic {
+		return switch (item) {
+			case Rock: {type: "rock"};
+			case BigRock: {type: "big_rock"};
+			case Fish(idx, len): {type: "fish", fishType: idx, lengthCm: len};
+			case Waders: {type: "waders"};
+			case Rocket: {type: "rocket"};
+			case HungerPotion: {type: "hunger_potion"};
+			case FishBait: {type: "fish_bait"};
+		};
+	}
+
+	public static function decodeItem(data:Dynamic):InventoryItem {
+		var t:String = data.type;
+		if (t == "rock") { return Rock; }
+		if (t == "big_rock") { return BigRock; }
+		if (t == "fish") { return Fish(Std.int(data.fishType), Std.int(data.lengthCm)); }
+		if (t == "waders") { return Waders; }
+		if (t == "rocket") { return Rocket; }
+		if (t == "hunger_potion") { return HungerPotion; }
+		if (t == "fish_bait") { return FishBait; }
+		return null;
 	}
 
 	static function matchesItem(a:InventoryItem, b:InventoryItem):Bool {
@@ -93,6 +138,9 @@ class Inventory {
 			case [BigRock, BigRock]: true;
 			case [Fish(_, _), Fish(_, _)]: true;
 			case [Waders, Waders]: true;
+			case [Rocket, Rocket]: true;
+			case [HungerPotion, HungerPotion]: true;
+			case [FishBait, FishBait]: true;
 			default: false;
 		};
 	}
@@ -103,4 +151,7 @@ enum InventoryItem {
 	BigRock;
 	Fish(fishSpriteIndex:Int, lengthCm:Int);
 	Waders;
+	Rocket;
+	HungerPotion;
+	FishBait;
 }

@@ -5,7 +5,6 @@ import schema.RoundState;
 import flixel.util.FlxColor;
 import flixel.FlxSprite;
 import schema.FishState;
-import flixel.util.FlxTimer;
 import managers.GameManager;
 import schema.PlayerState;
 import config.Configure;
@@ -34,10 +33,13 @@ import levels.ldtk.Level;
 import levels.ldtk.Ldtk.LdtkProject;
 import achievements.Achievements;
 import entities.Bush;
+import entities.Splash;
 import entities.CloudShadow;
 import entities.Player;
 import entities.Ripple;
 import entities.Seagull;
+import entities.SeagullPoop;
+import entities.BaitShopInterior;
 import entities.Shop;
 import entities.WaterSparkle;
 import events.gen.Event;
@@ -57,11 +59,24 @@ class PlayState extends FlxTransitionableState {
 
 	// Network things
 	var remotePlayers:Map<String, Player> = new Map();
-	var remoteFish:Map<String, WaterFish> = new Map();
+	// Fish are stored in fishSpawner (single group + fishMap for ID lookup)
 
 	var midGroundGroup = new FlxGroup();
 	var ySortGroup = new FlxGroup();
+	// serverFishGroup removed — fishSpawner is the single fish render group
 	var bushGroup = new FlxTypedGroup<Bush>();
+	var localBushContacts = new Map<Int, Bool>(); // entityRect index -> in contact
+	var remoteBushContacts = new Map<String, Map<Int, Bool>>(); // sessionId -> bushIndex -> inContact
+	var bushByRectIndex = new Map<Int, Bush>(); // entityRect index -> bush sprite
+	var serverDogs = new Map<Int, entities.Dog>(); // dogId -> Dog sprite
+	var powerUpSprite:FlxSprite;
+	var rocketSprites = new Map<Int, FlxSprite>();
+	var rocketData = new Map<Int, {x:Float, y:Float, dirX:Float, dirY:Float, speed:Float}>();
+	var rocketEmitters = new Map<Int, flixel.effects.particles.FlxEmitter>();
+	var hungerOverlay:FlxSprite;
+	var baitOverlay:FlxSprite;
+	var arcingItems:Array<{sprite:FlxSprite, startX:Float, startY:Float, landX:Float, landY:Float, flightTime:Float, elapsed:Float, onLand:Void->Void}> = [];
+	var groundItems:Array<{sprite:FlxSprite, item:entities.Inventory.InventoryItem}> = [];
 	var fishSpawner:FishSpawner;
 	var rockGroup:RockGroup;
 	var groundFishGroup:GroundFishGroup;
@@ -71,13 +86,14 @@ class PlayState extends FlxTransitionableState {
 	var shop:Shop;
 	var terrainLayer:BDTilemap;
 	var shallowColliders:FlxTypedGroup<FlxSprite>;
+	var waterColliders:FlxTypedGroup<FlxSprite>;
 	var inventoryHUD:InventoryHUD;
 	var scoreHUD:ScoreHUD;
 	var activeCameraTransition:CameraTransition = null;
-	var hotText:FlashingText;
 	var weedGroup = new FlxTypedGroup<entities.Weed>();
 	var seagullGroup = new FlxTypedGroup<Seagull>();
 	var seagullTimer:Float = 0;
+	var serverSeagulls:Map<Int, Seagull> = new Map();
 	var wormGroup = new FlxTypedGroup<Worm>();
 	var wormTimer:Float = 0;
 
@@ -86,7 +102,15 @@ class PlayState extends FlxTransitionableState {
 	var waterLayer:levels.ldtk.WaterGrid;
 	var sparkleTimer:Float = 0;
 
+	var shopInterior:BaitShopInterior;
+	var insideShop:Bool = false;
+	var shopReturnX:Float = 0;
+	var shopReturnY:Float = 0;
+	var mainWorldBounds:FlxRect;
+	var mainCameraBounds:FlxRect;
+
 	var ldtk = new LdtkProject();
+	var simulation:Simulation;
 
 	var round:RoundManager;
 
@@ -113,14 +137,15 @@ class PlayState extends FlxTransitionableState {
 
 		// QLog.error('Example error');
 
-		fishSpawner = new FishSpawner(onFishCaught);
-		rockGroup = new RockGroup(fishSpawner, this);
+		fishSpawner = new FishSpawner();
+		rockGroup = new RockGroup(this);
 		groundFishGroup = new GroundFishGroup();
 		wadersPickup = new WadersPickup();
 		pepperPickup = new PepperPickup();
 
 		// Build out our render order
 		add(midGroundGroup);
+		add(weedGroup);
 		add(rockGroup);
 		add(groundFishGroup);
 		add(wadersPickup);
@@ -130,16 +155,10 @@ class PlayState extends FlxTransitionableState {
 		add(ySortGroup);
 		add(transitions);
 
-		#if !local
 		setupNetwork();
-		// GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
-		fishSpawner.setNet(GameManager.ME.net);
-		#end
+		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
 
 		loadLevel("Level_0");
-
-		hotText = new FlashingText("HOT", 0.15, 3.0);
-		add(hotText);
 
 		if (round != null) {
 			round.initialize(this);
@@ -152,49 +171,219 @@ class PlayState extends FlxTransitionableState {
 		timerHUD.scrollFactor.set(0, 0);
 		add(timerHUD);
 
-		if (NetworkManager.IS_HOST) {
-			GameManager.ME.net.sendMessage("round_update", {
-				status: RoundState.STATUS_ACTIVE,
-			});
+		GameManager.ME.net.sendMessage("round_update", {
+			status: RoundState.STATUS_ACTIVE,
+		});
+
+		// Tell server we're ready — triggers world spawning, fish, timer, clouds
+		// Must be after loadLevel so player exists for spawn_locations
+		GameManager.ME.net.sendMessage("start_gameplay", {});
+
+		#if db
+		addDebugButtons();
+		#end
+	}
+
+	#if db
+	function addDebugButtons() {
+		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog", "Rocket", "Potion", "Fish", "Bait"];
+		var btnW = 60;
+		var btnH = 16;
+		var margin = 4;
+		var startX = FlxG.width - btnW - margin;
+		var startY = 40;
+		for (i in 0...labels.length) {
+			var bg = new FlxSprite(startX, startY + i * (btnH + margin));
+			bg.makeGraphic(btnW, btnH, FlxColor.fromRGB(40, 40, 40, 180));
+			bg.scrollFactor.set(0, 0);
+			add(bg);
+			var label = new FlxText(startX, startY + i * (btnH + margin) + 1, btnW, labels[i]);
+			label.size = 8;
+			label.alignment = FlxTextAlign.CENTER;
+			label.color = FlxColor.WHITE;
+			label.scrollFactor.set(0, 0);
+			add(label);
 		}
 	}
+
+	function checkDebugButtons() {
+		if (FlxG.mouse.justPressedRight) {
+			var mx = FlxG.mouse.x;
+			var my = FlxG.mouse.y;
+			player.setPosition(mx, my);
+			if (player.playerState != null) {
+				player.playerState.x = mx;
+				player.playerState.y = my;
+			}
+			player.clearPendingInputs();
+			GameManager.ME.net.sendMessage("set_position", {x: mx, y: my});
+		}
+		if (!FlxG.mouse.justPressed) {
+			return;
+		}
+		var btnW = 60;
+		var btnH = 16;
+		var margin = 4;
+		var startX = FlxG.width - btnW - margin;
+		var startY = 40;
+		var pos = FlxG.mouse.getScreenPosition();
+		var mx = pos.x;
+		var my = pos.y;
+		pos.put();
+		if (mx < startX || mx > startX + btnW) {
+			return;
+		}
+		for (i in 0...10) {
+			var by = startY + i * (btnH + margin);
+			if (my >= by && my < by + btnH) {
+				switch (i) {
+					case 0:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(Rock)) "remove" else "add", type: "rock"});
+					case 1:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(BigRock)) "remove" else "add", type: "big_rock"});
+					case 2:
+						GameManager.ME.net.sendHotPepper(!player.hotModeActive, 99);
+					case 3:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.hasWaders()) "remove" else "add", type: "waders"});
+					case 4:
+						GameManager.ME.net.sendMessage("debug_end_round", {});
+					case 5:
+						GameManager.ME.net.sendMessage("debug_spawn_dog", {});
+					case 6:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(Rocket)) "remove" else "add", type: "rocket"});
+					case 7:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(HungerPotion)) "remove" else "add", type: "hunger_potion"});
+					case 8:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: "add", type: "fish", fishType: FlxG.random.int(0, 11), lengthCm: FlxG.random.int(20, 60)});
+					case 9:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(FishBait)) "remove" else "add", type: "fish_bait"});
+				}
+				return;
+			}
+		}
+	}
+	#end
 
 	override function destroy() {
 		super.destroy();
 		GameManager.ME.net.onPlayerRemoved.remove(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.remove(onFishAdded);
+		GameManager.ME.net.onCastStart.remove(onRemoteCastStart);
 		GameManager.ME.net.onCastLine.remove(onRemoteCastLine);
 		GameManager.ME.net.onFishCaught.remove(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.remove(onRemoteLinePulled);
-		GameManager.ME.net.onRockSplash.remove(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onRockSplash.remove(onRockSplash);
 		GameManager.ME.net.onThrowRock.remove(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.remove(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.remove(onRemoteShopPlaced);
 		GameManager.ME.net.onWorldItems.remove(onRemoteWorldItems);
 		GameManager.ME.net.onItemPickup.remove(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.remove(onRemoteWeedBurst);
-		GameManager.ME.net.onBushRustle.remove(onRemoteBushRustle);
+		GameManager.ME.net.onBushIgnite.remove(onRemoteBushIgnite);
+		GameManager.ME.net.onWeedIgnite.remove(onRemoteWeedIgnite);
 		GameManager.ME.net.onHotPepper.remove(onRemoteHotPepper);
+		GameManager.ME.net.onPlayerDrown.remove(onRemotePlayerDrown);
 		GameManager.ME.net.onSpawnLocations.remove(onSpawnLocations);
 		GameManager.ME.net.onTimerSync.remove(onTimerSync);
+		GameManager.ME.net.onLocalPlayerAck.remove(onServerAck);
+		GameManager.ME.net.onWormSpawn.remove(onServerWormSpawn);
+		GameManager.ME.net.onSeagullSpawn.remove(onServerSeagullSpawn);
+		GameManager.ME.net.onSeagullPoop.remove(onServerSeagullPoop);
+		GameManager.ME.net.onSeagullDespawn.remove(onServerSeagullDespawn);
+		GameManager.ME.net.onPepperExtinguish.remove(onPepperExtinguish);
+		GameManager.ME.net.onInventoryUpdate.remove(onInventoryUpdate);
+		GameManager.ME.net.onDogSpawn.remove(onDogSpawn);
+		GameManager.ME.net.onDogUpdate.remove(onDogUpdate);
+		GameManager.ME.net.onDogCaught.remove(onDogCaught);
+		GameManager.ME.net.onDogDespawn.remove(onDogDespawn);
+		GameManager.ME.net.onDogItemLanded.remove(onDogItemLanded);
+		GameManager.ME.net.onDogAteFish.remove(onDogAteFish);
+		GameManager.ME.net.onPlayerKnockback.remove(onPlayerKnockback);
+		GameManager.ME.net.onPowerUpSpawn.remove(onPowerUpSpawn);
+		GameManager.ME.net.onPowerUpPickup.remove(onPowerUpPickup);
+		GameManager.ME.net.onRocketFired.remove(onRocketFired);
+		GameManager.ME.net.onRocketUpdate.remove(onRocketUpdate);
+		GameManager.ME.net.onRocketHit.remove(onRocketHit);
+		GameManager.ME.net.onRocketDespawn.remove(onRocketDespawn);
+		GameManager.ME.net.onThrowPotion.remove(onThrowPotion);
+		GameManager.ME.net.onHungerActive.remove(onHungerActive);
+		GameManager.ME.net.onHungerExpired.remove(onHungerExpired);
+		GameManager.ME.net.onThrowBait.remove(onThrowBait);
+		GameManager.ME.net.onBaitActive.remove(onBaitActive);
+		GameManager.ME.net.onBaitExpired.remove(onBaitExpired);
+		GameManager.ME.net.onCloudSync.remove(onServerCloudSync);
+		GameManager.ME.net.onGroundFishSpawn.remove(onRemoteGroundFishSpawn);
+		GameManager.ME.net.onGroundFishPickup.remove(onRemoteGroundFishPickup);
+		GameManager.ME.net.onWormKilled.remove(onRemoteWormKilled);
 	}
 
 	function setupNetwork() {
 		GameManager.ME.net.onPlayerRemoved.add(onPlayerRemoved);
 		GameManager.ME.net.onFishAdded.add(onFishAdded);
+		GameManager.ME.net.onCastStart.add(onRemoteCastStart);
 		GameManager.ME.net.onCastLine.add(onRemoteCastLine);
 		GameManager.ME.net.onFishCaught.add(onRemoteFishCaught);
 		GameManager.ME.net.onLinePulled.add(onRemoteLinePulled);
-		GameManager.ME.net.onRockSplash.add(rockGroup.onRemoteSplash);
+		GameManager.ME.net.onRockSplash.add(onRockSplash);
 		GameManager.ME.net.onThrowRock.add(onRemoteThrowRock);
 		GameManager.ME.net.onBushAdded.add(onRemoteBushAdded);
 		GameManager.ME.net.onShopPlaced.add(onRemoteShopPlaced);
 		GameManager.ME.net.onWorldItems.add(onRemoteWorldItems);
 		GameManager.ME.net.onItemPickup.add(onRemoteItemPickup);
 		GameManager.ME.net.onWeedBurst.add(onRemoteWeedBurst);
-		GameManager.ME.net.onBushRustle.add(onRemoteBushRustle);
+		GameManager.ME.net.onBushIgnite.add(onRemoteBushIgnite);
+		GameManager.ME.net.onWeedIgnite.add(onRemoteWeedIgnite);
 		GameManager.ME.net.onHotPepper.add(onRemoteHotPepper);
+		GameManager.ME.net.onPlayerDrown.add(onRemotePlayerDrown);
+		GameManager.ME.net.onSpawnLocations.add(onSpawnLocations);
 		GameManager.ME.net.onTimerSync.add(onTimerSync);
+		GameManager.ME.net.onLocalPlayerAck.add(onServerAck);
+		GameManager.ME.net.onGroundFishSpawn.add(onRemoteGroundFishSpawn);
+		GameManager.ME.net.onGroundFishPickup.add(onRemoteGroundFishPickup);
+		GameManager.ME.net.onWormKilled.add(onRemoteWormKilled);
+		GameManager.ME.net.onCloudSync.add(onServerCloudSync);
+		GameManager.ME.net.onWormSpawn.add(onServerWormSpawn);
+		GameManager.ME.net.onSeagullSpawn.add(onServerSeagullSpawn);
+		GameManager.ME.net.onSeagullPoop.add(onServerSeagullPoop);
+		GameManager.ME.net.onSeagullDespawn.add(onServerSeagullDespawn);
+		GameManager.ME.net.onPepperExtinguish.add(onPepperExtinguish);
+		GameManager.ME.net.onInventoryUpdate.add(onInventoryUpdate);
+		GameManager.ME.net.onDogSpawn.add(onDogSpawn);
+		GameManager.ME.net.onDogUpdate.add(onDogUpdate);
+		GameManager.ME.net.onDogCaught.add(onDogCaught);
+		GameManager.ME.net.onDogDespawn.add(onDogDespawn);
+		GameManager.ME.net.onDogItemLanded.add(onDogItemLanded);
+		GameManager.ME.net.onDogAteFish.add(onDogAteFish);
+		GameManager.ME.net.onPlayerKnockback.add(onPlayerKnockback);
+		GameManager.ME.net.onPowerUpSpawn.add(onPowerUpSpawn);
+		GameManager.ME.net.onPowerUpPickup.add(onPowerUpPickup);
+		GameManager.ME.net.onRocketFired.add(onRocketFired);
+		GameManager.ME.net.onRocketUpdate.add(onRocketUpdate);
+		GameManager.ME.net.onRocketHit.add(onRocketHit);
+		GameManager.ME.net.onRocketDespawn.add(onRocketDespawn);
+		GameManager.ME.net.onThrowPotion.add(onThrowPotion);
+		GameManager.ME.net.onHungerActive.add(onHungerActive);
+		GameManager.ME.net.onHungerExpired.add(onHungerExpired);
+		GameManager.ME.net.onThrowBait.add(onThrowBait);
+		GameManager.ME.net.onBaitActive.add(onBaitActive);
+		GameManager.ME.net.onBaitExpired.add(onBaitExpired);
+
+		// Fish may have been added to the schema before we subscribed
+		// (server spawns fish on room creation, before clients join PlayState).
+		// Manually check for any existing fish and create renderers.
+		var serverState = GameManager.ME.net.getState();
+		if (serverState != null) {
+			for (id => fish in serverState.fish) {
+				onFishAdded(id, fish);
+			}
+		}
 	}
 
 	function onPlayerRemoved(sessionId:String) {
@@ -213,10 +402,12 @@ class PlayState extends FlxTransitionableState {
 			return;
 		}
 
-		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y}');
+		QLog.notice('adding fish $fishId: ${fishState.x}, ${fishState.y} alive=${fishState.alive}');
 
 		var newFish = new WaterFish(fishId, fishState.x, fishState.y, null, true, fishState.fishType);
-		remoteFish.set(fishId, newFish);
+		// Direct reference to the FishState for reading synced fields (position, aiState, etc.)
+		newFish.serverFishState = fishState;
+		fishSpawner.fishMap.set(fishId, newFish);
 		fishSpawner.add(newFish);
 		QLog.notice('fish post-add pos: ${newFish.x}, ${newFish.y}');
 	}
@@ -231,33 +422,30 @@ class PlayState extends FlxTransitionableState {
 		}
 		terrainLayer = level.terrainLayer;
 		midGroundGroup.add(terrainLayer);
-		midGroundGroup.add(level.tileColliders);
+		waterColliders = level.tileColliders;
+		midGroundGroup.add(waterColliders);
 		shallowColliders = level.shallowTileColliders;
 		midGroundGroup.add(shallowColliders);
 		FlxG.worldBounds.copyFrom(terrainLayer.getBounds());
+		mainWorldBounds = FlxRect.get();
+		mainWorldBounds.copyFrom(FlxG.worldBounds);
 
-		// pick random spawn points for all players
-		var allSessionIds = [GameManager.ME.net.mySessionId];
-		for (_ => seshID in GameManager.ME.sessions) {
-			allSessionIds.push(seshID);
-		}
-		var spawnPoints = level.getRandomSpawnPoints(allSessionIds.length);
+		// Build collision map for client-side prediction
+		var hitboxJson = openfl.Assets.getText("assets/data/tile-hitboxes.json");
+		var col = CollisionMap.fromLevel(level.raw, hitboxJson);
+		simulation = new Simulation(col);
 
-		// build a map of sessionId -> {x, y} before we consume the points
-		var spawnMap = new Map<String, {x:Float, y:Float}>();
-		for (i in 0...allSessionIds.length) {
-			if (i < spawnPoints.length) {
-				spawnMap.set(allSessionIds[i], {x: spawnPoints[i].x, y: spawnPoints[i].y});
+		// Use server's current player position if available, otherwise fallback
+		var lx:Float = level.spawnPoint.x;
+		var ly:Float = level.spawnPoint.y;
+		var serverState = GameManager.ME.net.getState();
+		if (serverState != null) {
+			var myState = serverState.players.get(GameManager.ME.net.mySessionId);
+			if (myState != null && (myState.x != 0 || myState.y != 0)) {
+				lx = myState.x;
+				ly = myState.y;
 			}
 		}
-		// return pooled points
-		for (pt in spawnPoints) {
-			pt.put();
-		}
-
-		var localPos = spawnMap.get(GameManager.ME.net.mySessionId);
-		var lx = localPos != null ? localPos.x : level.spawnPoint.x;
-		var ly = localPos != null ? localPos.y : level.spawnPoint.y;
 		player = new Player(lx, ly, this);
 		if (GameManager.ME.mySkinIndex >= 0) {
 			player.skinIndex = GameManager.ME.mySkinIndex;
@@ -266,15 +454,38 @@ class PlayState extends FlxTransitionableState {
 		player.sessionId = GameManager.ME.net.mySessionId;
 		player.terrainLayer = terrainLayer;
 		player.groundEffectsGroup = midGroundGroup;
-		camera.follow(player);
+
+		// Wire up client-side prediction — in local mode, use the server's own
+		// simulation and player state so they're always in sync (no reconciliation needed)
+		if (GameManager.ME.net.isLocal()) {
+			player.simulation = GameManager.ME.net.getLocalSimulation();
+			player.playerState = GameManager.ME.net.getLocalPlayerState();
+		} else {
+			player.simulation = simulation;
+			player.playerState = new schema.PlayerState();
+			player.playerState.x = player.x;
+			player.playerState.y = player.y;
+			player.playerState.speed = 100;
+			player.playerState.width = 16;
+			player.playerState.height = 8;
+		}
+
+		camera.follow(player, TOPDOWN);
 		ySortGroup.add(player);
 
 		for (_ => seshID in GameManager.ME.sessions) {
-			var remotePos = spawnMap.get(seshID);
-			var rx = remotePos != null ? remotePos.x : level.spawnPoint.x;
-			var ry = remotePos != null ? remotePos.y : level.spawnPoint.y;
+			var rx:Float = level.spawnPoint.x;
+			var ry:Float = level.spawnPoint.y;
+			if (serverState != null) {
+				var remoteState = serverState.players.get(seshID);
+				if (remoteState != null && (remoteState.x != 0 || remoteState.y != 0)) {
+					rx = remoteState.x;
+					ry = remoteState.y;
+				}
+			}
 			var remote = new Player(rx, ry, this);
 			remote.isRemote = true;
+			remote.simulation = simulation; // shared simulation for wall collision
 			remote.terrainLayer = terrainLayer;
 			remote.groundEffectsGroup = midGroundGroup;
 			if (GameManager.ME.skins.exists(seshID)) {
@@ -289,48 +500,42 @@ class PlayState extends FlxTransitionableState {
 			ySortGroup.add(remote);
 		}
 
-		// host sends spawn locations to clients
-		#if !local
-		if (NetworkManager.IS_HOST) {
-			var spawnData:Dynamic = {};
-			for (sid => pos in spawnMap) {
-				Reflect.setField(spawnData, sid, {x: pos.x, y: pos.y});
-			}
-			GameManager.ME.net.sendSpawnLocations(spawnData);
-		}
-
-		// clients listen for host-assigned spawn locations
-		GameManager.ME.net.onSpawnLocations.add(onSpawnLocations);
-		#end
-
-		#if local
-		spawnWeeds();
-		spawnWorldItems(level);
-		#else
-		FlxTimer.wait(1, () -> {
-			if (NetworkManager.IS_HOST) {
-				spawnWeeds();
-				spawnWorldItems(level);
-				broadcastWorldItems();
-			} else {
-				QLog.notice('skipping spawn');
-			}
-		});
-		#end
+		// World items, fish, bushes, spawn locations all come from the server
+		// (real or local in-process) via start_gameplay -> onRemoteWorldItems / onBushAdded
 
 		waterLayer = level.waterGrid;
 		player.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onLocalSplash);
+		player.makePotion = (rx, ry) -> {
+			var r = new Rock(rx, ry, false, waterLayer, null, (lx, ly, _) -> {
+				GameManager.ME.net.sendMessage("potion_landed", {x: lx, y: ly});
+			});
+			r.makeGraphic(8, 8, 0xFF00CC66);
+			return r;
+		};
+		player.makeBait = (rx, ry) -> {
+			var r = new Rock(rx, ry, false, waterLayer, null, (lx, ly, _) -> {
+				GameManager.ME.net.sendMessage("bait_landed", {x: lx, y: ly});
+			});
+			r.makeGraphic(8, 8, 0xFFDDAA00); // golden bait placeholder
+			return r;
+		};
 		for (_ => remote in remotePlayers) {
 			remote.makeRock = (rx, ry, big) -> new Rock(rx, ry, big, waterLayer, rockGroup.addRock, rockGroup.onRemoteSplash);
+			remote.makePotion = (rx, ry) -> {
+				var r = new Rock(rx, ry, false, waterLayer, null, null);
+				r.makeGraphic(8, 8, 0xFF00CC66);
+				return r;
+			};
+			remote.makeBait = (rx, ry) -> {
+				var r = new Rock(rx, ry, false, waterLayer, null, null);
+				r.makeGraphic(8, 8, 0xFFDDAA00);
+				return r;
+			};
 		}
 		groundFishGroup.setWaterLayer(waterLayer);
-		#if local
-		spawnBushes();
-		#else
-		if (NetworkManager.IS_HOST) {
-			spawnBushes();
-		}
-		#end
+		groundFishGroup.onPickedUp = (fx, fy) -> {
+			GameManager.ME.net.sendMessage("ground_fish_pickup", {x: fx, y: fy});
+		};
 
 		// wire up pickup callbacks for network broadcast
 		rockGroup.onPickup = (type, idx) -> {
@@ -353,35 +558,12 @@ class PlayState extends FlxTransitionableState {
 			FlxG.camera.shake(0.002, 0.1);
 		};
 
-		CloudShadow.randomizeWind();
-		for (_ in 0...5) {
-			add(new CloudShadow());
-		}
+		// Clouds come from server (real or local) via cloud_sync
 
 		add(seagullGroup);
 
-		#if local
-		shop = new Shop();
-		shop.spawnRandom(level, terrainLayer);
-		ySortGroup.add(shop);
-		#else
-		if (NetworkManager.IS_HOST) {
-			var bushPositions = [for (bush in bushGroup) {x: bush.x, y: bush.y}];
-			shop = new Shop();
-			shop.spawnRandom(level, terrainLayer);
-			ySortGroup.add(shop);
-			GameManager.ME.net.sendWorldSetup(bushPositions, shop.x, shop.y);
-		} else {
-			// Check if world state already arrived (e.g. late joiner)
-			var state = GameManager.ME.net.getState();
-			if (state != null && state.shopReady) {
-				placeShopAt(state.shopX, state.shopY);
-				for (_ => bush in state.bushes) {
-					placeBushAt(bush.x, bush.y);
-				}
-			}
-		}
-		#end
+		// shopInterior = new BaitShopInterior();
+		// midGroundGroup.add(shopInterior.tilemap);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
 		add(inventoryHUD);
@@ -400,6 +582,7 @@ class PlayState extends FlxTransitionableState {
 		for (_ => zone in level.camZones) {
 			if (zone.containsPoint(playerPos)) {
 				setCameraBounds(zone);
+				mainCameraBounds = zone;
 			}
 		}
 		playerPos.put();
@@ -424,83 +607,7 @@ class PlayState extends FlxTransitionableState {
 		return "";
 	}
 
-	function spawnWorldItems(level:Level) {
-		rockGroup.spawn(level);
-		fishSpawner.spawn(level);
-		wadersPickup.spawn(level, terrainLayer);
-		pepperPickup.spawn(level, terrainLayer);
-	}
-
-	function spawnBushes() {
-		var bounds = FlxG.worldBounds;
-		for (_ in 0...5) {
-			for (_ in 0...20) {
-				var bx = FlxG.random.float(bounds.x, bounds.right - 32);
-				var by = FlxG.random.float(bounds.y, bounds.bottom - 32);
-				if (classifyGround(terrainLayer.sampleColorAt(bx, by)) == "grass") {
-					var bush = new Bush(bx, by, this);
-					bushGroup.add(bush);
-					ySortGroup.add(bush);
-					break;
-				}
-			}
-		}
-	}
-
-	function spawnWeeds() {
-		var bounds = FlxG.worldBounds;
-		for (_ in 0...20) {
-			for (_ in 0...20) {
-				var wx = FlxG.random.float(bounds.x, bounds.right - 8);
-				var wy = FlxG.random.float(bounds.y, bounds.bottom - 8);
-				var ground = classifyGround(terrainLayer.sampleColorAt(wx, wy));
-				if (ground == "grass" || ground == "dirt") {
-					var weed = new entities.Weed(wx, wy, this);
-					weedGroup.add(weed);
-					midGroundGroup.add(weed);
-					break;
-				}
-			}
-		}
-	}
-
-	function broadcastWorldItems() {
-		var rocks:Array<{x:Float, y:Float, big:Bool}> = [];
-		for (rock in rockGroup) {
-			if (rock != null && rock.alive) {
-				rocks.push({x: rock.x, y: rock.y, big: rock.big});
-			}
-		}
-
-		var weeds:Array<{x:Float, y:Float}> = [];
-		for (weed in weedGroup) {
-			if (weed != null && weed.alive) {
-				weeds.push({x: weed.spawnCX, y: weed.spawnCY});
-			}
-		}
-
-		var data:Dynamic = {
-			rocks: rocks,
-			weeds: weeds,
-		};
-		if (wadersPickup.visible && wadersPickup.alive) {
-			data.wadersX = wadersPickup.x;
-			data.wadersY = wadersPickup.y;
-		}
-		if (pepperPickup.visible && pepperPickup.alive) {
-			data.pepperX = pepperPickup.x;
-			data.pepperY = pepperPickup.y;
-		}
-
-		GameManager.ME.net.sendWorldItems(data);
-	}
-
 	function onRemoteWorldItems(data:Dynamic) {
-		if (NetworkManager.IS_HOST) {
-			return;
-		}
-
-		// spawn rocks from host positions
 		var rockPositions:Array<Dynamic> = data.rocks;
 		if (rockPositions != null) {
 			var typed:Array<{x:Float, y:Float, big:Bool}> = [];
@@ -515,8 +622,8 @@ class PlayState extends FlxTransitionableState {
 		if (weedPositions != null) {
 			for (w in weedPositions) {
 				var weed = new entities.Weed(w.x, w.y, this);
+				weed.groundGroup = midGroundGroup;
 				weedGroup.add(weed);
-				midGroundGroup.add(weed);
 			}
 		}
 
@@ -532,44 +639,156 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onRemoteItemPickup(sessionId:String, itemType:String, index:Int) {
+		var isMe = sessionId == player.sessionId;
 		switch (itemType) {
 			case "rock":
 				rockGroup.removeByIndex(index);
 			case "waders":
 				wadersPickup.remotePickup();
+				// Inventory update comes from server via inventory_update
 			case "pepper":
 				pepperPickup.remotePickup();
+				// Hot mode activation comes from server via onRemoteHotPepper
 		}
 	}
 
 	function onRemoteWeedBurst(sessionId:String, index:Int) {
+		// Tier 2: server confirmed the weed burst — record score for the player
 		if (index >= 0 && index < weedGroup.members.length) {
 			var weed = weedGroup.members[index];
 			if (weed != null && weed.alive) {
+				// Remote player or sender whose prediction hasn't fired yet
 				weed.burst();
 			}
 		}
 		GameManager.ME.recordWeedKill(sessionId);
 	}
 
-	function onRemoteBushRustle(index:Int, dirX:Float, dirY:Float) {
-		if (index >= 0 && index < bushGroup.members.length) {
-			var bush = bushGroup.members[index];
-			if (bush != null && bush.alive) {
-				bush.rustleFrom(dirX, dirY);
+	function onRemoteBushIgnite(index:Int) {
+		var bush = bushByRectIndex.get(index);
+		if (bush != null && bush.alive && !bush.burning) {
+			bush.ignite();
+		}
+	}
+
+	/** Process bush hits from Simulation.hitEntityIndices for any player. */
+	function processBushHits(p:Player, contacts:Map<Int, Bool>, isLocal:Bool) {
+		for (entityIdx in p.lastHitEntityIndices) {
+			var bush = bushByRectIndex.get(entityIdx);
+			if (bush == null || !bush.alive) { continue; }
+			if (isLocal && p.hotModeActive && !bush.burning) {
+				bush.ignite();
+				GameManager.ME.net.sendMessage("bush_ignite", {index: entityIdx});
+				continue;
+			}
+			if (!contacts.exists(entityIdx)) {
+				contacts.set(entityIdx, true);
+				var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
+				var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
+				var dist = Math.sqrt(dx * dx + dy * dy);
+				bush.rustleFrom(dist > 0 ? dx / dist : 1.0, dist > 0 ? dy / dist : 0.0);
+			}
+		}
+		// Clear contacts for bushes no longer hit
+		for (idx in [for (k in contacts.keys()) k]) {
+			var stillHit = false;
+			for (h in p.lastHitEntityIndices) {
+				if (h == idx) { stillHit = true; break; }
+			}
+			if (!stillHit) { contacts.remove(idx); }
+		}
+	}
+
+	function removeEntityRect(index:Int) {
+		if (simulation != null && index >= 0 && index < simulation.entityRects.length) {
+			simulation.entityRects[index] = {x: 0.0, y: 0.0, w: 0.0, h: 0.0};
+		}
+	}
+
+	function onRemoteWeedIgnite(index:Int) {
+		if (index >= 0 && index < weedGroup.members.length) {
+			var weed = weedGroup.members[index];
+			if (weed != null && weed.alive && !weed.burning) {
+				weed.ignite();
 			}
 		}
 	}
 
-	function onRemoteHotPepper(sessionId:String, isStart:Bool) {
-		var remote = remotePlayers.get(sessionId);
-		if (remote == null) {
-			return;
-		}
-		if (isStart) {
-			remote.activateHotMode();
+	function onRemotePlayerDrown(sessionId:String, x:Float, y:Float) {
+		if (sessionId == player.sessionId) {
+			if (!player.drowned) {
+				// Offset splash into the water (forward in facing direction)
+				var dir = player.lastInputDir.asVector();
+				var splashX = player.x + player.width / 2 + dir.x * 12;
+				var splashY = player.y + player.height + dir.y * 12;
+				dir.put();
+				add(new Splash(splashX, splashY, true));
+				player.drown();
+			}
 		} else {
-			remote.deactivateHotMode();
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				var dir = remote.lastInputDir.asVector();
+				var splashX = x + remote.width / 2 + dir.x * 12;
+				var splashY = y + remote.height + dir.y * 12;
+				dir.put();
+				add(new Splash(splashX, splashY, true));
+				remote.drown(x, y);
+			}
+		}
+	}
+
+	var steamEmitter:flixel.effects.particles.FlxEmitter;
+	var steamTarget:Player;
+	var steamTimer:Float = 0;
+
+	function onPepperExtinguish(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		// Deactivate hot mode
+		if (sessionId == player.sessionId) {
+			player.deactivateHotMode();
+			steamTarget = player;
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				remote.deactivateHotMode();
+				steamTarget = remote;
+			}
+		}
+		TODO.sfx("sizzle");
+		// Create emitter that follows the player's butt for 2 seconds
+		if (steamEmitter != null) { remove(steamEmitter); steamEmitter.destroy(); }
+		steamEmitter = new flixel.effects.particles.FlxEmitter(0, 0, 60);
+		steamEmitter.makeParticles(6, 6, 0xFFDDDDDD, 60);
+		steamEmitter.lifespan.set(0.6, 1.2);
+		steamEmitter.speed.set(15, 35);
+		steamEmitter.alpha.set(0.8, 0.9, 0.0, 0.0);
+		steamEmitter.scale.set(1.5, 2.5, 0.4, 0.6);
+		steamEmitter.launchMode = flixel.effects.particles.FlxEmitter.FlxEmitterMode.CIRCLE;
+		steamEmitter.launchAngle.set(250, 290); // upward (270° = straight up, ±20° spread)
+		steamEmitter.frequency = 0.03;
+		steamEmitter.start(false);
+		add(steamEmitter);
+		steamTimer = 2.0;
+	}
+
+	function onRemoteHotPepper(sessionId:String, isStart:Bool) {
+		// Server-authoritative hot mode — applies to ALL players including local
+		if (sessionId == player.sessionId) {
+			if (isStart) {
+				player.activateHotMode();
+			} else {
+				player.deactivateHotMode();
+			}
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				if (isStart) {
+					remote.activateHotMode();
+				} else {
+					remote.deactivateHotMode();
+				}
+			}
 		}
 	}
 
@@ -590,30 +809,51 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onFishCaught(fishId:String, catcherSessionId:String, fishType:Int) {
-		#if !local
-		GameManager.ME.net.sendFishCaught(fishId, catcherSessionId, fishType);
-		#end
+		// Server detects fish catches directly and broadcasts fish_caught;
+		// no need to send from client.
 
 		// Trigger on the catching player immediately (avoids latency; echo-back is a no-op)
 		if (catcherSessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
-				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
+				// Server already added fish to inventory via inventory_update.
+				// If inventory was full at catch time, server didn't add — drop ground fish.
+				if (player.inventory.isFull()) {
+					GameManager.ME.net.sendMessage("ground_fish_drop", {
+						playerX: player.x + 8,
+						playerY: player.y - 14,
+						fishType: player.caughtFishSpriteIndex,
+						lengthCm: player.caughtFishLengthCm
+					});
 				}
 				player.onFishDelivered = null;
 			};
 			player.catchFish(true, catcherSessionId, fishId, fishType);
 		} else {
 			var remote = remotePlayers.get(catcherSessionId);
-			if (remote != null)
+			if (remote != null) {
 				remote.catchFish(true, catcherSessionId, fishId, fishType);
+			}
 		}
 	}
 
 	function placeBushAt(bx:Float, by:Float) {
+		trace('placeBushAt(${bx}, ${by}) bushGroup.length=${bushGroup.length} entityRects=${simulation != null ? simulation.entityRects.length : -1}');
 		var bush = new Bush(bx, by, this);
+		bush.groundGroup = midGroundGroup;
 		bushGroup.add(bush);
 		ySortGroup.add(bush);
+		if (simulation != null) {
+			var rectIdx = simulation.entityRects.length;
+			simulation.entityRects.push({x: bx + 2, y: by + 2, w: 10.0, h: 2.0});
+			bushByRectIndex.set(rectIdx, bush);
+			bush.onDeath = () -> {
+				removeEntityRect(rectIdx);
+				bushByRectIndex.remove(rectIdx);
+				GameManager.ME.net.sendMessage("bush_dead", {index: rectIdx});
+				bushGroup.remove(bush, true);
+				ySortGroup.remove(bush, true);
+			};
+		}
 	}
 
 	function placeShopAt(sx:Float, sy:Float) {
@@ -623,35 +863,38 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	function onRemoteBushAdded(x:Float, y:Float) {
-		if (NetworkManager.IS_HOST) {
-			return;
-		}
 		placeBushAt(x, y);
 	}
 
 	function onRemoteShopPlaced(x:Float, y:Float) {
-		if (NetworkManager.IS_HOST) {
-			return;
-		}
 		placeShopAt(x, y);
 	}
 
 	function onSpawnLocations(message:Dynamic) {
-		// host already placed everyone, so skip
-		if (NetworkManager.IS_HOST) {
-			return;
-		}
-		// reposition local player and remotes based on host-assigned locations
+		// reposition local player and remotes based on server-assigned locations
 		var myId = GameManager.ME.net.mySessionId;
 		var myPos:Dynamic = Reflect.field(message, myId);
 		if (myPos != null) {
 			player.setPosition(myPos.x, myPos.y);
+			if (player.playerState != null) {
+				player.playerState.x = myPos.x;
+				player.playerState.y = myPos.y;
+			}
+			// Clear pending inputs so reconciliation doesn't jump back to old position
+			player.clearPendingInputs();
 		}
 		for (seshID => remote in remotePlayers) {
 			var pos:Dynamic = Reflect.field(message, seshID);
 			if (pos != null) {
 				remote.setPosition(pos.x, pos.y);
 			}
+		}
+	}
+
+	function onRemoteCastStart(sessionId:String, dir:String) {
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteStartCharge(dir);
 		}
 	}
 
@@ -671,15 +914,21 @@ class PlayState extends FlxTransitionableState {
 
 	function onRemoteFishCaught(sessionId:String, fishId:String, fishType:Int) {
 		// Hide the remote fish sprite — it will fade back in when the host starts moving it again
-		var fish = remoteFish.get(fishId);
-		if (fish != null)
+		var fish = fishSpawner.fishMap.get(fishId);
+		if (fish != null) {
 			fish.visible = false;
+		}
 
 		// Non-host clients receive this to trigger the catch animation
 		if (sessionId == player.sessionId) {
 			player.onFishDelivered = () -> {
 				if (!player.inventory.add(Fish(player.caughtFishSpriteIndex, player.caughtFishLengthCm))) {
-					groundFishGroup.addFish(player.x + 8, player.y - 14, player.caughtFishSpriteIndex, player.caughtFishLengthCm);
+					GameManager.ME.net.sendMessage("ground_fish_drop", {
+						playerX: player.x + 8,
+						playerY: player.y - 14,
+						fishType: player.caughtFishSpriteIndex,
+						lengthCm: player.caughtFishLengthCm
+					});
 				}
 				player.onFishDelivered = null;
 			};
@@ -701,6 +950,56 @@ class PlayState extends FlxTransitionableState {
 		}
 	}
 
+	function onRemoteGroundFishSpawn(data:Dynamic) {
+		var startX:Float = data.startX;
+		var startY:Float = data.startY;
+		var landX:Float = data.landX;
+		var landY:Float = data.landY;
+		var fishType:Int = Std.int(data.fishType);
+		var lengthCm:Int = Std.int(data.lengthCm);
+		trace('ground_fish_spawn received: start=($startX,$startY) land=($landX,$landY) type=$fishType');
+		groundFishGroup.add(new entities.GroundFish(startX, startY, landX, landY, fishType, lengthCm));
+	}
+
+	function onRemoteGroundFishPickup(px:Float, py:Float, sessionId:String) {
+		// Local player already killed the fish in handleOverlap — skip the echo
+		if (sessionId == player.sessionId) { return; }
+		// For remote players, find the closest ground fish and kill it
+		var closest:entities.GroundFish = null;
+		var closestDist = Math.POSITIVE_INFINITY;
+		for (fish in groundFishGroup) {
+			if (fish == null || !fish.alive) {
+				continue;
+			}
+			var dx = fish.x - px;
+			var dy = fish.y - py;
+			var dist = dx * dx + dy * dy;
+			if (dist < closestDist) {
+				closestDist = dist;
+				closest = fish;
+			}
+		}
+		if (closest != null) {
+			closest.kill();
+		}
+	}
+
+	#if FLX_DEBUG
+	override public function draw() {
+		super.draw();
+		// Draw simulation entity rects (green) to compare with Flixel hitboxes
+		if (simulation != null && FlxG.camera.debugLayer != null) {
+			var gfx = FlxG.camera.debugLayer.graphics;
+			var scrollX = FlxG.camera.scroll.x;
+			var scrollY = FlxG.camera.scroll.y;
+			for (b in simulation.entityRects) {
+				gfx.lineStyle(1, 0x00FF00, 0.8);
+				gfx.drawRect(b.x - scrollX, b.y - scrollY, b.w, b.h);
+			}
+		}
+	}
+	#end
+
 	function handleAchieve(def:AchievementDef) {
 		add(def.toToast(true));
 	}
@@ -721,17 +1020,15 @@ class PlayState extends FlxTransitionableState {
 		timerSynced = true;
 	}
 
+	function onServerAck(serverState:schema.PlayerState) {
+		player.reconcileFromServer(serverState);
+		player.inShallowWater = serverState.inShallowWater;
+	}
+
 	function updateTimerHUD(elapsed:Float) {
-		if (NetworkManager.IS_HOST) {
-			// Host reads directly from its own TimedGoal via runTimeSec sent in syncs —
-			// just tick locally so the display stays smooth between broadcasts
-			if (timerSynced) {
-				timerRunSec += elapsed;
-			}
-		} else {
-			if (timerSynced) {
-				timerRunSec += elapsed;
-			}
+		// Server broadcasts timer_sync every 5s; tick locally between syncs for smooth display
+		if (timerSynced) {
+			timerRunSec += elapsed;
 		}
 
 		if (!timerSynced) {
@@ -749,6 +1046,10 @@ class PlayState extends FlxTransitionableState {
 	}
 
 	override public function update(elapsed:Float) {
+		// Tick game logic (local or networked) BEFORE updating children
+		// so Player.update() reads the latest server-computed position
+		GameManager.ME.net.update(elapsed);
+
 		super.update(elapsed);
 
 		updateTimerHUD(elapsed);
@@ -757,85 +1058,629 @@ class PlayState extends FlxTransitionableState {
 			EventBus.fire(new Click(FlxG.mouse.x, FlxG.mouse.y));
 		}
 
-		FlxG.collide(midGroundGroup, player);
-		FlxG.collide(bushGroup, player, (bush:Bush, p:Player) -> {
-			var dx = bush.x + bush.width / 2 - (p.x + p.width / 2);
-			var dy = bush.y + bush.height / 2 - (p.y + p.height / 2);
-			var dist = Math.sqrt(dx * dx + dy * dy);
-			var dirX = dist > 0 ? dx / dist : 1.0;
-			var dirY = dist > 0 ? dy / dist : 0.0;
-			bush.rustleFrom(dirX, dirY);
-			var index = bushGroup.members.indexOf(bush);
-			GameManager.ME.net.sendBushRustle(index, dirX, dirY);
-		});
-		FlxG.overlap(weedGroup, player, (weed:entities.Weed, _) -> {
-			var index = weedGroup.members.indexOf(weed);
-			weed.burst();
-			GameManager.ME.net.sendWeedBurst(index);
-			GameManager.ME.recordWeedKill(GameManager.ME.mySessionId);
-		});
-		FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
-			TODO.sfx("worm_squish");
-			midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
-			worm.kill();
-			GameManager.ME.net.sendMessage("worm_killed", {});
-			GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
-		});
-		if (shop != null) {
-			FlxG.collide(shop, player, Shop.onCollide);
+		#if db
+		checkDebugButtons();
+		#end
+
+		// Hot mode drown is handled server-side in GameLogic.fixedTick()
+		// Server broadcasts "player_drown" when a hot player touches water
+
+		// NO FlxG.collide(midGroundGroup, player) — Simulation handles all terrain collision.
+
+		// Remote players use Simulation.tickPlayer in their updateRemoteInterpolation.
+		// Bush rustle for remotes is handled below alongside the local player.
+
+		if (insideShop) {
+			checkShopExit();
+		} else {
+			// Bush interaction — driven by Simulation hitEntityIndices.
+			// Same system for local AND remote players — one collision path.
+			processBushHits(player, localBushContacts, true);
+			for (sessionId => remote in remotePlayers) {
+				var contacts = remoteBushContacts.get(sessionId);
+				if (contacts == null) { contacts = new Map<Int, Bool>(); remoteBushContacts.set(sessionId, contacts); }
+				processBushHits(remote, contacts, false);
+			}
+
+			// Weed interaction — burst is Tier 2 (stateful, affects score)
+			// ignite is Tier 2 (stateful, destroys weed)
+			FlxG.overlap(weedGroup, player, (weed:entities.Weed, p:Player) -> {
+				if (p.hotModeActive) {
+					if (!weed.burning) {
+						weed.ignite();
+						var index = weedGroup.members.indexOf(weed);
+						GameManager.ME.net.sendMessage("weed_ignite", {index: index});
+					}
+					return;
+				}
+				if (!weed.alive) { return; }
+				var index = weedGroup.members.indexOf(weed);
+				// Tier 2: play burst immediately (predicted cosmetic), send to server for scoring
+				weed.burst();
+				GameManager.ME.net.sendWeedBurst(index);
+				// Score is recorded when server confirms via onRemoteWeedBurst
+			});
+			FlxG.overlap(wormGroup, player, (worm:Worm, _) -> {
+				TODO.sfx("worm_squish");
+				midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
+				worm.kill();
+				GameManager.ME.net.sendMessage("worm_killed", {id: worm.wormId});
+				GameManager.ME.recordWormKill(GameManager.ME.mySessionId);
+			});
+			if (shop != null && FlxG.overlap(shop, player)) {
+				enterShop();
+			}
+
+			// inShallowWater is set server-authoritatively via PlayerState schema
+			// (local player reads it in onServerAck, remotes in handleChange)
 		}
 
-		if (player.inventory.hasWaders() && terrainLayer != null) {
-			player.inShallowWater = terrainLayer.isFullyInTaggedArea(player, [SHALLOW, SOLID]);
-		} else {
-			player.inShallowWater = false;
+		// Update steam emitter (pepper extinguish — follows player butt)
+		if (steamTimer > 0 && steamEmitter != null && steamTarget != null) {
+			steamTimer -= elapsed;
+			steamEmitter.setPosition(steamTarget.x + steamTarget.width / 2, steamTarget.y + 2);
+			if (steamTimer <= 0) {
+				steamEmitter.emitting = false;
+				var capturedEmitter = steamEmitter;
+				flixel.util.FlxTimer.wait(1.5, () -> {
+					remove(capturedEmitter);
+					capturedEmitter.destroy();
+				});
+				steamEmitter = null;
+				steamTarget = null;
+			}
 		}
+
+		// Update arcing items (dog-dropped gear)
+		var ai = arcingItems.length;
+		while (ai-- > 0) {
+			var item = arcingItems[ai];
+			item.elapsed += elapsed;
+			var t = Math.min(1.0, item.elapsed / item.flightTime);
+			var gx = item.startX + (item.landX - item.startX) * t;
+			var gy = item.startY + (item.landY - item.startY) * t;
+			var dist = Math.sqrt((item.landX - item.startX) * (item.landX - item.startX) + (item.landY - item.startY) * (item.landY - item.startY));
+			var arcH = Math.min(dist * 0.5, 64);
+			item.sprite.setPosition(gx, gy - arcH * 4 * t * (1 - t));
+			if (t >= 1.0) {
+				if (item.onLand != null) { item.onLand(); }
+				arcingItems.splice(ai, 1);
+			}
+		}
+
+		// Simulate rockets locally (deterministic: straight line + acceleration)
+		var hasRockets = false;
+		for (rid => rd in rocketData) {
+			hasRockets = true;
+			rd.speed += 300.0 * elapsed; // ROCKET_ACCELERATION
+			if (rd.speed > 350.0) { rd.speed = 350.0; } // ROCKET_MAX_SPEED
+			rd.x += rd.dirX * rd.speed * elapsed;
+			rd.y += rd.dirY * rd.speed * elapsed;
+			var sprite = rocketSprites.get(rid);
+			if (sprite != null) {
+				sprite.setPosition(rd.x - 4, rd.y - 4);
+			}
+			var emitter = rocketEmitters.get(rid);
+			if (emitter != null) {
+				emitter.setPosition(rd.x, rd.y);
+			}
+		}
+
+		// Toggle fish scare radius debug circles when rockets are in flight
+		#if db
+		for (fishSprite in fishSpawner.members) {
+			if (fishSprite != null) {
+				fishSprite.showScareRadius = hasRockets;
+			}
+		}
+		#end
+
 		ySortGroup.sort((order, a, b) -> {
+			if (a == null || b == null) { return 0; }
 			var objA:flixel.FlxObject = cast a;
 			var objB:flixel.FlxObject = cast b;
 			return FlxSort.byValues(order, objA.y + objA.height, objB.y + objB.height);
 		});
-		handleCameraBounds();
 
-		if (player.hotModeActive && !hotText.isFlashing()) {
-			hotText.start();
+		if (!insideShop) {
+			handleCameraBounds();
 		}
+
 
 		// DS "Debug Suite" is how we get to all of our debugging tools
 		DS.get(DebugDraw).drawCameraText(50, 50, "hello", DebugLayers.AUDIO);
 
-		var bobbers:Map<String, FlxSprite> = new Map();
-		if (player.isBobberLanded())
-			bobbers.set(player.sessionId, player.castBobber);
-		#if !local
-		if (NetworkManager.IS_HOST) {
-			for (sid => remote in remotePlayers) {
-				if (remote.isBobberLanded())
-					bobbers.set(sid, remote.castBobber);
-			}
-		}
-		#end
-		fishSpawner.setBobbers(bobbers);
-		rockGroup.checkPickup(player);
-		groundFishGroup.checkPickup(player);
-		wadersPickup.checkPickup(player);
-		pepperPickup.checkPickup(player);
-		if (shop != null) {
-			shop.checkInteraction(player);
-		}
+		if (!insideShop && !player.frozen) {
+			// Bobber checks are handled server-side now; no need to set bobbers on fish
+			rockGroup.checkPickup(player);
+			groundFishGroup.checkPickup(player);
+			wadersPickup.checkPickup(player);
+			pepperPickup.checkPickup(player);
 
-		updateSparkles(elapsed);
-		updateSeagulls(elapsed);
-		updateWorms(elapsed);
+			// Check ground items (dropped from dog bites)
+			var gi = groundItems.length;
+			while (gi-- > 0) {
+				var gItem = groundItems[gi];
+				if (gItem.sprite == null || !gItem.sprite.alive) {
+					groundItems.splice(gi, 1);
+					continue;
+				}
+				if (FlxG.overlap(player, gItem.sprite)) {
+					if (!player.inventory.isFull()) {
+						// Tell server about the pickup — inventory_update will sync
+						var encoded = entities.Inventory.encodeItem(gItem.item);
+						GameManager.ME.net.sendMessage("ground_item_pickup", {
+							x: gItem.sprite.x, y: gItem.sprite.y,
+							itemType: encoded.type, fishType: encoded.fishType, lengthCm: encoded.lengthCm
+						});
+						remove(gItem.sprite);
+						gItem.sprite.destroy();
+						groundItems.splice(gi, 1);
+						break;
+					} else {
+						player.showInventoryFull(gItem.sprite);
+					}
+				}
+			}
+
+			updateSparkles(elapsed);
+		}
 	}
 
-	function updateSeagulls(elapsed:Float) {
-		seagullTimer -= elapsed;
-		if (seagullTimer > 0) {
-			return;
+	// --- Dog handlers ---
+
+	function onDogSpawn(data:Dynamic) {
+		var id:Int = data.id;
+		if (serverDogs.exists(id)) { return; }
+		var dog = new entities.Dog(id, data.x, data.y);
+		serverDogs.set(id, dog);
+		ySortGroup.add(dog);
+	}
+
+	function onDogUpdate(data:Dynamic) {
+		var dog = serverDogs.get(Std.int(data.id));
+		if (dog != null) {
+			dog.serverUpdate(data.x, data.y, data.velX, data.velY);
 		}
-		seagullTimer = FlxG.random.float(2.0, 6.0);
-		seagullGroup.add(new Seagull(FlxG.random.bool(), this, midGroundGroup, terrainLayer, fishSpawner));
+	}
+
+	function onDogCaught(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		var dogId:Int = data.id;
+
+		if (sessionId == player.sessionId) {
+			// Cancel any active cast — reel in the line
+			if (player.isCasting()) {
+				player.catchFish(false);
+			}
+			// Freeze + blink
+			player.frozen = true;
+			trace('DOG CAUGHT: player=(${Std.int(player.x)},${Std.int(player.y)}) frozen=${player.frozen} inventory=${player.inventory.count()}');
+			flixel.effects.FlxFlicker.flicker(player, 3.0, 0.13);
+			flixel.util.FlxTimer.wait(3.0, () -> {
+				player.frozen = false;
+			});
+
+			// Server reads inventory and computes drops — just send position
+			GameManager.ME.net.sendMessage("dog_item_drop", {
+				dogId: dogId,
+				playerX: player.x + 8,
+				playerY: player.y - 14
+			});
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				flixel.effects.FlxFlicker.flicker(remote, 3.0, 0.13);
+			}
+		}
+	}
+
+	function onDogItemLanded(data:Dynamic) {
+		var startX:Float = data.startX;
+		var startY:Float = data.startY;
+		var landX:Float = data.landX;
+		var landY:Float = data.landY;
+		var itemType:String = data.itemType;
+		var itemData:Dynamic = data.itemData;
+		trace('DOG ITEM LANDED: type=${itemType} start=(${Std.int(startX)},${Std.int(startY)}) land=(${Std.int(landX)},${Std.int(landY)}) player=(${Std.int(player.x)},${Std.int(player.y)}) frozen=${player.frozen}');
+
+		switch (itemType) {
+			case "fish":
+				var fishType:Int = itemData.fishType != null ? Std.int(itemData.fishType) : 0;
+				var lengthCm:Int = itemData.lengthCm != null ? Std.int(itemData.lengthCm) : 10;
+				groundFishGroup.add(new entities.GroundFish(startX, startY, landX, landY, fishType, lengthCm));
+			case "rock":
+				var big:Bool = itemData.big == true;
+				var rs = new FlxSprite(startX, startY);
+				rs.makeGraphic(8, 8, 0xFF888888);
+				add(rs);
+				spawnArcItem(rs, startX, startY, landX, landY, () -> {
+					remove(rs); rs.destroy();
+					rockGroup.addRock(landX, landY, big);
+				});
+			case "waders":
+				var ws = new FlxSprite(startX, startY);
+				ws.makeGraphic(8, 8, 0xFF0088FF);
+				add(ws);
+				spawnArcItem(ws, startX, startY, landX, landY, () -> {
+					remove(ws); ws.destroy();
+					wadersPickup.spawnAt(landX, landY);
+				});
+			case "rocket":
+				var rk = new FlxSprite(startX, startY);
+				rk.makeGraphic(8, 8, 0xFFFF4400);
+				add(rk);
+				spawnArcItem(rk, startX, startY, landX, landY, () -> {
+					groundItems.push({sprite: rk, item: Rocket});
+				});
+			case "potion":
+				var pt = new FlxSprite(startX, startY);
+				pt.makeGraphic(8, 8, 0xFF00CC66);
+				add(pt);
+				spawnArcItem(pt, startX, startY, landX, landY, () -> {
+					groundItems.push({sprite: pt, item: HungerPotion});
+				});
+			case "bait":
+				var bt = new FlxSprite(startX, startY);
+				bt.makeGraphic(8, 8, 0xFFDDAA00);
+				add(bt);
+				spawnArcItem(bt, startX, startY, landX, landY, () -> {
+					groundItems.push({sprite: bt, item: FishBait});
+				});
+		}
+	}
+
+	function spawnArcItem(sprite:FlxSprite, sx:Float, sy:Float, lx:Float, ly:Float, onLand:Void->Void) {
+		var dist = Math.sqrt((lx - sx) * (lx - sx) + (ly - sy) * (ly - sy));
+		arcingItems.push({
+			sprite: sprite, startX: sx, startY: sy, landX: lx, landY: ly,
+			flightTime: if (dist > 0) dist / 200 else 0.01, elapsed: 0, onLand: onLand
+		});
+	}
+
+	function onDogAteFish(data:Dynamic) {
+		// Remove the ground fish closest to where the dog picked it up
+		var fx:Float = data.x;
+		var fy:Float = data.y;
+		var closest:entities.GroundFish = null;
+		var closestDist = Math.POSITIVE_INFINITY;
+		for (gf in groundFishGroup) {
+			if (gf == null || !gf.alive) { continue; }
+			var fish:entities.GroundFish = cast gf;
+			var dx = fish.x - fx;
+			var dy = fish.y - fy;
+			var dist = dx * dx + dy * dy;
+			if (dist < closestDist) {
+				closestDist = dist;
+				closest = fish;
+			}
+		}
+		if (closest != null) {
+			closest.kill();
+		}
+	}
+
+	function onDogDespawn(data:Dynamic) {
+		var id:Int = data.id;
+		var dog = serverDogs.get(id);
+		if (dog != null) {
+			ySortGroup.remove(dog);
+			dog.destroy();
+			serverDogs.remove(id);
+		}
+	}
+
+	// ── Power-Up / Rocket ──
+
+	function onPlayerKnockback(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		var duration:Float = data.duration;
+		if (sessionId == player.sessionId) {
+			player.knockbackTimer = duration;
+		} else {
+			var remote = remotePlayers.get(sessionId);
+			if (remote != null) {
+				remote.knockbackTimer = duration;
+			}
+		}
+	}
+
+	function onPowerUpSpawn(data:Dynamic) {
+		if (powerUpSprite != null) {
+			powerUpSprite.kill();
+		}
+		powerUpSprite = new FlxSprite(data.x - 8, data.y - 8);
+		powerUpSprite.makeGraphic(16, 16, 0xFFFF00FF); // magenta box placeholder
+		ySortGroup.add(powerUpSprite);
+	}
+
+	function onPowerUpPickup(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		if (powerUpSprite != null) {
+			ySortGroup.remove(powerUpSprite);
+			powerUpSprite.destroy();
+			powerUpSprite = null;
+		}
+		if (sessionId == player.sessionId) {
+			// Inventory update comes from server via inventory_update
+			TODO.sfx("powerup_pickup");
+		}
+	}
+
+	function onRocketFired(data:Dynamic) {
+		var rid:Int = data.id;
+		var rx:Float = data.x;
+		var ry:Float = data.y;
+		var dirX:Float = data.dirX;
+		var dirY:Float = data.dirY;
+		var sprite = new FlxSprite(rx - 4, ry - 4);
+		sprite.makeGraphic(8, 8, 0xFFFF4400); // orange rocket placeholder
+		ySortGroup.add(sprite);
+		rocketSprites.set(rid, sprite);
+		rocketData.set(rid, {x: rx, y: ry, dirX: dirX, dirY: dirY, speed: 40.0});
+
+		// Trailing smoke emitter
+		var emitter = new flixel.effects.particles.FlxEmitter(rx, ry, 500);
+		emitter.makeParticles(6, 6, 0xFFBBBBBB, 500);
+		emitter.lifespan.set(0.5, 1.2);
+		// Spray smoke backwards from the rocket's direction
+		var smokeSpeedMin:Float = 20;
+		var smokeSpeedMax:Float = 60;
+		var backAngle = Math.atan2(-dirY, -dirX) * 180 / Math.PI; // opposite of travel dir
+		emitter.launchMode = flixel.effects.particles.FlxEmitter.FlxEmitterMode.CIRCLE;
+		emitter.launchAngle.set(backAngle - 50, backAngle + 50); // 100 degree spread behind rocket
+		emitter.speed.set(smokeSpeedMin, smokeSpeedMax);
+		emitter.alpha.set(0.9, 0.9, 0.0, 0.0);
+		emitter.scale.set(1.5, 2.5, 0.3, 0.5);
+		emitter.frequency = 0.001;
+		emitter.start(false);
+		emitter.start(false);
+		add(emitter);
+		rocketEmitters.set(rid, emitter);
+
+		TODO.sfx("rocket_fire");
+	}
+
+	function onRocketUpdate(data:Dynamic) {
+		// Clients simulate locally — server updates not used
+	}
+
+	function removeRocket(rid:Int) {
+		var sprite = rocketSprites.get(rid);
+		if (sprite != null) {
+			ySortGroup.remove(sprite);
+			sprite.destroy();
+			rocketSprites.remove(rid);
+		}
+		rocketData.remove(rid);
+		var emitter = rocketEmitters.get(rid);
+		if (emitter != null) {
+			emitter.emitting = false;
+			// Let remaining particles fade out, then remove
+			flixel.util.FlxTimer.wait(1.0, () -> {
+				remove(emitter);
+				emitter.destroy();
+			});
+			rocketEmitters.remove(rid);
+		}
+	}
+
+	function onRocketHit(data:Dynamic) {
+		var rid:Int = data.id;
+		var targetSessionId:String = data.targetSessionId;
+
+		removeRocket(rid);
+
+		TODO.sfx("rocket_hit");
+
+		// Stun the target player (same as dog caught)
+		if (targetSessionId == player.sessionId) {
+			if (player.isCasting()) {
+				player.catchFish(false);
+			}
+			player.frozen = true;
+			flixel.effects.FlxFlicker.flicker(player, 3.0, 0.13);
+			flixel.util.FlxTimer.wait(3.0, () -> {
+				player.frozen = false;
+			});
+
+			// Server reads inventory and computes drops
+			GameManager.ME.net.sendMessage("dog_item_drop", {
+				dogId: -1,
+				playerX: player.x + 8,
+				playerY: player.y - 14
+			});
+		} else {
+			var remote = remotePlayers.get(targetSessionId);
+			if (remote != null) {
+				flixel.effects.FlxFlicker.flicker(remote, 3.0, 0.13);
+			}
+		}
+	}
+
+	function onRocketDespawn(data:Dynamic) {
+		removeRocket(data.id);
+	}
+
+	function onRockSplash(sx:Float, sy:Float, big:Bool) {
+		rockGroup.onRemoteSplash(sx, sy, big);
+		// Scare fish visually — all fish are in fishSpawner now
+		var radius = if (big) 160.0 else 80.0;
+		for (fishSprite in fishSpawner.members) {
+			if (fishSprite == null || !fishSprite.alive) { continue; }
+			var dx = (fishSprite.x + fishSprite.width / 2) - sx;
+			var dy = (fishSprite.y + fishSprite.height / 2) - sy;
+			if (dx * dx + dy * dy < radius * radius) {
+				fishSprite.scare(sx, sy);
+			}
+		}
+	}
+
+	function onThrowPotion(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		if (sessionId == player.sessionId) { return; } // local player already threw
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteThrowRock(data.targetX, data.targetY, false, data.dir);
+		}
+	}
+
+	function onHungerActive(data:Dynamic) {
+		TODO.sfx("hunger_potion");
+		var landX:Float = data.x;
+		var landY:Float = data.y;
+		// Flood-fill from landing position to find the water body, then tint those tiles
+		if (waterLayer != null) {
+			var gs = waterLayer.gridSize;
+			var startCx = Std.int(landX / gs);
+			var startCy = Std.int(landY / gs);
+			if (waterLayer.getInt(startCx, startCy) == 1) {
+				// Flood-fill to find all tiles in this water body
+				var visited = new Map<Int, Bool>();
+				var queue = new Array<Int>();
+				var key = startCy * waterLayer.cWid + startCx;
+				queue.push(key);
+				visited.set(key, true);
+				while (queue.length > 0) {
+					var k = queue.shift();
+					var cx = k % waterLayer.cWid;
+					var cy = Std.int(k / waterLayer.cWid);
+					for (d in [{dx: 0, dy: -1}, {dx: 0, dy: 1}, {dx: -1, dy: 0}, {dx: 1, dy: 0}]) {
+						var nx = cx + d.dx;
+						var ny = cy + d.dy;
+						if (nx < 0 || nx >= waterLayer.cWid || ny < 0 || ny >= waterLayer.cHei) { continue; }
+						var nk = ny * waterLayer.cWid + nx;
+						if (visited.exists(nk)) { continue; }
+						if (waterLayer.getInt(nx, ny) != 1) { continue; }
+						visited.set(nk, true);
+						queue.push(nk);
+					}
+				}
+				// Create overlay sprites for each water tile in the body
+				if (hungerOverlay != null) { remove(hungerOverlay); hungerOverlay.destroy(); }
+				hungerOverlay = new FlxSprite();
+				hungerOverlay.makeGraphic(waterLayer.cWid * gs, waterLayer.cHei * gs, 0x00000000);
+				// Fill the water body tiles with a green tint
+				flixel.util.FlxSpriteUtil.drawRect(hungerOverlay, 0, 0, 0, 0, 0x00000000); // ensure pixels exist
+				for (k => _ in visited) {
+					var cx = k % waterLayer.cWid;
+					var cy = Std.int(k / waterLayer.cWid);
+					flixel.util.FlxSpriteUtil.drawRect(hungerOverlay, cx * gs, cy * gs, gs, gs, 0x2200FF66);
+				}
+				add(hungerOverlay);
+			}
+		}
+	}
+
+	function onHungerExpired(data:Dynamic) {
+		if (hungerOverlay != null) {
+			remove(hungerOverlay);
+			hungerOverlay.destroy();
+			hungerOverlay = null;
+		}
+	}
+
+	function onThrowBait(data:Dynamic) {
+		var sessionId:String = data.sessionId;
+		if (sessionId == player.sessionId) { return; }
+		var remote = remotePlayers.get(sessionId);
+		if (remote != null) {
+			remote.remoteThrowRock(data.targetX, data.targetY, false, data.dir);
+		}
+	}
+
+	function onBaitActive(data:Dynamic) {
+		TODO.sfx("bait_splash");
+		var cx:Float = data.x;
+		var cy:Float = data.y;
+		var rx:Float = data.radiusX;
+		var ry:Float = data.radiusY;
+		// Draw a golden oval overlay at the bait zone
+		var diam = Std.int(rx * 2);
+		var diamY = Std.int(ry * 2);
+		if (baitOverlay != null) { remove(baitOverlay); baitOverlay.destroy(); }
+		baitOverlay = new FlxSprite();
+		baitOverlay.makeGraphic(diam, diamY, 0x00000000);
+		// Draw filled oval
+		for (py in 0...diamY) {
+			for (px in 0...diam) {
+				var dx = (px - rx) / rx;
+				var dy = (py - ry) / ry;
+				if (dx * dx + dy * dy < 1) {
+					baitOverlay.pixels.setPixel32(px, py, 0x22DDAA00);
+				}
+			}
+		}
+		baitOverlay.dirty = true;
+		baitOverlay.setPosition(cx - rx, cy - ry);
+		add(baitOverlay);
+	}
+
+	function onBaitExpired(data:Dynamic) {
+		if (baitOverlay != null) {
+			remove(baitOverlay);
+			baitOverlay.destroy();
+			baitOverlay = null;
+		}
+	}
+
+	function onInventoryUpdate(data:Dynamic) {
+		var prevCount = player.inventory.count();
+		player.inventory.syncFromServer(data.items);
+		if (player.inventory.count() > prevCount) {
+			FmodManager.PlaySoundOneShot(FmodSFX.ItemCollect);
+		}
+	}
+
+	function onServerCloudSync(data:Dynamic) {
+		var cloudArray:Array<Dynamic> = data.clouds;
+		if (cloudArray != null) {
+			for (cd in cloudArray) {
+				add(CloudShadow.fromServer(cd));
+			}
+		}
+	}
+
+	function onRemoteWormKilled(sessionId:String, wormId:Int) {
+		for (worm in wormGroup) {
+			if (worm != null && worm.alive && worm.wormId == wormId) {
+				TODO.sfx("worm_squish");
+				midGroundGroup.add(new WormSplat(worm.x + worm.width / 2, worm.y + worm.height / 2));
+				worm.kill();
+				break;
+			}
+		}
+	}
+
+	function onServerWormSpawn(data:Dynamic) {
+		var w = new Worm(data.srcX, data.srcY, data.destX, data.destY);
+		w.wormId = Std.int(data.id);
+		wormGroup.add(w);
+	}
+
+	function onServerSeagullSpawn(data:Dynamic) {
+		var gull = Seagull.fromServer(data, this, midGroundGroup, terrainLayer);
+		seagullGroup.add(gull);
+		serverSeagulls.set(gull.seagullId, gull);
+	}
+
+	function onServerSeagullPoop(data:Dynamic) {
+		// Create a poop projectile at the given position. Fish scare is handled server-side.
+		var poopX:Float = data.x;
+		var poopY:Float = data.y;
+		var fallDist:Float = data.fallDist;
+		var birdVelX:Float = data.birdVelX;
+		add(new SeagullPoop(poopX, poopY, fallDist, birdVelX, this, midGroundGroup, terrainLayer));
+	}
+
+	function onServerSeagullDespawn(data:Dynamic) {
+		var sid:Int = Std.int(data.id);
+		var gull = serverSeagulls.get(sid);
+		if (gull != null) {
+			seagullGroup.remove(gull, true);
+			gull.destroy();
+			serverSeagulls.remove(sid);
+		}
 	}
 
 	function updateWorms(elapsed:Float) {
@@ -956,6 +1801,39 @@ class PlayState extends FlxTransitionableState {
 						QLog.error('camera transition area has unsupported cardinal direction ${dir}');
 				}
 			}
+		}
+	}
+
+	function enterShop() {
+		insideShop = true;
+		shopReturnX = shop.x + shop.width / 2;
+		shopReturnY = shop.y + shop.height + 4;
+
+		// Cancel any active casting or throwing before teleport
+		player.cancelAllActions();
+
+		// Sell fish on entry
+		shop.sellFish(player);
+
+		// Teleport player into the shop interior
+		player.setPosition(shopInterior.spawnPoint.x, shopInterior.spawnPoint.y);
+		FlxG.worldBounds.copyFrom(shopInterior.worldBounds);
+		setCameraBounds(shopInterior.cameraBounds);
+	}
+
+	function checkShopExit() {
+		if (shopInterior.isPlayerPastExit(player.y, player.height)) {
+			exitShop();
+		}
+	}
+
+	function exitShop() {
+		insideShop = false;
+		player.setPosition(shopReturnX, shopReturnY);
+
+		FlxG.worldBounds.copyFrom(mainWorldBounds);
+		if (mainCameraBounds != null) {
+			setCameraBounds(mainCameraBounds);
 		}
 	}
 

@@ -4,6 +4,7 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.group.FlxGroup;
+import flixel.math.FlxRect;
 import flixel.util.FlxColor;
 import flixel.util.FlxSpriteUtil;
 import levels.ldtk.BDTilemap;
@@ -40,6 +41,13 @@ class Seagull extends FlxSprite {
 	var terrain:BDTilemap;
 	var fishSpawner:FishSpawner;
 
+	// The world-space area this bird flies across, captured at spawn time
+	var flyBounds:FlxRect;
+
+	// Server-driven seagull support
+	public var seagullId:Int = 0;
+	public var isServerDriven:Bool = false;
+
 	public function new(goingRight:Bool, state:FlxState, groundGroup:FlxGroup, terrain:BDTilemap, fishSpawner:FishSpawner) {
 		super();
 		this.goingRight = goingRight;
@@ -52,13 +60,14 @@ class Seagull extends FlxSprite {
 		animation.add("soar", [0], 1, false);
 		animation.play("fly");
 		flipX = goingRight;
-		scrollFactor.set(0, 0);
 
 		shadow = new FlxSprite();
 		shadow.makeGraphic(10, 4, FlxColor.TRANSPARENT);
 		FlxSpriteUtil.drawEllipse(shadow, 0, 0, 10, 4, FlxColor.BLACK);
 		shadow.alpha = SHADOW_ALPHA;
-		shadow.scrollFactor.set(0, 0);
+
+		flyBounds = FlxRect.get();
+		flyBounds.copyFrom(FlxG.worldBounds);
 
 		var speed = FlxG.random.float(SPEED_MIN, SPEED_MAX);
 		velocity.x = goingRight ? speed : -speed;
@@ -69,18 +78,35 @@ class Seagull extends FlxSprite {
 		spawnAtEdge();
 	}
 
+	/** Create a server-driven seagull from broadcast data. */
+	public static function fromServer(data:Dynamic, state:FlxState, groundGroup:FlxGroup, terrain:BDTilemap):Seagull {
+		var goingRight:Bool = data.velX > 0;
+		var gull = new Seagull(goingRight, state, groundGroup, terrain, null);
+		gull.isServerDriven = true;
+		gull.seagullId = Std.int(data.id);
+		// Override spawn position and velocity with server values
+		gull.x = data.x;
+		gull.y = data.y;
+		gull.velocity.x = data.velX;
+		gull.velocity.y = data.velY;
+		gull.flipX = goingRight;
+		return gull;
+	}
+
 	function spawnAtEdge() {
 		if (goingRight) {
-			x = -width - MARGIN;
+			x = flyBounds.left - width - MARGIN;
 		} else {
-			x = FlxG.width + MARGIN;
+			x = flyBounds.right + MARGIN;
 		}
-		y = FlxG.random.float(-8, FlxG.height - 8);
+		// Spawn in the upper portion so shadows land in the playable area
+		y = FlxG.random.float(flyBounds.top - SHADOW_BASE_OFFSET, flyBounds.top + flyBounds.height * 0.5);
 	}
 
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
 
+		// Flap/soar animation runs for all seagulls (local and server-driven)
 		stateTimer -= elapsed;
 		if (stateTimer <= 0) {
 			if (soaring) {
@@ -92,6 +118,12 @@ class Seagull extends FlxSprite {
 				animation.play("soar");
 				stateTimer = FlxG.random.float(SOAR_MIN, SOAR_MAX);
 			}
+		}
+
+		// Server-driven seagulls skip poop, drift, and off-screen detection
+		// (server handles those and broadcasts events)
+		if (isServerDriven) {
+			return;
 		}
 
 		driftTimer -= elapsed;
@@ -106,25 +138,22 @@ class Seagull extends FlxSprite {
 			doPoop();
 		}
 
-		if ((goingRight && x > FlxG.width + MARGIN) || (!goingRight && x < -width - MARGIN)) {
+		if ((goingRight && x > flyBounds.right + MARGIN) || (!goingRight && x < flyBounds.left - width - MARGIN)) {
 			kill();
 		}
 	}
 
 	function doPoop() {
 		TODO.sfx("seagull_poop");
-		var altitude = Math.max(0, (FlxG.height - 8 - y) / (FlxG.height));
+		var altitude = Math.max(0, Math.min(1, (flyBounds.bottom - y) / flyBounds.height));
 		var shadowOffsetY = SHADOW_BASE_OFFSET + altitude * 40;
-		var worldX = FlxG.camera.scroll.x + x + width / 2;
-		var worldY = FlxG.camera.scroll.y + y + height / 2;
 		var fallDist = shadowOffsetY - height / 2;
-		parentState.add(new SeagullPoop(worldX, worldY, fallDist, velocity.x, parentState, groundGroup, terrain, fishSpawner));
+		parentState.add(new SeagullPoop(x + width / 2, y + height / 2, fallDist, velocity.x, parentState, groundGroup, terrain));
 	}
 
 	override public function draw() {
 		if (alive && shadow != null) {
-			// Project shadow downward — higher birds (lower y) cast shadows further below
-			var altitude = Math.max(0, (FlxG.height - 8 - y) / (FlxG.height));
+			var altitude = Math.max(0, Math.min(1, (flyBounds.bottom - y) / flyBounds.height));
 			var offsetY = SHADOW_BASE_OFFSET + altitude * 40;
 			shadow.x = x + width / 2 - shadow.width / 2;
 			shadow.y = y + offsetY;
@@ -138,6 +167,10 @@ class Seagull extends FlxSprite {
 		if (shadow != null) {
 			shadow.destroy();
 			shadow = null;
+		}
+		if (flyBounds != null) {
+			flyBounds.put();
+			flyBounds = null;
 		}
 		super.destroy();
 	}

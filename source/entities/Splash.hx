@@ -17,7 +17,7 @@ class Splash extends FlxSprite {
 			TODO.sfx("splash_small");
 			animation.add("splash", [0, 1, 2, 3, 4, 5, 6], 10, false);
 		}
-		animation.finishCallback = (_) -> kill();
+		animation.onFinish.add((_) -> kill());
 		animation.play("splash");
 	}
 }
