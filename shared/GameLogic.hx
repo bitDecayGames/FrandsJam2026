@@ -40,7 +40,7 @@ class GameLogic {
 	var bobberPositions:Map<String, {x:Float, y:Float}>;
 	var hotModePlayers:Map<String, Bool>;
 	var hotModeTimers:Map<String, Float>;
-	var inventories:Map<String, Array<{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool}>>;
+	var inventories:Map<String, Array<{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool, ?debug:Bool}>>;
 	static inline var MAX_INVENTORY:Int = 4;
 	var wadersPlayers:Map<String, Bool>;
 	public var bushRects:Array<{x:Float, y:Float, w:Float, h:Float}>;
@@ -97,6 +97,12 @@ class GameLogic {
 	static var HUNGER_DURATION:Float = 10.0;
 	static var HUNGER_ATTRACT_DIST:Float = 999; // attract from anywhere in body
 
+	// Gravity bomb
+	var gravityBombTimer:Float;
+	var gravityBombX:Float;
+	var gravityBombY:Float;
+	static var GRAVITY_BOMB_DURATION:Float = 8.0;
+
 	// Fish bait
 	var baitTimer:Float;
 	var baitX:Float;
@@ -107,6 +113,14 @@ class GameLogic {
 	static var BAIT_DURATION:Float = 15.0;
 	static var BAIT_RADIUS:Float = 64.0;
 	static var BAIT_RADIUS_Y:Float = 44.0; // squashed oval
+
+	// Time of day (hours 0-24), server-authoritative. Noon (12) = neutral colors.
+	public var timeOfDayHour:Float;
+	var timeTargetHour:Float;
+	var timeFastForward:Bool;
+	var todSyncCooldown:Float;
+	static var TIME_NORMAL_RATE:Float = 0.0; // time stands still — only set_time moves the clock
+	static var TIME_FAST_RATE:Float = 6.0; // fast-forward speed, game-hours per second
 
 	// Round timer
 	public var roundTimerSec:Float;
@@ -183,6 +197,9 @@ class GameLogic {
 		nextRocketId = 1;
 		hungerTimer = 0;
 		hungerBodyIndex = -1;
+		gravityBombTimer = 0;
+		gravityBombX = 0;
+		gravityBombY = 0;
 		baitTimer = 0;
 		baitX = 0;
 		baitY = 0;
@@ -194,6 +211,11 @@ class GameLogic {
 		roundDurationSec = 600;
 		timerSyncCooldown = 5.0;
 		gameplayStarted = false;
+
+		timeOfDayHour = 12.0;
+		timeTargetHour = 12.0;
+		timeFastForward = false;
+		todSyncCooldown = 5.0;
 
 		seagulls = [];
 		nextSeagullId = 1;
@@ -316,7 +338,7 @@ class GameLogic {
 
 			case "ground_item_pickup":
 				// Server adds the item to inventory
-				var itemData:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool} = {type: data.itemType};
+				var itemData:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool, ?debug:Bool} = {type: data.itemType};
 				if (data.fishType != null) { itemData.fishType = Std.int(data.fishType); }
 				if (data.lengthCm != null) { itemData.lengthCm = Std.int(data.lengthCm); }
 				serverAddItem(clientId, itemData);
@@ -591,17 +613,42 @@ class GameLogic {
 					}
 				}
 
+			case "set_time":
+				// Day/Night buttons — fast-forward the clock to the requested hour
+				var target:Float = data.hour;
+				timeTargetHour = ((target % 24) + 24) % 24;
+				timeFastForward = true;
+				broadcast("time_sync", {hour: timeOfDayHour, rate: TIME_FAST_RATE});
+
+			case "use_gravity_bomb":
+				if (gravityBombTimer > 0) { return; } // one active bomb at a time
+				if (!serverHasItem(clientId, "gravity_bomb")) { return; }
+				serverRemoveItem(clientId, "gravity_bomb");
+				var p = players.get(clientId);
+				if (p != null) {
+					// Drop the bomb at the player's feet (bottom-center of hitbox)
+					gravityBombX = p.x + p.width / 2;
+					gravityBombY = p.y + p.height;
+					gravityBombTimer = GRAVITY_BOMB_DURATION;
+					simulation.gravityWell = {x: gravityBombX, y: gravityBombY};
+					broadcast("gravity_bomb_active", {
+						x: gravityBombX, y: gravityBombY,
+						duration: GRAVITY_BOMB_DURATION, sessionId: clientId
+					});
+				}
+
 			case "debug_inventory":
 				var action:String = data.action;
 				var type:String = data.type;
 				if (action == "add") {
-					var item:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool} = {type: type};
+					// debug-granted items are never consumed on use — only removable via the button
+					var item:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool, ?debug:Bool} = {type: type, debug: true};
 					if (data.fishType != null) { item.fishType = Std.int(data.fishType); }
 					if (data.lengthCm != null) { item.lengthCm = Std.int(data.lengthCm); }
 					serverAddItem(clientId, item);
 					if (type == "waders") { wadersPlayers.set(clientId, true); }
 				} else if (action == "remove") {
-					serverRemoveItem(clientId, type);
+					serverRemoveItem(clientId, type, true);
 					if (type == "waders") { wadersPlayers.remove(clientId); }
 				}
 
@@ -694,8 +741,16 @@ class GameLogic {
 
 			var queue = inputQueue.get(id);
 			if (queue == null || queue.length == 0) {
-				p.velocityX = 0;
-				p.velocityY = 0;
+				if (gravityBombTimer > 0) {
+					// No inputs this tick, but the bomb still sucks — tick with a no-move input
+					var idleHot = hotModePlayers.exists(id) && hotModePlayers.get(id);
+					var idleWaders = wadersPlayers.exists(id) && wadersPlayers.get(id);
+					var idleFlags = if (idleHot || idleWaders) CollisionMap.FLAG_SOLID else 0;
+					simulation.tickPlayer(p, [{seq: p.lastProcessedSeq, dir: -1, buttons: 0, elapsed: t}], t, idleFlags);
+				} else {
+					p.velocityX = 0;
+					p.velocityY = 0;
+				}
 				continue;
 			}
 			var isHot = hotModePlayers.exists(id) && hotModePlayers.get(id);
@@ -785,6 +840,35 @@ class GameLogic {
 				broadcast("bait_expired", {});
 			}
 		}
+		if (gravityBombTimer > 0) {
+			gravityBombTimer -= t;
+			if (gravityBombTimer <= 0) {
+				gravityBombTimer = 0;
+				simulation.gravityWell = null;
+				broadcast("gravity_bomb_expired", {});
+			}
+		}
+
+		// Advance time of day — fast-forward runs until it hits the target hour
+		if (timeFastForward) {
+			var remaining = timeTargetHour - timeOfDayHour;
+			while (remaining < 0) { remaining += 24; }
+			var step = TIME_FAST_RATE * t;
+			if (step >= remaining) {
+				timeOfDayHour = timeTargetHour;
+				timeFastForward = false;
+				broadcast("time_sync", {hour: timeOfDayHour, rate: TIME_NORMAL_RATE});
+			} else {
+				timeOfDayHour = (timeOfDayHour + step) % 24;
+			}
+		} else {
+			timeOfDayHour = (timeOfDayHour + TIME_NORMAL_RATE * t) % 24;
+		}
+		todSyncCooldown -= t;
+		if (todSyncCooldown <= 0) {
+			todSyncCooldown = 5.0;
+			broadcast("time_sync", {hour: timeOfDayHour, rate: timeFastForward ? TIME_FAST_RATE : TIME_NORMAL_RATE});
+		}
 
 		if (gameplayStarted) {
 			roundTimerSec += t;
@@ -848,9 +932,14 @@ class GameLogic {
 		}
 		rockets = [];
 
-		// Reset hunger/bait
+		// Reset hunger/bait/gravity bomb
 		hungerTimer = 0;
 		baitTimer = 0;
+		if (gravityBombTimer > 0) {
+			gravityBombTimer = 0;
+			simulation.gravityWell = null;
+			broadcast("gravity_bomb_expired", {});
+		}
 		powerUpAlive = false;
 		powerUpRespawnTimer = 3.0;
 
@@ -1305,12 +1394,18 @@ class GameLogic {
 
 	// --- Seagulls ---
 
+	/** Night window — birds and clouds stay away until morning. */
+	public function isNight():Bool {
+		return timeOfDayHour >= 21 || timeOfDayHour < 6;
+	}
+
 	function updateSeagulls(t:Float) {
 		var worldWidth:Float = collision.cols * collision.tileSize;
 		var worldHeight:Float = collision.rows * collision.tileSize;
 
+		// No new birds at night — existing ones just finish flying away
 		seagullSpawnTimer -= t;
-		if (seagullSpawnTimer <= 0) {
+		if (seagullSpawnTimer <= 0 && !isNight()) {
 			seagullSpawnTimer = 2.0 + Math.random() * 4.0;
 			var goingRight = Math.random() > 0.5;
 			var speed = 40 + Math.random() * 30;
@@ -1814,7 +1909,7 @@ class GameLogic {
 
 	// ── Server Inventory ──
 
-	function serverAddItem(clientId:String, item:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool}):Bool {
+	function serverAddItem(clientId:String, item:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool, ?debug:Bool}):Bool {
 		var inv = inventories.get(clientId);
 		if (inv == null) { return false; }
 		if (inv.length >= MAX_INVENTORY) { return false; }
@@ -1823,11 +1918,16 @@ class GameLogic {
 		return true;
 	}
 
-	function serverRemoveItem(clientId:String, type:String):Bool {
+	function serverRemoveItem(clientId:String, type:String, force:Bool = false):Bool {
 		var inv = inventories.get(clientId);
 		if (inv == null) { return false; }
 		for (i in 0...inv.length) {
 			if (inv[i].type == type) {
+				if (!force && inv[i].debug == true) {
+					// debug-granted item — pretend it was consumed so the action still
+					// fires, but keep it. Only the debug button (force) removes it.
+					return true;
+				}
 				inv.splice(i, 1);
 				sendInventoryUpdate(clientId);
 				return true;
@@ -1851,7 +1951,7 @@ class GameLogic {
 		return inv.length >= MAX_INVENTORY;
 	}
 
-	function serverClearInventory(clientId:String):Array<{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool}> {
+	function serverClearInventory(clientId:String):Array<{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool, ?debug:Bool}> {
 		var inv = inventories.get(clientId);
 		if (inv == null) { return []; }
 		var items = inv.copy();

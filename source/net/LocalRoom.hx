@@ -172,6 +172,12 @@ class LocalRoom {
 				net.onBaitActive.dispatch(data);
 			case "bait_expired":
 				net.onBaitExpired.dispatch(data);
+			case "gravity_bomb_active":
+				net.onGravityBombActive.dispatch(data);
+			case "gravity_bomb_expired":
+				net.onGravityBombExpired.dispatch(data);
+			case "time_sync":
+				net.onTimeOfDaySync.dispatch(data);
 		}
 	}
 }

@@ -94,7 +94,7 @@ class GameRoom extends RoomOf<GameState, Dynamic> {
 			"line_pulled", "round_update", "player_ready", "set_position",
 			"dog_item_drop", "dog_no_fish", "fire_rocket",
 			"throw_potion", "potion_landed", "throw_bait", "bait_landed",
-			"ground_item_pickup", "debug_inventory"
+			"ground_item_pickup", "debug_inventory", "use_gravity_bomb", "set_time"
 		];
 		for (topic in handledMessages) {
 			var capturedTopic = topic;

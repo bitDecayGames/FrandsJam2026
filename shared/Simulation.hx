@@ -12,8 +12,16 @@ import schema.PlayerState;
 class Simulation {
 	public static inline var FIXED_STEP:Float = 1 / 20.0; // must match GameRoom.fixedTimeStep
 
+	// Gravity bomb pull — additive force toward the well, applied in tickPlayer so
+	// client prediction, reconciliation replay, and server all compute the same thing.
+	// Radius sized to roughly match the top-left lake (288x160 px, ~151 tiles) —
+	// full strength inside, zero outside (hard cutoff).
+	public static inline var GRAVITY_PULL_SPEED:Float = 40;
+	public static inline var GRAVITY_RADIUS:Float = 112;
+
 	public var collision:CollisionMap;
 	public var entityRects:Array<{x:Float, y:Float, w:Float, h:Float}> = [];
+	public var gravityWell:Null<{x:Float, y:Float}> = null;
 
 	public function new(collision:CollisionMap) {
 		this.collision = collision;
@@ -26,7 +34,7 @@ class Simulation {
 	/** Indices of entity rects hit during the last tickPlayer call. */
 	public var hitEntityIndices:Array<Int> = [];
 
-	public function tickPlayer(p:PlayerState, inputs:Array<P_Input>, elapsed:Float = 0, blockFlags:Int = 0):Void {
+	public function tickPlayer(p:PlayerState, inputs:Array<P_Input>, elapsed:Float = 0, blockFlags:Int = 0, applyWellForces:Bool = true):Void {
 		hitEntityIndices = [];
 
 		if (inputs == null || inputs.length == 0) {
@@ -45,6 +53,18 @@ class Simulation {
 				vx = inDir.x * p.speed;
 				vy = inDir.y * p.speed;
 				p.facing = dirToFacing(input.dir);
+			}
+		}
+
+		// Gravity bomb suck — additive, so running away just slows the pull.
+		// Collision resolution below still applies (water, bushes, etc).
+		if (applyWellForces && gravityWell != null) {
+			var gdx = gravityWell.x - (p.x + p.width / 2);
+			var gdy = gravityWell.y - (p.y + p.height / 2);
+			var gdist = Math.sqrt(gdx * gdx + gdy * gdy);
+			if (gdist > 4 && gdist < GRAVITY_RADIUS) {
+				vx += (gdx / gdist) * GRAVITY_PULL_SPEED;
+				vy += (gdy / gdist) * GRAVITY_PULL_SPEED;
 			}
 		}
 

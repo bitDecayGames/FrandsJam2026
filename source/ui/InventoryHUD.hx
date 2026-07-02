@@ -71,6 +71,14 @@ class InventoryHUD extends FlxSpriteGroup {
 						slots[i].makeGraphic(16, 16, 0xFFDDAA00);
 						slots[i].scale.set(1, 1);
 						slots[i].offset.set(0, 0);
+					case GravityBomb:
+						slots[i].makeGraphic(16, 16, 0xFF7722CC); // purple placeholder
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
+					case NightVision:
+						slots[i].makeGraphic(16, 16, 0xFF116622); // dark green placeholder
+						slots[i].scale.set(1, 1);
+						slots[i].offset.set(0, 0);
 				}
 			} else {
 				// slots[i].loadGraphic(null);

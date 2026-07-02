@@ -9,6 +9,9 @@ class CloudShadow extends FlxSprite {
 
 	public static var windAngle:Float = 0;
 
+	/** 1 = day (visible), 0 = night (faded out). PlayState eases this toward its target. */
+	public static var visibilityFactor:Float = 1;
+
 	public var cloudId:Int = 0;
 
 	public static function randomizeWind() {
@@ -35,6 +38,9 @@ class CloudShadow extends FlxSprite {
 
 	override public function update(elapsed:Float) {
 		super.update(elapsed);
+
+		// clouds fade away at night and drift back in come morning
+		alpha = SHADOW_ALPHA * visibilityFactor;
 
 		// respawn at upwind edge when past world bounds
 		var bounds = FlxG.worldBounds;

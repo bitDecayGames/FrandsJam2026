@@ -510,7 +510,8 @@ class Player extends FlxSprite {
 
 			var inp:PInput.P_Input = {seq: 0, dir: dirAngle, buttons: 0, elapsed: FlxG.elapsed};
 			var remoteBlockFlags = if (inShallowWater || hotModeActive) CollisionMap.FLAG_SOLID else 0;
-			simulation.tickPlayer(remoteSimState, [inp], FlxG.elapsed, remoteBlockFlags);
+			// applyWellForces=false — the server position we interpolate toward already includes the gravity pull
+			simulation.tickPlayer(remoteSimState, [inp], FlxG.elapsed, remoteBlockFlags, false);
 			lastHitEntityIndices = simulation.hitEntityIndices;
 			setPosition(remoteSimState.x, remoteSimState.y);
 			velocity.set(0, 0);
@@ -736,6 +737,11 @@ class Player extends FlxSprite {
 			GameManager.ME.net.sendMessage("fire_rocket", {dir: dirIdx, knockback: true});
 			// Server applies knockback; camera shake is client-only cosmetic
 			FlxG.camera.shake(0.012, 0.2);
+		}
+
+		// Drop gravity bomb at our feet with V key — server validates and broadcasts
+		if (!frozen && !throwing && castState == IDLE && FlxG.keys.justPressed.V && inventory.has(GravityBomb)) {
+			GameManager.ME.net.sendMessage("use_gravity_bomb", {});
 		}
 
 		// Throw hunger potion with B button (priority over rock, same arc)
@@ -1236,11 +1242,28 @@ class Player extends FlxSprite {
 	}
 	function updateCast(elapsed:Float) {
 		if (!isRemote) {
+			// Gravity bomb suck: can't fish while being dragged — auto reel-in and block new casts
+			if (isGravityAffected()) {
+				switch (castState) {
+					case CHARGING:
+						// cancel the charge, same as releasing with no power
+						powerBarBg.visible = false;
+						powerBarFill.visible = false;
+						castState = IDLE;
+						frozen = false;
+						playMovementAnim(true);
+						GameManager.ME.net.sendMessage("cast_cancel", {});
+					case CASTING | LANDED:
+						catchFish();
+					default:
+						// CAST_ANIM falls through to CASTING next frame and gets reeled there
+				}
+			}
 			switch (castState) {
 				// --- START: Local player handling
 				case IDLE:
 					if (frozen) { /* skip input while frozen (e.g. typing) */ }
-					else if (SimpleController.just_pressed(A)) {
+					else if (SimpleController.just_pressed(A) && !isGravityAffected()) {
 						castState = CHARGING;
 						frozen = true;
 						castDirSuffix = getDirSuffix();
@@ -1400,6 +1423,16 @@ class Player extends FlxSprite {
 
 	public function clearPendingInputs() {
 		pendingInputs = [];
+	}
+
+	/** True while the gravity bomb is actively sucking us in. */
+	public function isGravityAffected():Bool {
+		if (simulation == null || simulation.gravityWell == null) {
+			return false;
+		}
+		var gdx = simulation.gravityWell.x - (x + width / 2);
+		var gdy = simulation.gravityWell.y - (y + height / 2);
+		return gdx * gdx + gdy * gdy < Simulation.GRAVITY_RADIUS * Simulation.GRAVITY_RADIUS;
 	}
 
 	public function isCasting():Bool {

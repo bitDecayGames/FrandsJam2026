@@ -70,6 +70,7 @@ class PlayState extends FlxTransitionableState {
 	var bushByRectIndex = new Map<Int, Bush>(); // entityRect index -> bush sprite
 	var serverDogs = new Map<Int, entities.Dog>(); // dogId -> Dog sprite
 	var powerUpSprite:FlxSprite;
+	var gravityBombSprite:entities.GravityBomb;
 	var rocketSprites = new Map<Int, FlxSprite>();
 	var rocketData = new Map<Int, {x:Float, y:Float, dirX:Float, dirY:Float, speed:Float}>();
 	var rocketEmitters = new Map<Int, flixel.effects.particles.FlxEmitter>();
@@ -120,6 +121,21 @@ class PlayState extends FlxTransitionableState {
 	var timerTotalSec:Float = 0;
 	var timerSynced:Bool = false;
 
+	// UI camera — drawn on top of the game camera, skips the time-of-day filter
+	var uiCamera:flixel.FlxCamera;
+
+	// Time of day — server-synced clock + environment color grade
+	var timeHud:ui.TimeOfDayHUD;
+	var todShader:shaders.TimeOfDayShader;
+	var todHour:Float = 12.0;
+	var todRate:Float = 0.0; // matches GameLogic.TIME_NORMAL_RATE — time only moves via the buttons
+	var todCandleR:Float = 120; // eased candle radius (pepper doubles it smoothly)
+	var remoteGlowR = new Map<String, Float>(); // eased bonfire radius per remote player
+	var todNvFactor:Float = 0; // eased night vision goggle factor (0..1)
+	var todNvTime:Float = 0; // grain animation clock
+	var todNvArmed:Bool = false; // goggles held + full night
+	var todNvDelay:Float = 0; // ~1s of normal night before the goggles "click" on/off
+
 	public function new(round:RoundManager) {
 		this.round = round;
 		super();
@@ -129,6 +145,12 @@ class PlayState extends FlxTransitionableState {
 		super.create();
 
 		FlxG.camera.pixelPerfectRender = true;
+
+		// HUD renders on its own camera so the time-of-day shader doesn't dim it.
+		// Must exist before loadLevel() — inventory/score HUDs are created in there.
+		uiCamera = new flixel.FlxCamera();
+		uiCamera.bgColor = FlxColor.TRANSPARENT;
+		FlxG.cameras.add(uiCamera, false);
 
 		Achievements.onAchieve.add(handleAchieve);
 		EventBus.subscribe(ClickCount, (c) -> {
@@ -170,7 +192,18 @@ class PlayState extends FlxTransitionableState {
 		timerHUD.alignment = FlxTextAlign.CENTER;
 		timerHUD.color = FlxColor.WHITE;
 		timerHUD.scrollFactor.set(0, 0);
+		timerHUD.cameras = [uiCamera];
 		add(timerHUD);
+
+		// Sundial clock + Day/Night fast-forward buttons
+		timeHud = new ui.TimeOfDayHUD();
+		timeHud.onSetTime = (h) -> GameManager.ME.net.sendMessage("set_time", {hour: h});
+		timeHud.cameras = [uiCamera];
+		add(timeHud);
+
+		// Environment tint shader driven by time of day (noon = identity)
+		todShader = new shaders.TimeOfDayShader();
+		FlxG.camera.filters = [new openfl.filters.ShaderFilter(todShader)];
 
 		GameManager.ME.net.sendMessage("round_update", {
 			status: RoundState.STATUS_ACTIVE,
@@ -187,7 +220,7 @@ class PlayState extends FlxTransitionableState {
 
 	#if db
 	function addDebugButtons() {
-		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog", "Rocket", "Potion", "Fish", "Bait"];
+		var labels = ["Rock", "Big Rock", "Pepper", "Waders", "End Round", "Dog", "Rocket", "Potion", "Fish", "Bait", "Gravity", "NVG"];
 		var btnW = 60;
 		var btnH = 16;
 		var margin = 4;
@@ -197,12 +230,14 @@ class PlayState extends FlxTransitionableState {
 			var bg = new FlxSprite(startX, startY + i * (btnH + margin));
 			bg.makeGraphic(btnW, btnH, FlxColor.fromRGB(40, 40, 40, 180));
 			bg.scrollFactor.set(0, 0);
+			bg.cameras = [uiCamera];
 			add(bg);
 			var label = new FlxText(startX, startY + i * (btnH + margin) + 1, btnW, labels[i]);
 			label.size = 8;
 			label.alignment = FlxTextAlign.CENTER;
 			label.color = FlxColor.WHITE;
 			label.scrollFactor.set(0, 0);
+			label.cameras = [uiCamera];
 			add(label);
 		}
 	}
@@ -234,7 +269,7 @@ class PlayState extends FlxTransitionableState {
 		if (mx < startX || mx > startX + btnW) {
 			return;
 		}
-		for (i in 0...10) {
+		for (i in 0...12) {
 			var by = startY + i * (btnH + margin);
 			if (my >= by && my < by + btnH) {
 				switch (i) {
@@ -265,6 +300,12 @@ class PlayState extends FlxTransitionableState {
 					case 9:
 						GameManager.ME.net.sendMessage("debug_inventory",
 							{action: if (player.inventory.has(FishBait)) "remove" else "add", type: "fish_bait"});
+					case 10:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(GravityBomb)) "remove" else "add", type: "gravity_bomb"});
+					case 11:
+						GameManager.ME.net.sendMessage("debug_inventory",
+							{action: if (player.inventory.has(NightVision)) "remove" else "add", type: "night_vision"});
 				}
 				return;
 			}
@@ -319,6 +360,14 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onThrowBait.remove(onThrowBait);
 		GameManager.ME.net.onBaitActive.remove(onBaitActive);
 		GameManager.ME.net.onBaitExpired.remove(onBaitExpired);
+		GameManager.ME.net.onGravityBombActive.remove(onGravityBombActive);
+		GameManager.ME.net.onGravityBombExpired.remove(onGravityBombExpired);
+		GameManager.ME.net.onTimeOfDaySync.remove(onTimeOfDaySync);
+		FlxG.camera.filters = null;
+		if (uiCamera != null) {
+			FlxG.cameras.remove(uiCamera);
+			uiCamera = null;
+		}
 		GameManager.ME.net.onCloudSync.remove(onServerCloudSync);
 		GameManager.ME.net.onGroundFishSpawn.remove(onRemoteGroundFishSpawn);
 		GameManager.ME.net.onGroundFishPickup.remove(onRemoteGroundFishPickup);
@@ -375,6 +424,9 @@ class PlayState extends FlxTransitionableState {
 		GameManager.ME.net.onThrowBait.add(onThrowBait);
 		GameManager.ME.net.onBaitActive.add(onBaitActive);
 		GameManager.ME.net.onBaitExpired.add(onBaitExpired);
+		GameManager.ME.net.onGravityBombActive.add(onGravityBombActive);
+		GameManager.ME.net.onGravityBombExpired.add(onGravityBombExpired);
+		GameManager.ME.net.onTimeOfDaySync.add(onTimeOfDaySync);
 
 		// Fish may have been added to the schema before we subscribed
 		// (server spawns fish on room creation, before clients join PlayState).
@@ -389,6 +441,7 @@ class PlayState extends FlxTransitionableState {
 
 	function onPlayerRemoved(sessionId:String) {
 		trace('PlayState: remote player $sessionId left, removing remote player');
+		remoteGlowR.remove(sessionId);
 		var remote = remotePlayers.get(sessionId);
 		if (remote != null) {
 			remove(remote);
@@ -567,12 +620,14 @@ class PlayState extends FlxTransitionableState {
 		// midGroundGroup.add(shopInterior.tilemap);
 
 		inventoryHUD = new InventoryHUD(player.inventory);
+		inventoryHUD.cameras = [uiCamera];
 		add(inventoryHUD);
 
 		player.inventory.onChange.add(onInventoryChanged);
 		onInventoryChanged();
 
 		scoreHUD = new ScoreHUD();
+		scoreHUD.cameras = [uiCamera];
 		add(scoreHUD);
 
 		for (t in level.camTransitions) {
@@ -1063,6 +1118,55 @@ class PlayState extends FlxTransitionableState {
 		checkDebugButtons();
 		#end
 
+		// Advance the time-of-day clock locally at the server-given rate; syncs correct drift
+		todHour = (todHour + todRate * elapsed) % 24;
+		timeHud.setHour(todHour);
+		todShader.applyHour(todHour);
+
+		// Candle glow bound to the local player — steady, no flicker
+		var lp = FlxPoint.get();
+		player.getScreenPosition(lp);
+		// Night vision goggles — doubles the light radius + green grain overlay.
+		// Whenever the desired state flips (night falls with goggles held, goggles
+		// added/removed, morning comes), hold the current look for ~1s first so it
+		// feels like the player is reaching up to flick them on/off.
+		todNvTime += elapsed;
+		var nvDesired = player.inventory.has(NightVision) && todShader.lightStrength > 0.95;
+		if (nvDesired != todNvArmed) {
+			todNvArmed = nvDesired;
+			todNvDelay = 0.5;
+		}
+		if (todNvDelay > 0) { todNvDelay -= elapsed; }
+		var nvTarget:Float = (todNvArmed && todNvDelay <= 0) || (!todNvArmed && todNvDelay > 0 && todNvFactor > 0.5) ? 1.0 : 0.0;
+		todNvFactor += (nvTarget - todNvFactor) * Math.min(1, elapsed * 4.0);
+		todShader.setNightVision(todNvFactor, todNvTime);
+
+		// Hot pepper turns you into a walking bonfire — ease the radius toward double
+		var candleTarget:Float = (player.hotModeActive ? 240 : 120) * (1 + todNvFactor);
+		todCandleR += (candleTarget - todCandleR) * Math.min(1, elapsed * 4.0);
+		todShader.setLight(lp.x + player.width / 2, lp.y - 4, todCandleR);
+		lp.put();
+
+		// Ease remote bonfire glows in/out so they expand/contract instead of popping
+		for (sessionId => remote in remotePlayers) {
+			var target:Float = (remote != null && remote.alive && remote.hotModeActive) ? 240 : 0;
+			var cur = remoteGlowR.exists(sessionId) ? remoteGlowR.get(sessionId) : 0;
+			remoteGlowR.set(sessionId, cur + (target - cur) * Math.min(1, elapsed * 4.0));
+		}
+
+		// Clouds fade out at night, drift back in come morning
+		var isNightNow = todHour >= 21 || todHour < 6;
+		var cloudTarget:Float = isNightNow ? 0.0 : 1.0;
+		var cf = entities.CloudShadow.visibilityFactor;
+		entities.CloudShadow.visibilityFactor = cf + (cloudTarget - cf) * Math.min(1, elapsed * 0.8);
+
+		// Faint glows over ground items + dogs so players can find them in the dark
+		if (todShader.lightStrength > 0) {
+			collectNightGlows();
+		} else {
+			todShader.setGlows([]);
+		}
+
 		// Hot mode drown is handled server-side in GameLogic.fixedTick()
 		// Server broadcasts "player_drown" when a hot player touches water
 
@@ -1328,6 +1432,13 @@ class PlayState extends FlxTransitionableState {
 				spawnArcItem(bt, startX, startY, landX, landY, () -> {
 					groundItems.push({sprite: bt, item: FishBait});
 				});
+			case "gravity_bomb":
+				var gb = new FlxSprite(startX, startY);
+				gb.makeGraphic(8, 8, 0xFF7722CC);
+				add(gb);
+				spawnArcItem(gb, startX, startY, landX, landY, () -> {
+					groundItems.push({sprite: gb, item: GravityBomb});
+				});
 		}
 	}
 
@@ -1405,6 +1516,111 @@ class PlayState extends FlxTransitionableState {
 		if (sessionId == player.sessionId) {
 			// Inventory update comes from server via inventory_update
 			TODO.sfx("powerup_pickup");
+		}
+	}
+
+	// ── Time of Day ──
+
+	function onTimeOfDaySync(data:Dynamic) {
+		todHour = data.hour;
+		todRate = data.rate;
+	}
+
+	/** Gather screen-space glow spots (items on the ground, dogs) for the night shader. Max 16. */
+	function collectNightGlows() {
+		var flat:Array<Float> = [];
+		var scrollX = FlxG.camera.scroll.x;
+		var scrollY = FlxG.camera.scroll.y;
+
+		function addGlow(wx:Float, wy:Float, radius:Float, strength:Float = 0.6) {
+			if (flat.length >= 16 * 4) { return; }
+			var sx = wx - scrollX;
+			var sy = wy - scrollY;
+			// skip glows well off-screen
+			if (sx < -radius || sx > FlxG.width + radius || sy < -radius || sy > FlxG.height + radius) { return; }
+			flat.push(sx);
+			flat.push(sy);
+			flat.push(radius);
+			flat.push(strength);
+		}
+
+		// Burning trees blaze at full strength — add first so they never get capped out
+		for (bush in bushGroup) {
+			if (bush != null && bush.alive && bush.burning) {
+				addGlow(bush.x + bush.width / 2, bush.y + bush.height / 2, 90, 1.0);
+			}
+		}
+		// Remote players on fire are walking bonfires — eased radius (grows/shrinks with pepper)
+		for (sessionId => remote in remotePlayers) {
+			var r = remoteGlowR.exists(sessionId) ? remoteGlowR.get(sessionId) : 0;
+			if (remote != null && remote.alive && r > 4) {
+				addGlow(remote.x + remote.width / 2, remote.y - 4, r, 1.0);
+			}
+		}
+		// Rockets in flight burn extra bright (strength > 1 widens the fully-lit core)
+		for (rd in rocketData) {
+			addGlow(rd.x, rd.y, 60, 2.0);
+		}
+		for (rock in rockGroup) {
+			if (rock != null && rock.alive && rock.exists) {
+				addGlow(rock.x + rock.width / 2, rock.y + rock.height / 2, 22);
+			}
+		}
+		for (gf in groundFishGroup) {
+			if (gf != null && gf.alive && gf.exists) {
+				addGlow(gf.x + gf.width / 2, gf.y + gf.height / 2, 22);
+			}
+		}
+		for (gItem in groundItems) {
+			if (gItem.sprite != null && gItem.sprite.alive) {
+				addGlow(gItem.sprite.x + gItem.sprite.width / 2, gItem.sprite.y + gItem.sprite.height / 2, 22);
+			}
+		}
+		if (powerUpSprite != null && powerUpSprite.alive) {
+			addGlow(powerUpSprite.x + powerUpSprite.width / 2, powerUpSprite.y + powerUpSprite.height / 2, 24);
+		}
+		if (wadersPickup != null && wadersPickup.alive && wadersPickup.visible) {
+			addGlow(wadersPickup.x + wadersPickup.width / 2, wadersPickup.y + wadersPickup.height / 2, 22);
+		}
+		if (pepperPickup != null && pepperPickup.alive && pepperPickup.visible) {
+			addGlow(pepperPickup.x + pepperPickup.width / 2, pepperPickup.y + pepperPickup.height / 2, 22);
+		}
+		for (dog in serverDogs) {
+			if (dog != null && dog.alive) {
+				addGlow(dog.x, dog.y, 28); // dog x,y is its center
+			}
+		}
+
+		todShader.setGlows(flat);
+	}
+
+	// ── Gravity Bomb ──
+
+	function onGravityBombActive(data:Dynamic) {
+		var bx:Float = data.x;
+		var by:Float = data.y;
+		// The well lives on the shared Simulation, so local prediction + reconciliation
+		// replay apply the same additive pull the server does.
+		if (simulation != null) {
+			simulation.gravityWell = {x: bx, y: by};
+		}
+		if (gravityBombSprite != null) {
+			ySortGroup.remove(gravityBombSprite);
+			gravityBombSprite.destroy();
+		}
+		gravityBombSprite = new entities.GravityBomb(bx, by, midGroundGroup);
+		ySortGroup.add(gravityBombSprite);
+		TODO.sfx("gravity_bomb");
+	}
+
+	function onGravityBombExpired(data:Dynamic) {
+		if (simulation != null) {
+			simulation.gravityWell = null;
+		}
+		if (gravityBombSprite != null) {
+			ySortGroup.remove(gravityBombSprite);
+			gravityBombSprite.destroy();
+			gravityBombSprite = null;
 		}
 	}
 

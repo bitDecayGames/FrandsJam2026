@@ -117,6 +117,8 @@ class Inventory {
 			case Rocket: {type: "rocket"};
 			case HungerPotion: {type: "hunger_potion"};
 			case FishBait: {type: "fish_bait"};
+			case GravityBomb: {type: "gravity_bomb"};
+			case NightVision: {type: "night_vision"};
 		};
 	}
 
@@ -129,6 +131,8 @@ class Inventory {
 		if (t == "rocket") { return Rocket; }
 		if (t == "hunger_potion") { return HungerPotion; }
 		if (t == "fish_bait") { return FishBait; }
+		if (t == "gravity_bomb") { return GravityBomb; }
+		if (t == "night_vision") { return NightVision; }
 		return null;
 	}
 
@@ -141,6 +145,8 @@ class Inventory {
 			case [Rocket, Rocket]: true;
 			case [HungerPotion, HungerPotion]: true;
 			case [FishBait, FishBait]: true;
+			case [GravityBomb, GravityBomb]: true;
+			case [NightVision, NightVision]: true;
 			default: false;
 		};
 	}
@@ -154,4 +160,6 @@ enum InventoryItem {
 	Rocket;
 	HungerPotion;
 	FishBait;
+	GravityBomb;
+	NightVision;
 }
