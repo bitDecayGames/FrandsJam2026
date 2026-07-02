@@ -17,20 +17,10 @@ class FishTypeData {
 }
 
 class FishTypes {
-	// Fish type indices correspond to sprite frame indices (0-4) in fish.png
+	// Fish type indices correspond to sprite frame indices in fish.png.
+	// Data lives in shared/FishValue.hx so the server can price fish too.
 	public static var TYPES:Array<FishTypeData> = [
-		new FishTypeData("Minnow", 5, 10, 25),
-		new FishTypeData("Goldfish", 10, 20, 50),
-		new FishTypeData("Anchovy", 15, 25, 60),
-		new FishTypeData("No Name", 18, 8, 30),
-		new FishTypeData("Trout", 20, 30, 45),
-		new FishTypeData("Stone Fish", 25, 30, 45),
-		new FishTypeData("Zebra Fish", 30, 30, 45),
-		new FishTypeData("Sword Fish", 35, 30, 45),
-		new FishTypeData("Bass", 40, 40, 60),
-		new FishTypeData("Golden Bass", 50, 50, 80),
-		new FishTypeData("Eel", 75, 20, 120),
-		new FishTypeData("Boot", -30, 40, 50),
+		for (d in FishValue.TYPES) new FishTypeData(d.name, d.basePrice, d.minLength, d.maxLength)
 	];
 
 	/** Generate a random length for the given fish type index. */
@@ -42,19 +32,8 @@ class FishTypes {
 		return FlxG.random.int(data.minLength, data.maxLength);
 	}
 
-	/** Calculate the sell value of a fish: baseAmount * ((length - min) / (max - min)) + baseAmount * 0.5 */
+	/** Calculate the sell value of a fish — delegates to the shared formula. */
 	public static function calculateValue(typeIndex:Int, lengthCm:Int):Int {
-		if (typeIndex < 0 || typeIndex >= TYPES.length) {
-			return 10;
-		}
-		var data = TYPES[typeIndex];
-		var range = data.maxLength - data.minLength;
-		var lengthFactor:Float = if (range > 0) {
-			(lengthCm - data.minLength) / range;
-		} else {
-			0.5;
-		};
-		var value:Float = data.basePrice * lengthFactor + data.basePrice * 0.5;
-		return Math.round(value);
+		return FishValue.calculateValue(typeIndex, lengthCm);
 	}
 }

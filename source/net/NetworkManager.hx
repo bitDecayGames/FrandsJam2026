@@ -104,6 +104,7 @@ class NetworkManager {
 	public var onGravityBombActive = new FlxTypedSignal<Dynamic->Void>(); // {x, y, duration, sessionId}
 	public var onGravityBombExpired = new FlxTypedSignal<Dynamic->Void>();
 	public var onTimeOfDaySync = new FlxTypedSignal<Dynamic->Void>(); // {hour, rate}
+	public var onRoundSummary = new FlxTypedSignal<Dynamic->Void>(); // {players: [{sessionId, name, skinIndex, score, fish}]}
 
 	public static inline var roomName:String = "game_room";
 
@@ -454,6 +455,7 @@ class NetworkManager {
 			onMsg("gravity_bomb_active", (message:Dynamic) -> { onGravityBombActive.dispatch(message); });
 			onMsg("gravity_bomb_expired", (message:Dynamic) -> { onGravityBombExpired.dispatch(message); });
 			onMsg("time_sync", (message:Dynamic) -> { onTimeOfDaySync.dispatch(message); });
+			onMsg("round_summary", (message:Dynamic) -> { onRoundSummary.dispatch(message); });
 			}); // end runInMainThread
 		});
 	}

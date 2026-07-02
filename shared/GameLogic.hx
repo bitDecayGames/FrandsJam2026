@@ -657,6 +657,7 @@ class GameLogic {
 					broadcast("round_time_up", {});
 					gameplayStarted = false;
 					if (round.status == RoundState.STATUS_ACTIVE) {
+						broadcastRoundSummary();
 						var newData = new RoundState();
 						newData.status = RoundState.STATUS_POST_ROUND;
 						newData.currentRound = round.currentRound;
@@ -681,6 +682,10 @@ class GameLogic {
 				var newTotal = data.totalRounds != null ? Std.int(data.totalRounds) : round.totalRounds;
 				if (newStatus == round.status && newRound == round.currentRound && newTotal == round.totalRounds) {
 					return;
+				}
+				// Round just ended via a client-driven transition — sell fish + send summary
+				if (newStatus == RoundState.STATUS_POST_ROUND && round.status == RoundState.STATUS_ACTIVE) {
+					broadcastRoundSummary();
 				}
 				var newData = new RoundState();
 				newData.status = newStatus;
@@ -881,6 +886,7 @@ class GameLogic {
 				broadcast("round_time_up", {});
 				gameplayStarted = false;
 				if (round.status == RoundState.STATUS_ACTIVE) {
+					broadcastRoundSummary();
 					var newData = new RoundState();
 					newData.status = RoundState.STATUS_POST_ROUND;
 					newData.currentRound = round.currentRound;
@@ -1908,6 +1914,40 @@ class GameLogic {
 	}
 
 	// ── Server Inventory ──
+
+	/**
+	 * Sell every player's unsold fish and broadcast the post-round summary.
+	 * Payload per player: {sessionId, name, skinIndex, score (PRE-sale), fish: [{fishType, lengthCm, value}]}.
+	 * The payout is applied to PlayerState.score here (server-authoritative) —
+	 * clients only animate the conveyor/counting from this payload.
+	**/
+	function broadcastRoundSummary() {
+		var entries:Array<Dynamic> = [];
+		for (id => p in players) {
+			var fishList:Array<Dynamic> = [];
+			var total = 0;
+			var inv = inventories.get(id);
+			if (inv != null) {
+				var i = 0;
+				while (i < inv.length) {
+					if (inv[i].type == "fish") {
+						var ft = inv[i].fishType != null ? inv[i].fishType : 0;
+						var len = inv[i].lengthCm != null ? inv[i].lengthCm : 20;
+						var v = FishValue.calculateValue(ft, len);
+						fishList.push({fishType: ft, lengthCm: len, value: v});
+						total += v;
+						inv.splice(i, 1);
+					} else {
+						i++;
+					}
+				}
+				sendInventoryUpdate(id);
+			}
+			entries.push({sessionId: id, name: p.name, skinIndex: p.skinIndex, score: p.score, fish: fishList});
+			p.score += total;
+		}
+		broadcast("round_summary", {players: entries});
+	}
 
 	function serverAddItem(clientId:String, item:{type:String, ?fishType:Int, ?lengthCm:Int, ?big:Bool, ?debug:Bool}):Bool {
 		var inv = inventories.get(clientId);

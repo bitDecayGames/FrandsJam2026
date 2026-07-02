@@ -14,8 +14,8 @@ import managers.FishManager.FishDb;
 import rounds.Round;
 import states.VictoryState;
 import states.PlayState;
-import states.PostRoundState;
 import states.PreRoundState;
+import states.RoundSummaryState;
 import states.LobbyState;
 import flixel.FlxG;
 
@@ -59,6 +59,9 @@ class GameManager {
 	/** Fires whenever any player sells a fish (local or remote): sessionId, entry */
 	public var onFishSoldLocal = new FlxTypedSignal<String->SoldFishEntry->Void>();
 
+	/** Latest round_summary payload from the server. RoundSummaryState consumes (and clears) it. */
+	public var lastRoundSummary:Dynamic = null;
+
 	public function new() {
 		ME = this;
 		fish = new FishManager(new FishDb());
@@ -74,6 +77,7 @@ class GameManager {
 		net.onScoreChanged.add(onScoreChanged);
 		net.onFishSold.add(onFishSold);
 		net.onWormKilled.add(recordWormKill);
+		net.onRoundSummary.add((data) -> lastRoundSummary = data);
 
 		net.onKicked.add(handleKicked);
 	}
@@ -258,7 +262,7 @@ class GameManager {
 
 	private function onRoundDone() {
 		roundStatus = RoundState.STATUS_POST_ROUND;
-		FlxG.switchState(() -> new PostRoundState());
+		FlxG.switchState(() -> new RoundSummaryState());
 	}
 
 	private function playersReady() {
@@ -385,7 +389,7 @@ class GameManager {
 			case RoundState.STATUS_ACTIVE:
 				FlxG.switchState(() -> new PlayState(round));
 			case RoundState.STATUS_POST_ROUND:
-				FlxG.switchState(() -> new PostRoundState());
+				FlxG.switchState(() -> new RoundSummaryState());
 			case RoundState.STATUS_END_GAME:
 				endGame();
 			case RoundState.STATUS_INACTIVE:

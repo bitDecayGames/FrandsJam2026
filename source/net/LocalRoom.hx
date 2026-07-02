@@ -178,6 +178,8 @@ class LocalRoom {
 				net.onGravityBombExpired.dispatch(data);
 			case "time_sync":
 				net.onTimeOfDaySync.dispatch(data);
+			case "round_summary":
+				net.onRoundSummary.dispatch(data);
 		}
 	}
 }
