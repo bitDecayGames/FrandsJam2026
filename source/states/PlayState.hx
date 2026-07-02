@@ -156,7 +156,8 @@ class PlayState extends FlxTransitionableState {
 		add(transitions);
 
 		setupNetwork();
-		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
+		var host = GameManager.soloMode ? "local" : Configure.getServerURL();
+		GameManager.ME.net.connect(host, Configure.getServerPort());
 
 		loadLevel("Level_0");
 

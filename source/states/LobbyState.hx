@@ -101,8 +101,9 @@ class LobbyState extends FlxTransitionableState {
 		collisionMap = CollisionMap.fromLevel(level.raw, hitboxJson);
 		simulation = new Simulation(collisionMap);
 
-		// Connect
-		GameManager.ME.net.connect(Configure.getServerURL(), Configure.getServerPort());
+		// Connect — single player runs an embedded server (LocalRoom), multiplayer hits the configured host
+		var host = GameManager.soloMode ? "local" : Configure.getServerURL();
+		GameManager.ME.net.connect(host, Configure.getServerPort());
 
 		// Random walkable spawn
 		var spawn = pickRandomSpawn();

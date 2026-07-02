@@ -28,6 +28,10 @@ typedef SoldFishEntry = {
 class GameManager {
 	public static var ME:GameManager;
 
+	// When true, the player runs their own embedded server (LocalRoom) instead of
+	// connecting to a remote host. Set from the main menu's Single/Multiplayer choice.
+	public static var soloMode:Bool = false;
+
 	public var fish:FishManager;
 	public var net:NetworkManager;
 
